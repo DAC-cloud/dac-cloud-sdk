@@ -1,0 +1,19 @@
+{
+  "name": "@dac-cloud/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "dac": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@dac-cloud/core": "0.1.0",
+    "@dac-cloud/manifests": "0.1.0",
+    "viem": "^2.39.0"
+  }
+}
