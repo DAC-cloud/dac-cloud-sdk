@@ -7,10 +7,16 @@ export const dacFactoryAbi = parseAbi([
 ]);
 
 export const dacCellAbi = parseAbi([
+  "event DACProposalCreated(uint256 indexed id, address indexed prop, bytes4 indexed typ, address target, bytes32 data1, bytes data2)",
+  "event CapitalCallCreated(uint256 indexed id, address indexed recipient, bytes32 indexed callHash, address treasuryToken, uint256 tokenAmount, uint256 cashAmount, uint256 nonce)",
   "function getMainToken() view returns (address)",
   "function getAgentToken() view returns (address)",
   "function getDealManager() view returns (address)",
+  "function getVotingConfig() view returns ((uint256 quorumPercent, uint256 blockingPercent, uint256 highQuorumPercent, uint256 duration, uint256 qualification))",
+  "function depositTreasury(address token, uint256 amount)",
+  "function recoverTreasury(address token)",
   "function createManagementProposal((bytes4 typ,address target,bytes32 i,bytes data) params) returns (uint256 id)",
+  "function fulfillCapitalCall((address treasuryToken, uint256 nonce, address tokenRecipient, uint256 tokenAmount, uint256 cashAmount) call) returns (bool)",
   "function executeDACProposal(uint256 id)",
   "function getProposalVoting(uint256 proposalId) view returns (address)"
 ]);
@@ -20,4 +26,20 @@ export const dealManagerAbi = parseAbi([
   "function createDealProposal((bytes4 dealKind,string name,string description,string linkHash,address moduleFactory,address governanceFactory,address dealTarget,address proposer,bool vetoEnabled,address fundingToken,uint256 fundingAmount,uint256 rewardsLimit,uint256 approveDeadline,uint256 dealDeadline,bytes dealConfig,bytes4 evaluatorSelector,bytes evaluatorConfig) params) returns (uint256 id, address dealCell, address dealAddr, address evaluatorAddr)",
   "function deals(uint256 id) view returns (address)",
   "function isRecoverable(uint256 id) view returns (bool)"
+]);
+
+export const votingProposalAbi = parseAbi([
+  "function vote(bool support)",
+  "function isResolved() returns (bool)",
+  "function outcome() returns (bool)"
+]);
+
+export const erc20VotesAbi = parseAbi([
+  "function delegate(address delegatee) returns (uint256)",
+  "function getVotes(address account) view returns (uint256)"
+]);
+
+export const erc20Abi = parseAbi([
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)"
 ]);

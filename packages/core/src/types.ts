@@ -20,6 +20,22 @@ export interface ProposalParams {
   data: Hex;
 }
 
+export interface CapitalCall {
+  treasuryToken: Address;
+  nonce: bigint;
+  tokenRecipient: Address;
+  tokenAmount: bigint;
+  cashAmount: bigint;
+}
+
+export interface VotingConfig {
+  quorumPercent: bigint;
+  blockingPercent: bigint;
+  highQuorumPercent: bigint;
+  duration: bigint;
+  qualification: bigint;
+}
+
 export interface DealParams {
   dealKind: Hex;
   name: string;
