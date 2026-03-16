@@ -1,6 +1,16 @@
 import {encodeAbiParameters, numberToHex, type Address, type Hex} from "viem";
 import {DAC_PROPOSAL_TYPE} from "./selectors";
 import type {ProposalParams} from "./types";
+import type {TreasurySpendAllowance} from "./modules/core/types";
+import {
+  buildTreasuryApproveAgentSpendProposal as buildTreasuryApproveAgentSpendProposalModule,
+  buildTreasuryAssignClaimerProposal as buildTreasuryAssignClaimerProposalModule,
+  buildTreasuryDelegateVoteRightsProposal as buildTreasuryDelegateVoteRightsProposalModule,
+  buildTreasuryDirectSpendProposal as buildTreasuryDirectSpendProposalModule,
+  buildTreasuryPermit2SpendProposal as buildTreasuryPermit2SpendProposalModule,
+  buildTreasuryReturnCapitalProposal as buildTreasuryReturnCapitalProposalModule,
+  buildTreasuryRevokeAgentProposal as buildTreasuryRevokeAgentProposalModule,
+} from "./modules/core/proposals";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
 
@@ -71,4 +81,61 @@ export function buildCapitalCallProposal(
       [treasuryToken, cashAmount],
     ),
   };
+}
+
+export function buildTreasuryDirectSpendProposal(
+  token: Address,
+  destination: Address,
+  amount: bigint,
+): ProposalParams {
+  return buildTreasuryDirectSpendProposalModule(token, destination, amount);
+}
+
+export function buildTreasuryPermit2SpendProposal(
+  token: Address,
+  spender: Address,
+  amount: bigint,
+  expiration: bigint,
+): ProposalParams {
+  return buildTreasuryPermit2SpendProposalModule(token, spender, amount, expiration);
+}
+
+export function buildTreasuryReturnCapitalProposal(
+  token: Address,
+  amount: bigint,
+): ProposalParams {
+  return buildTreasuryReturnCapitalProposalModule(token, amount);
+}
+
+export function buildTreasuryApproveAgentSpendProposal(
+  token: Address,
+  agent: Address,
+  destination: Address,
+  allowance: TreasurySpendAllowance,
+): ProposalParams {
+  return buildTreasuryApproveAgentSpendProposalModule(token, agent, destination, allowance);
+}
+
+export function buildTreasuryAssignClaimerProposal(
+  agent: Address,
+  token: Address,
+  counterparty: Address,
+  amount: bigint,
+): ProposalParams {
+  return buildTreasuryAssignClaimerProposalModule(agent, token, counterparty, amount);
+}
+
+export function buildTreasuryRevokeAgentProposal(
+  token: Address,
+  agent: Address,
+  counterparty: Address,
+): ProposalParams {
+  return buildTreasuryRevokeAgentProposalModule(token, agent, counterparty);
+}
+
+export function buildTreasuryDelegateVoteRightsProposal(
+  token: Address,
+  delegatee: Address,
+): ProposalParams {
+  return buildTreasuryDelegateVoteRightsProposalModule(token, delegatee);
 }

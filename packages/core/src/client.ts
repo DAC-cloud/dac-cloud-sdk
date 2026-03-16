@@ -1,7 +1,7 @@
 import {createPublicClient, createWalletClient, decodeEventLog, http, type Address, type Chain, type Hex, type PrivateKeyAccount, type PublicClient, type WalletClient} from "viem";
 import {privateKeyToAccount} from "viem/accounts";
 import type {ProtocolManifest} from "@dac-cloud/manifests";
-import {dacFactoryAbi, dacCellAbi, dealManagerAbi, erc20Abi, erc20VotesAbi, votingProposalAbi} from "./abi";
+import {agentTokenAbi, dacFactoryAbi, dacCellAbi, dealAbi, dealCellAbi, dealManagerAbi, erc20Abi, erc20VotesAbi, votingProposalAbi} from "./abi";
 import type {CapitalCall, DACConfig, DealParams, ProposalParams, VotingConfig} from "./types";
 
 export interface DacCoreOptions {
@@ -27,12 +27,19 @@ export interface DacCoreClient {
   getMainToken(dacCell: Address): Promise<Address>;
   getAgentToken(dacCell: Address): Promise<Address>;
   createDealProposal(args: {dealManager: Address; params: DealParams}): Promise<Hex>;
+  createDealProposalDetailed(args: {dealManager: Address; params: DealParams}): Promise<{txHash: Hex; dealId?: bigint; proposalId?: bigint; dealCell?: Address; dealAddress?: Address; evaluatorAddress?: Address}>;
   createDacManagementProposal(args: {dacCell: Address; params: ProposalParams}): Promise<{txHash: Hex; proposalId?: bigint; proposalAddress?: Address}>;
   getDacProposalVotingAddress(args: {dacCell: Address; proposalId: bigint}): Promise<Address>;
   getDacVotingConfig(args: {dacCell: Address}): Promise<VotingConfig>;
   voteProposal(args: {proposalAddress: Address; support: boolean}): Promise<Hex>;
   checkProposalOutcome(args: {proposalAddress: Address}): Promise<{resolved: boolean; outcome: boolean}>;
   executeDacProposal(args: {dacCell: Address; proposalId: bigint}): Promise<Hex>;
+  stakeAgentToDeal(args: {agentToken: Address; dealCell: Address; amount: bigint}): Promise<Hex>;
+  getStakeToken(args: {dealCell: Address}): Promise<Address>;
+  createDealManagementProposal(args: {dealAddress: Address; params: ProposalParams}): Promise<{txHash: Hex; proposalId?: bigint; proposalAddress?: Address}>;
+  getDealProposalVotingAddress(args: {dealAddress: Address; proposalId: bigint}): Promise<Address>;
+  executeDealProposal(args: {dealAddress: Address; proposalId: bigint}): Promise<Hex>;
+  executeDealProposalDetailed(args: {dealAddress: Address; proposalId: bigint}): Promise<{txHash: Hex; dacProposalId?: bigint; trancheId?: bigint}>;
   fulfillCapitalCall(args: {dacCell: Address; call: CapitalCall}): Promise<Hex>;
   depositTreasury(args: {dacCell: Address; token: Address; amount: bigint}): Promise<Hex>;
   recoverTreasury(args: {dacCell: Address; token: Address}): Promise<Hex>;
@@ -143,6 +150,47 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       });
     },
 
+    async createDealProposalDetailed({dealManager, params}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for createDealProposalDetailed");
+      }
+
+      const txHash = await walletClient.writeContract({
+        address: dealManager,
+        abi: dealManagerAbi,
+        functionName: "createDealProposal",
+        args: [params],
+        account: walletClient.account,
+      });
+
+      const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
+      let dealId: bigint | undefined;
+      let proposalId: bigint | undefined;
+      let dealCell: Address | undefined;
+      let dealAddress: Address | undefined;
+
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: dealManagerAbi,
+            data: log.data,
+            topics: log.topics,
+          });
+          if (decoded.eventName === "DealCreated") {
+            dealId = decoded.args.id;
+            proposalId = decoded.args.proposalId;
+            dealCell = decoded.args.cell;
+            dealAddress = decoded.args.deal;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      return {txHash, dealId, proposalId, dealCell, dealAddress};
+    },
+
     async createDacManagementProposal({dacCell, params}) {
       if (!walletClient || !walletClient.account) {
         throw new Error("Wallet client with account is required for createDacManagementProposal");
@@ -249,6 +297,123 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         args: [proposalId],
         account: walletClient.account,
       });
+    },
+
+    async stakeAgentToDeal({agentToken, dealCell, amount}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for stakeAgentToDeal");
+      }
+
+      return walletClient.writeContract({
+        address: agentToken,
+        abi: agentTokenAbi,
+        functionName: "stakeToDeal",
+        args: [dealCell, amount],
+        account: walletClient.account,
+      });
+    },
+
+    async getStakeToken({dealCell}) {
+      return publicClient.readContract({
+        address: dealCell,
+        abi: dealCellAbi,
+        functionName: "stakeToken",
+      });
+    },
+
+    async createDealManagementProposal({dealAddress, params}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for createDealManagementProposal");
+      }
+
+      const txHash = await walletClient.writeContract({
+        address: dealAddress,
+        abi: dealAbi,
+        functionName: "createStakedAgentProposal",
+        args: [params],
+        account: walletClient.account,
+      });
+
+      const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
+      let proposalId: bigint | undefined;
+      let proposalAddress: Address | undefined;
+
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: dealAbi,
+            data: log.data,
+            topics: log.topics,
+          });
+          if (decoded.eventName === "DealManagementProposalCreated") {
+            proposalId = decoded.args.id;
+            proposalAddress = decoded.args.prop;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      return {txHash, proposalId, proposalAddress};
+    },
+
+    async getDealProposalVotingAddress({dealAddress, proposalId}) {
+      return publicClient.readContract({
+        address: dealAddress,
+        abi: dealAbi,
+        functionName: "getProposal",
+        args: [proposalId],
+      });
+    },
+
+    async executeDealProposal({dealAddress, proposalId}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for executeDealProposal");
+      }
+
+      return walletClient.writeContract({
+        address: dealAddress,
+        abi: dealAbi,
+        functionName: "executeStakedAgentProposal",
+        args: [proposalId],
+        account: walletClient.account,
+      });
+    },
+
+    async executeDealProposalDetailed({dealAddress, proposalId}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for executeDealProposalDetailed");
+      }
+      const txHash = await walletClient.writeContract({
+        address: dealAddress,
+        abi: dealAbi,
+        functionName: "executeStakedAgentProposal",
+        args: [proposalId],
+        account: walletClient.account,
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
+      let dacProposalId: bigint | undefined;
+      let trancheId: bigint | undefined;
+
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: dealManagerAbi,
+            data: log.data,
+            topics: log.topics,
+          });
+          if (decoded.eventName === "TrancheCreated") {
+            dacProposalId = decoded.args.proposalId;
+            trancheId = decoded.args.trancheId;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      return {txHash, dacProposalId, trancheId};
     },
 
     async fulfillCapitalCall({dacCell, call}) {

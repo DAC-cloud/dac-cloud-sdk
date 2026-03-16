@@ -3,6 +3,13 @@ import {randomBytes} from "node:crypto";
 import {resolve} from "node:path";
 import {
   accountFromPrivateKey,
+  buildTreasuryApproveAgentSpendProposal,
+  buildTreasuryAssignClaimerProposal,
+  buildTreasuryDelegateVoteRightsProposal,
+  buildTreasuryDirectSpendProposal,
+  buildTreasuryPermit2SpendProposal,
+  buildTreasuryReturnCapitalProposal,
+  buildTreasuryRevokeAgentProposal,
   buildBurnMainTokensReserveProposal,
   buildCapitalCallProposal,
   buildDelegateVoteRightsProposal,
@@ -10,12 +17,17 @@ import {
   buildMintMainTokensReserveProposal,
   buildRevokeAgentTokensProposal,
   createDacCoreClient,
+  coreModule,
   type CapitalCall,
   type DACConfig,
+  formatViemError,
   type ProposalParams,
+  CORE_DEAL_KIND,
+  CORE_EVALUATOR_KIND,
+  DEAL_PROPOSAL_TYPE,
 } from "@dac-cloud/core";
 import {loadProtocolManifest, tryLoadBasicDacSeed} from "@dac-cloud/manifests";
-import {defineChain, type Address, type Hex} from "viem";
+import {defineChain, encodeAbiParameters, numberToHex, type Address, type Hex} from "viem";
 
 const DEFAULT_ANVIL_PK_0 =
   "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as Hex;
@@ -113,6 +125,19 @@ function usage() {
       "  dac capital-call-fulfill --dac <dacCellAddress> --treasury-token <address> --recipient <address> --token-amount <uint256> --cash-amount <uint256> --nonce <uint256>",
       "  dac recover-treasury --dac <dacCellAddress> --token <address>",
       "  dac deposit-treasury --dac <dacCellAddress> --token <address> --amount <uint256>",
+      "  dac create-treasury-deal --dac <dacCellAddress> --funding-token <address> --funding-amount <uint256>",
+      "  dac dac-proposal-vote-execute --dac <dacCellAddress> --proposal-id <uint256> [--support true]",
+      "  dac stake-agent-to-deal --dac <dacCellAddress> --deal-cell <address> --amount <uint256>",
+      "  dac delegate-stake --deal-cell <address> [--delegatee <address>]",
+      "  dac request-tranche --deal <dealAddress> --token <address> --amount <uint256>",
+      "  dac approve-tranche --dac <dacCellAddress> --proposal-id <uint256>",
+      "  dac treasury-direct-spend --deal <dealAddress> --token <address> --destination <address> --amount <uint256>",
+      "  dac treasury-permit2-spend --deal <dealAddress> --token <address> --spender <address> --amount <uint256> --expiration <uint48>",
+      "  dac treasury-return-capital --deal <dealAddress> --token <address> --amount <uint256>",
+      "  dac treasury-approve-agent-spend --deal <dealAddress> --token <address> --agent <address> --destination <address> --total-amount <uint160> --single-tx-amount <uint160> --clock-limit <uint256> --duration <uint256>",
+      "  dac treasury-assign-claimer --deal <dealAddress> --agent <address> --token <address> --counterparty <address> --amount <uint160>",
+      "  dac treasury-revoke-agent --deal <dealAddress> --token <address> --agent <address> --counterparty <address>",
+      "  dac treasury-delegate-vote-rights --deal <dealAddress> --token <address> --delegatee <address>",
       "",
       "Important flags:",
       "  --contracts-root /path/to/dac-cloud-contracts",
@@ -124,8 +149,9 @@ function usage() {
       "  --auto-vote true|false (default true)",
       "  --auto-execute true|false (default true)",
       "  --support true|false (default true)",
+      "  --stake-token 0x... (optional, used for auto-delegate in deal-level proposals)",
       "  --pre-vote-advance-seconds N (default 1)",
-      "  --advance-seconds N (if omitted, auto-uses votingDuration+1)",
+      "  --advance-seconds N (optional; command-specific fallback when omitted)",
       "",
     ].join("\n"),
   );
@@ -186,6 +212,68 @@ async function runDacProposalLifecycle(input: {
     account,
     core,
     mainToken,
+    delegateTx,
+    proposalTx: created.txHash,
+    proposalId,
+    proposalAddress,
+    executeTx,
+  };
+}
+
+async function runDealProposalLifecycle(input: {
+  args: Record<string, string>;
+  deal: Address;
+  params: ProposalParams;
+}) {
+  const {args, deal, params} = input;
+  const {account, core, rpcUrl} = await makeCoreFromArgs(args);
+
+  const autoDelegate = toBoolArg(args["auto-delegate"], true);
+  const autoVote = toBoolArg(args["auto-vote"], true);
+  const autoExecute = toBoolArg(args["auto-execute"], true);
+  const support = toBoolArg(args.support, true);
+  const preVoteAdvanceSeconds = Number(args["pre-vote-advance-seconds"] ?? "1");
+  const explicitAdvanceSeconds = args["advance-seconds"] ? Number(args["advance-seconds"]) : undefined;
+
+  const stakeToken = args["stake-token"] as Address | undefined;
+  let delegateTx: Hex | undefined;
+  if (autoDelegate && stakeToken) {
+    delegateTx = await core.delegateVotes({token: stakeToken, delegatee: account.address});
+  }
+
+  const created = await core.createDealManagementProposal({dealAddress: deal, params});
+  const proposalId = created.proposalId;
+  const proposalAddress = created.proposalAddress
+    ?? (proposalId !== undefined ? await core.getDealProposalVotingAddress({dealAddress: deal, proposalId}) : undefined);
+
+  if (proposalAddress && autoVote) {
+    if (preVoteAdvanceSeconds > 0) {
+      await advanceTime(rpcUrl, preVoteAdvanceSeconds);
+    }
+    await core.voteProposal({proposalAddress, support});
+  }
+
+  let executeTx: Hex | undefined;
+  if (proposalAddress && autoExecute && proposalId !== undefined) {
+    let status = await core.checkProposalOutcome({proposalAddress});
+    if (!status.resolved) {
+      const advanceSeconds = explicitAdvanceSeconds ?? 24 * 60 * 60;
+      await advanceTime(rpcUrl, advanceSeconds);
+      status = await core.checkProposalOutcome({proposalAddress});
+    }
+
+    if (status.resolved && status.outcome) {
+      executeTx = await core.executeDealProposal({dealAddress: deal, proposalId});
+    } else if (!status.resolved) {
+      throw new Error("Deal proposal is not resolved yet.");
+    } else {
+      throw new Error("Deal proposal resolved with negative outcome.");
+    }
+  }
+
+  return {
+    account,
+    stakeToken,
     delegateTx,
     proposalTx: created.txHash,
     proposalId,
@@ -551,6 +639,513 @@ async function depositTreasury(args: Record<string, string>) {
   );
 }
 
+function bytes32Uint(value: bigint): Hex {
+  return numberToHex(value, {size: 32});
+}
+
+async function createTreasuryDeal(args: Record<string, string>) {
+  const {account, core, protocol, rpcUrl} = await makeCoreFromArgs(args);
+  const dac = args.dac as Address | undefined;
+  const fundingToken = args["funding-token"] as Address | undefined;
+  const fundingAmount = args["funding-amount"] ? BigInt(args["funding-amount"]) : undefined;
+  if (!dac || !fundingToken || fundingAmount === undefined) {
+    throw new Error("--dac, --funding-token and --funding-amount are required");
+  }
+
+  const dealManager = await core.getDealManager(dac);
+  const nowSec = (await core.publicClient.getBlock()).timestamp;
+  const approveDeadline = args["approve-deadline"] ? BigInt(args["approve-deadline"]) : nowSec + 7n * 24n * 60n * 60n;
+  const dealDeadline = args["deal-deadline"] ? BigInt(args["deal-deadline"]) : nowSec + 30n * 24n * 60n * 60n;
+  const rewardsLimit = args["rewards-limit"] ? BigInt(args["rewards-limit"]) : 500_000_000n;
+  const expectedReturn = args["expected-return"] ? BigInt(args["expected-return"]) : fundingAmount;
+  const evaluatorDeadline = args["evaluator-deadline"] ? BigInt(args["evaluator-deadline"]) : nowSec + 24n * 60n * 60n;
+
+  const evaluatorConfig = coreModule.buildMilestoneEvaluatorConfig({
+    rewardShare: 1_000_000_000_000_000_000n,
+    milestones: [
+      {
+        milestoneType: 0,
+        token: fundingToken,
+        oracle: "0x0000000000000000000000000000000000000000",
+        valuationMode: 0,
+        fundingToken: "0x0000000000000000000000000000000000000000",
+        expectedReturn,
+        timestamp: evaluatorDeadline,
+        rewardPercentage: 1_000_000_000_000_000_000n,
+        rewardCurve: [1_000_000_000_000_000_000n],
+        penaltyCurve: [1_000_000_000_000_000_000n],
+        minPercentGrace: 0n,
+        extension: 0n,
+      },
+    ],
+  });
+
+  const dealParams = {
+    dealKind: CORE_DEAL_KIND.PERMIT2_TREASURY,
+    name: args.name ?? "SDK Treasury Deal",
+    description: args.description ?? "SDK-generated treasury deal",
+    linkHash: args["link-hash"] ?? "sdk://treasury-deal",
+    moduleFactory: protocol.coreModuleFactory as Address,
+    governanceFactory: protocol.coreDealGovernanceFactory as Address,
+    dealTarget: "0x0000000000000000000000000000000000000000" as Address,
+    proposer: account.address,
+    vetoEnabled: toBoolArg(args["veto-enabled"], false),
+    fundingToken,
+    fundingAmount,
+    rewardsLimit,
+    approveDeadline,
+    dealDeadline,
+    dealConfig: encodeAbiParameters([{name: "value", type: "string"}], [args["deal-config-label"] ?? "sdk treasury config"]),
+    evaluatorSelector: CORE_EVALUATOR_KIND.MILESTONES_EVALUATOR,
+    evaluatorConfig,
+  };
+
+  const created = await core.createDealProposalDetailed({dealManager, params: dealParams});
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "create-treasury-deal",
+      dac,
+      proposer: account.address,
+      dealManager,
+      txHash: created.txHash,
+      dealId: created.dealId?.toString(),
+      dacProposalId: created.proposalId?.toString(),
+      dealCell: created.dealCell,
+      dealAddress: created.dealAddress,
+      note: "Use existing DAC proposal commands to vote/execute approval, then stake agents before approval execution.",
+      rpcUrl,
+    }) + "\n",
+  );
+}
+
+async function dacProposalVoteExecute(args: Record<string, string>) {
+  const {core, rpcUrl} = await makeCoreFromArgs(args);
+  const dac = args.dac as Address | undefined;
+  const proposalId = args["proposal-id"] ? BigInt(args["proposal-id"]) : undefined;
+  if (!dac || proposalId === undefined) {
+    throw new Error("--dac and --proposal-id are required");
+  }
+  const support = toBoolArg(args.support, true);
+  const proposalAddress = await core.getDacProposalVotingAddress({dacCell: dac, proposalId});
+
+  await advanceTime(rpcUrl, Number(args["pre-vote-advance-seconds"] ?? "1"));
+  const voteTx = await core.voteProposal({proposalAddress, support});
+
+  let status = await core.checkProposalOutcome({proposalAddress});
+  if (!status.resolved) {
+    if (!args["advance-seconds"]) {
+      throw new Error("Proposal not resolved yet. Provide --advance-seconds if you intentionally want to wait.");
+    }
+    const advanceSeconds = Number(args["advance-seconds"]);
+    await advanceTime(rpcUrl, advanceSeconds);
+    status = await core.checkProposalOutcome({proposalAddress});
+  }
+  if (!status.resolved || !status.outcome) {
+    throw new Error("Proposal was not passed.");
+  }
+
+  const executeTx = await core.executeDacProposal({dacCell: dac, proposalId});
+  process.stdout.write(
+    JSON.stringify({
+      action: "dac-proposal-vote-execute",
+      dac,
+      proposalId: proposalId.toString(),
+      proposalAddress,
+      voteTx,
+      executeTx,
+    }) + "\n",
+  );
+}
+
+async function stakeAgentToDeal(args: Record<string, string>) {
+  const {account, core} = await makeCoreFromArgs(args);
+  const dac = args.dac as Address | undefined;
+  const dealCell = args["deal-cell"] as Address | undefined;
+  const amount = args.amount ? BigInt(args.amount) : undefined;
+  if (!dac || !dealCell || amount === undefined) {
+    throw new Error("--dac, --deal-cell and --amount are required");
+  }
+
+  const agentToken = await core.getAgentToken(dac);
+  const txHash = await core.stakeAgentToDeal({agentToken, dealCell, amount});
+  const stakeToken = await core.getStakeToken({dealCell});
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "stake-agent-to-deal",
+      staker: account.address,
+      dac,
+      dealCell,
+      agentToken,
+      stakeToken,
+      amount: amount.toString(),
+      txHash,
+      note: "Call delegate-stake to activate StakedAgent voting power for this staker.",
+    }) + "\n",
+  );
+}
+
+async function delegateStake(args: Record<string, string>) {
+  const {account, core} = await makeCoreFromArgs(args);
+  const dealCell = args["deal-cell"] as Address | undefined;
+  if (!dealCell) {
+    throw new Error("--deal-cell is required");
+  }
+  const delegatee = (args.delegatee as Address | undefined) ?? account.address;
+  const stakeToken = await core.getStakeToken({dealCell});
+  const txHash = await core.delegateVotes({token: stakeToken, delegatee});
+  const votes = await core.getVotes({token: stakeToken, account: delegatee});
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "delegate-stake",
+      dealCell,
+      stakeToken,
+      delegatee,
+      txHash,
+      votes: votes.toString(),
+    }) + "\n",
+  );
+}
+
+async function requestTranche(args: Record<string, string>) {
+  const {core, rpcUrl} = await makeCoreFromArgs(args);
+  const deal = args.deal as Address | undefined;
+  const token = args.token as Address | undefined;
+  const amount = args.amount ? BigInt(args.amount) : undefined;
+  if (!deal || !token || amount === undefined) {
+    throw new Error("--deal, --token and --amount are required");
+  }
+
+  const params: ProposalParams = {
+    typ: DEAL_PROPOSAL_TYPE.REQUEST_TRANCHE,
+    target: token,
+    i: bytes32Uint(amount),
+    data: "0x",
+  };
+
+  const created = await core.createDealManagementProposal({dealAddress: deal, params});
+  const proposalId = created.proposalId;
+  const proposalAddress = created.proposalAddress
+    ?? (proposalId !== undefined ? await core.getDealProposalVotingAddress({dealAddress: deal, proposalId}) : undefined);
+
+  if (!proposalAddress || proposalId === undefined) {
+    throw new Error("Failed to resolve deal proposal from create tx");
+  }
+
+  await advanceTime(rpcUrl, Number(args["pre-vote-advance-seconds"] ?? "1"));
+  await core.voteProposal({proposalAddress, support: true});
+
+  let status = await core.checkProposalOutcome({proposalAddress});
+  if (!status.resolved) {
+    const advanceSeconds = args["advance-seconds"] ? Number(args["advance-seconds"]) : 24 * 60 * 60;
+    await advanceTime(rpcUrl, advanceSeconds);
+    status = await core.checkProposalOutcome({proposalAddress});
+  }
+  if (!status.outcome) {
+    throw new Error("Deal proposal resolved as failed.");
+  }
+
+  const executed = await core.executeDealProposalDetailed({dealAddress: deal, proposalId});
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "request-tranche",
+      deal,
+      token,
+      amount: amount.toString(),
+      proposalTx: created.txHash,
+      proposalId: proposalId.toString(),
+      proposalAddress,
+      executeTx: executed.txHash,
+      trancheId: executed.trancheId?.toString(),
+      dacProposalId: executed.dacProposalId?.toString(),
+      note: "Use approve-tranche with emitted dacProposalId.",
+    }) + "\n",
+  );
+}
+
+async function approveTranche(args: Record<string, string>) {
+  const {core, rpcUrl} = await makeCoreFromArgs(args);
+  const dac = args.dac as Address | undefined;
+  const proposalId = args["proposal-id"] ? BigInt(args["proposal-id"]) : undefined;
+  if (!dac || proposalId === undefined) {
+    throw new Error("--dac and --proposal-id are required");
+  }
+  const support = toBoolArg(args.support, true);
+  const proposalAddress = await core.getDacProposalVotingAddress({dacCell: dac, proposalId});
+
+  await advanceTime(rpcUrl, Number(args["pre-vote-advance-seconds"] ?? "1"));
+  const voteTx = await core.voteProposal({proposalAddress, support});
+
+  let status = await core.checkProposalOutcome({proposalAddress});
+  if (!status.resolved) {
+    if (!args["advance-seconds"]) {
+      throw new Error("Proposal not resolved yet. Provide --advance-seconds if you intentionally want to wait.");
+    }
+    await advanceTime(rpcUrl, Number(args["advance-seconds"]));
+    status = await core.checkProposalOutcome({proposalAddress});
+  }
+
+  if (!status.resolved || !status.outcome) {
+    throw new Error("Tranche approval proposal was not passed.");
+  }
+
+  const executeTx = await core.executeDacProposal({dacCell: dac, proposalId});
+  process.stdout.write(
+    JSON.stringify({
+      action: "approve-tranche",
+      dac,
+      proposalId: proposalId.toString(),
+      proposalAddress,
+      voteTx,
+      executeTx,
+    }) + "\n",
+  );
+}
+
+async function treasuryDirectSpend(args: Record<string, string>) {
+  const deal = args.deal as Address | undefined;
+  const token = args.token as Address | undefined;
+  const destination = args.destination as Address | undefined;
+  const amount = args.amount ? BigInt(args.amount) : undefined;
+  if (!deal || !token || !destination || amount === undefined) {
+    throw new Error("--deal, --token, --destination and --amount are required");
+  }
+
+  const result = await runDealProposalLifecycle({
+    args,
+    deal,
+    params: buildTreasuryDirectSpendProposal(token, destination, amount),
+  });
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "treasury-direct-spend",
+      deal,
+      token,
+      destination,
+      amount: amount.toString(),
+      stakeToken: result.stakeToken,
+      delegateTx: result.delegateTx,
+      proposalTx: result.proposalTx,
+      proposalId: result.proposalId?.toString(),
+      proposalAddress: result.proposalAddress,
+      executeTx: result.executeTx,
+    }) + "\n",
+  );
+}
+
+async function treasuryPermit2Spend(args: Record<string, string>) {
+  const deal = args.deal as Address | undefined;
+  const token = args.token as Address | undefined;
+  const spender = args.spender as Address | undefined;
+  const amount = args.amount ? BigInt(args.amount) : undefined;
+  const expiration = args.expiration ? BigInt(args.expiration) : undefined;
+  if (!deal || !token || !spender || amount === undefined || expiration === undefined) {
+    throw new Error("--deal, --token, --spender, --amount and --expiration are required");
+  }
+
+  const result = await runDealProposalLifecycle({
+    args,
+    deal,
+    params: buildTreasuryPermit2SpendProposal(token, spender, amount, expiration),
+  });
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "treasury-permit2-spend",
+      deal,
+      token,
+      spender,
+      amount: amount.toString(),
+      expiration: expiration.toString(),
+      stakeToken: result.stakeToken,
+      delegateTx: result.delegateTx,
+      proposalTx: result.proposalTx,
+      proposalId: result.proposalId?.toString(),
+      proposalAddress: result.proposalAddress,
+      executeTx: result.executeTx,
+    }) + "\n",
+  );
+}
+
+async function treasuryReturnCapital(args: Record<string, string>) {
+  const deal = args.deal as Address | undefined;
+  const token = args.token as Address | undefined;
+  const amount = args.amount ? BigInt(args.amount) : undefined;
+  if (!deal || !token || amount === undefined) {
+    throw new Error("--deal, --token and --amount are required");
+  }
+
+  const result = await runDealProposalLifecycle({
+    args,
+    deal,
+    params: buildTreasuryReturnCapitalProposal(token, amount),
+  });
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "treasury-return-capital",
+      deal,
+      token,
+      amount: amount.toString(),
+      stakeToken: result.stakeToken,
+      delegateTx: result.delegateTx,
+      proposalTx: result.proposalTx,
+      proposalId: result.proposalId?.toString(),
+      proposalAddress: result.proposalAddress,
+      executeTx: result.executeTx,
+    }) + "\n",
+  );
+}
+
+async function treasuryApproveAgentSpend(args: Record<string, string>) {
+  const deal = args.deal as Address | undefined;
+  const token = args.token as Address | undefined;
+  const agent = args.agent as Address | undefined;
+  const destination = args.destination as Address | undefined;
+  const totalAmount = args["total-amount"] ? BigInt(args["total-amount"]) : undefined;
+  const singleTxAmount = args["single-tx-amount"] ? BigInt(args["single-tx-amount"]) : undefined;
+  const clockLimit = args["clock-limit"] ? BigInt(args["clock-limit"]) : undefined;
+  const duration = args.duration ? BigInt(args.duration) : undefined;
+  if (!deal || !token || !agent || !destination || totalAmount === undefined || singleTxAmount === undefined || clockLimit === undefined || duration === undefined) {
+    throw new Error("--deal, --token, --agent, --destination, --total-amount, --single-tx-amount, --clock-limit and --duration are required");
+  }
+
+  const allowance: coreModule.TreasurySpendAllowance = {
+    totalAmount,
+    singleTxAmount,
+    clockLimit,
+    duration,
+  };
+
+  const result = await runDealProposalLifecycle({
+    args,
+    deal,
+    params: buildTreasuryApproveAgentSpendProposal(token, agent, destination, allowance),
+  });
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "treasury-approve-agent-spend",
+      deal,
+      token,
+      agent,
+      destination,
+      allowance: {
+        totalAmount: allowance.totalAmount.toString(),
+        singleTxAmount: allowance.singleTxAmount.toString(),
+        clockLimit: allowance.clockLimit.toString(),
+        duration: allowance.duration.toString(),
+      },
+      stakeToken: result.stakeToken,
+      delegateTx: result.delegateTx,
+      proposalTx: result.proposalTx,
+      proposalId: result.proposalId?.toString(),
+      proposalAddress: result.proposalAddress,
+      executeTx: result.executeTx,
+    }) + "\n",
+  );
+}
+
+async function treasuryAssignClaimer(args: Record<string, string>) {
+  const deal = args.deal as Address | undefined;
+  const agent = args.agent as Address | undefined;
+  const token = args.token as Address | undefined;
+  const counterparty = args.counterparty as Address | undefined;
+  const amount = args.amount ? BigInt(args.amount) : undefined;
+  if (!deal || !agent || !token || !counterparty || amount === undefined) {
+    throw new Error("--deal, --agent, --token, --counterparty and --amount are required");
+  }
+
+  const result = await runDealProposalLifecycle({
+    args,
+    deal,
+    params: buildTreasuryAssignClaimerProposal(agent, token, counterparty, amount),
+  });
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "treasury-assign-claimer",
+      deal,
+      agent,
+      token,
+      counterparty,
+      amount: amount.toString(),
+      stakeToken: result.stakeToken,
+      delegateTx: result.delegateTx,
+      proposalTx: result.proposalTx,
+      proposalId: result.proposalId?.toString(),
+      proposalAddress: result.proposalAddress,
+      executeTx: result.executeTx,
+    }) + "\n",
+  );
+}
+
+async function treasuryRevokeAgent(args: Record<string, string>) {
+  const deal = args.deal as Address | undefined;
+  const token = args.token as Address | undefined;
+  const agent = args.agent as Address | undefined;
+  const counterparty = args.counterparty as Address | undefined;
+  if (!deal || !token || !agent || !counterparty) {
+    throw new Error("--deal, --token, --agent and --counterparty are required");
+  }
+
+  const result = await runDealProposalLifecycle({
+    args,
+    deal,
+    params: buildTreasuryRevokeAgentProposal(token, agent, counterparty),
+  });
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "treasury-revoke-agent",
+      deal,
+      token,
+      agent,
+      counterparty,
+      stakeToken: result.stakeToken,
+      delegateTx: result.delegateTx,
+      proposalTx: result.proposalTx,
+      proposalId: result.proposalId?.toString(),
+      proposalAddress: result.proposalAddress,
+      executeTx: result.executeTx,
+    }) + "\n",
+  );
+}
+
+async function treasuryDelegateVoteRights(args: Record<string, string>) {
+  const deal = args.deal as Address | undefined;
+  const token = args.token as Address | undefined;
+  const delegatee = args.delegatee as Address | undefined;
+  if (!deal || !token || !delegatee) {
+    throw new Error("--deal, --token and --delegatee are required");
+  }
+
+  const result = await runDealProposalLifecycle({
+    args,
+    deal,
+    params: buildTreasuryDelegateVoteRightsProposal(token, delegatee),
+  });
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "treasury-delegate-vote-rights",
+      deal,
+      token,
+      delegatee,
+      stakeToken: result.stakeToken,
+      delegateTx: result.delegateTx,
+      proposalTx: result.proposalTx,
+      proposalId: result.proposalId?.toString(),
+      proposalAddress: result.proposalAddress,
+      executeTx: result.executeTx,
+    }) + "\n",
+  );
+}
+
 async function main() {
   const [, , command, ...rawArgs] = process.argv;
   const args = parseArgs(rawArgs);
@@ -604,12 +1199,64 @@ async function main() {
     await depositTreasury(args);
     return;
   }
+  if (command === "create-treasury-deal") {
+    await createTreasuryDeal(args);
+    return;
+  }
+  if (command === "dac-proposal-vote-execute") {
+    await dacProposalVoteExecute(args);
+    return;
+  }
+  if (command === "stake-agent-to-deal") {
+    await stakeAgentToDeal(args);
+    return;
+  }
+  if (command === "delegate-stake") {
+    await delegateStake(args);
+    return;
+  }
+  if (command === "request-tranche") {
+    await requestTranche(args);
+    return;
+  }
+  if (command === "approve-tranche") {
+    await approveTranche(args);
+    return;
+  }
+  if (command === "treasury-direct-spend") {
+    await treasuryDirectSpend(args);
+    return;
+  }
+  if (command === "treasury-permit2-spend") {
+    await treasuryPermit2Spend(args);
+    return;
+  }
+  if (command === "treasury-return-capital") {
+    await treasuryReturnCapital(args);
+    return;
+  }
+  if (command === "treasury-approve-agent-spend") {
+    await treasuryApproveAgentSpend(args);
+    return;
+  }
+  if (command === "treasury-assign-claimer") {
+    await treasuryAssignClaimer(args);
+    return;
+  }
+  if (command === "treasury-revoke-agent") {
+    await treasuryRevokeAgent(args);
+    return;
+  }
+  if (command === "treasury-delegate-vote-rights") {
+    await treasuryDelegateVoteRights(args);
+    return;
+  }
 
   throw new Error(`Unknown command: ${command}`);
 }
 
 main().catch((err: unknown) => {
-  const message = err instanceof Error ? err.message : String(err);
+  const message = formatViemError(err);
   process.stderr.write(`${message}\n`);
   process.exit(1);
 });

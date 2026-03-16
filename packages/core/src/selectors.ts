@@ -1,9 +1,22 @@
 import {toFunctionSelector} from "viem";
+import {
+  CORE_DEAL_KIND as CORE_DEAL_KIND_FROM_MODULE,
+  CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE,
+  CORE_EVALUATOR_KIND as CORE_EVALUATOR_KIND_FROM_MODULE,
+  CORE_TREASURY_PROPOSAL_TYPE as CORE_TREASURY_PROPOSAL_TYPE_FROM_MODULE,
+} from "./modules/core/selectors";
 
-export const CORE_DEAL_KIND = {
-  DAC_DEAL: toFunctionSelector("createDACDeal()"),
-  PERMIT2_TREASURY: toFunctionSelector("createPermit2TreasuryDeal()"),
+export const CORE_DEAL_KIND = CORE_DEAL_KIND_FROM_MODULE;
+
+export const CORE_EVALUATOR_KIND = CORE_EVALUATOR_KIND_FROM_MODULE;
+
+export const DEAL_PROPOSAL_TYPE = {
+  REQUEST_TRANCHE: toFunctionSelector("requestTranche()"),
 } as const;
+
+export const CORE_DEAL_PROPOSAL_TYPE = CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE;
+
+export const CORE_TREASURY_PROPOSAL_TYPE = CORE_TREASURY_PROPOSAL_TYPE_FROM_MODULE;
 
 export const DAC_PROPOSAL_TYPE = {
   UPDATE_VOTING_CONFIG: toFunctionSelector("updateVotingConfig()"),

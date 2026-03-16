@@ -1,12 +1,15 @@
 import {parseAbi} from "viem";
+import {commonErrorSignatures} from "./errors";
 
 export const dacFactoryAbi = parseAbi([
+  ...commonErrorSignatures,
   "event DACDeployed(address indexed dac, address mainToken, address agentToken, bool init)",
   "function deployDAC((string symbol,string name,string description,uint256 mainTokenMaxSupply,uint256 defaultQuorum,address founder,uint256 founderAllocation,address treasuryToken,uint256 founderCommitment,bool dividendsEnabled) config, bytes32 salt, address deferBirthRole) returns (address dacAddr, address mainTokenAddr, address agentTokenAddr)",
   "function startDAC(address dacCell, (string symbol,string name,string description,uint256 mainTokenMaxSupply,uint256 defaultQuorum,address founder,uint256 founderAllocation,address treasuryToken,uint256 founderCommitment,bool dividendsEnabled) config, address mainTokenAddr, address agentTokenAddr)"
 ]);
 
 export const dacCellAbi = parseAbi([
+  ...commonErrorSignatures,
   "event DACProposalCreated(uint256 indexed id, address indexed prop, bytes4 indexed typ, address target, bytes32 data1, bytes data2)",
   "event CapitalCallCreated(uint256 indexed id, address indexed recipient, bytes32 indexed callHash, address treasuryToken, uint256 tokenAmount, uint256 cashAmount, uint256 nonce)",
   "function getMainToken() view returns (address)",
@@ -22,24 +25,47 @@ export const dacCellAbi = parseAbi([
 ]);
 
 export const dealManagerAbi = parseAbi([
+  ...commonErrorSignatures,
   "event DealCreated(address indexed dac, uint256 indexed id, uint256 indexed proposalId, address creator, bytes4 kind, address cell, address deal)",
+  "event TrancheCreated(address indexed dac, uint256 indexed id, uint256 indexed proposalId, uint256 trancheId)",
   "function createDealProposal((bytes4 dealKind,string name,string description,string linkHash,address moduleFactory,address governanceFactory,address dealTarget,address proposer,bool vetoEnabled,address fundingToken,uint256 fundingAmount,uint256 rewardsLimit,uint256 approveDeadline,uint256 dealDeadline,bytes dealConfig,bytes4 evaluatorSelector,bytes evaluatorConfig) params) returns (uint256 id, address dealCell, address dealAddr, address evaluatorAddr)",
   "function deals(uint256 id) view returns (address)",
   "function isRecoverable(uint256 id) view returns (bool)"
 ]);
 
 export const votingProposalAbi = parseAbi([
+  ...commonErrorSignatures,
   "function vote(bool support)",
   "function isResolved() returns (bool)",
   "function outcome() returns (bool)"
 ]);
 
 export const erc20VotesAbi = parseAbi([
+  ...commonErrorSignatures,
   "function delegate(address delegatee) returns (uint256)",
   "function getVotes(address account) view returns (uint256)"
 ]);
 
 export const erc20Abi = parseAbi([
+  ...commonErrorSignatures,
   "function approve(address spender, uint256 amount) returns (bool)",
   "function allowance(address owner, address spender) view returns (uint256)"
+]);
+
+export const agentTokenAbi = parseAbi([
+  ...commonErrorSignatures,
+  "function stakeToDeal(address dealCell, uint256 amount)"
+]);
+
+export const dealCellAbi = parseAbi([
+  ...commonErrorSignatures,
+  "function stakeToken() view returns (address)"
+]);
+
+export const dealAbi = parseAbi([
+  ...commonErrorSignatures,
+  "event DealManagementProposalCreated(address indexed cell,address indexed prop,uint256 id,bytes4 indexed typ,address target,bytes32 data1,bytes data2)",
+  "function createStakedAgentProposal((bytes4 typ,address target,bytes32 i,bytes data) params) returns (uint256 proposalId)",
+  "function executeStakedAgentProposal(uint256 proposalId)",
+  "function getProposal(uint256 proposalId) view returns (address)"
 ]);
