@@ -3,6 +3,10 @@ import {DAC_PROPOSAL_TYPE} from "./selectors";
 import type {ProposalParams} from "./types";
 import type {TreasurySpendAllowance} from "./modules/core/types";
 import {
+  buildChildDacCreateProposalProposal as buildChildDacCreateProposalProposalModule,
+  buildChildDacReinvestProfitsProposal as buildChildDacReinvestProfitsProposalModule,
+  buildChildDacReturnProfitsProposal as buildChildDacReturnProfitsProposalModule,
+  buildChildDacVoteProposalProposal as buildChildDacVoteProposalProposalModule,
   buildTreasuryApproveAgentSpendProposal as buildTreasuryApproveAgentSpendProposalModule,
   buildTreasuryAssignClaimerProposal as buildTreasuryAssignClaimerProposalModule,
   buildTreasuryDelegateVoteRightsProposal as buildTreasuryDelegateVoteRightsProposalModule,
@@ -138,4 +142,24 @@ export function buildTreasuryDelegateVoteRightsProposal(
   delegatee: Address,
 ): ProposalParams {
   return buildTreasuryDelegateVoteRightsProposalModule(token, delegatee);
+}
+
+export function buildChildDacCreateProposalProposal(childProposal: ProposalParams): ProposalParams {
+  return buildChildDacCreateProposalProposalModule(childProposal);
+}
+
+export function buildChildDacVoteProposalProposal(childProposalId: bigint, support: boolean): ProposalParams {
+  return buildChildDacVoteProposalProposalModule(childProposalId, support);
+}
+
+export function buildChildDacReturnProfitsProposal(token: Address, amount: bigint): ProposalParams {
+  return buildChildDacReturnProfitsProposalModule(token, amount);
+}
+
+export function buildChildDacReinvestProfitsProposal(
+  token: Address,
+  amount: bigint,
+  capitalCallHash: Hex,
+): ProposalParams {
+  return buildChildDacReinvestProfitsProposalModule(token, amount, capitalCallHash);
 }

@@ -3,6 +3,10 @@ import {randomBytes} from "node:crypto";
 import {resolve} from "node:path";
 import {
   accountFromPrivateKey,
+  buildChildDacCreateProposalProposal,
+  buildChildDacReinvestProfitsProposal,
+  buildChildDacReturnProfitsProposal,
+  buildChildDacVoteProposalProposal,
   buildTreasuryApproveAgentSpendProposal,
   buildTreasuryAssignClaimerProposal,
   buildTreasuryDelegateVoteRightsProposal,
@@ -26,6 +30,7 @@ import {
   CORE_EVALUATOR_KIND,
   DEAL_PROPOSAL_TYPE,
 } from "@dac-cloud/core";
+import {createIndexerClient} from "@dac-cloud/indexer";
 import {loadProtocolManifest, tryLoadBasicDacSeed} from "@dac-cloud/manifests";
 import {defineChain, encodeAbiParameters, numberToHex, type Address, type Hex} from "viem";
 
@@ -108,6 +113,20 @@ async function makeCoreFromArgs(args: Record<string, string>) {
   return {chainId, rpcUrl, contractsRoot, account, protocol, core};
 }
 
+function makeIndexerFromArgs(args: Record<string, string>) {
+  const indexerUrl = args["indexer-url"] ?? process.env.DAC_INDEXER_URL ?? "http://127.0.0.1:8080/v1/graphql";
+  return createIndexerClient({url: indexerUrl});
+}
+
+function parseListArgs(args: Record<string, string>): {limit?: number; offset?: number} {
+  const limit = args.limit !== undefined ? Number(args.limit) : undefined;
+  const offset = args.offset !== undefined ? Number(args.offset) : undefined;
+  return {
+    limit: Number.isFinite(limit) ? limit : undefined,
+    offset: Number.isFinite(offset) ? offset : undefined,
+  };
+}
+
 function usage() {
   process.stdout.write(
     [
@@ -131,6 +150,11 @@ function usage() {
       "  dac delegate-stake --deal-cell <address> [--delegatee <address>]",
       "  dac request-tranche --deal <dealAddress> --token <address> --amount <uint256>",
       "  dac approve-tranche --dac <dacCellAddress> --proposal-id <uint256>",
+      "  dac deal-proposal-vote-execute --deal <dealAddress> --proposal-id <uint256> [--support true]",
+      "  dac child-dac-create-proposal --deal <dealAddress> --child-typ <bytes4> [--child-target <address>] [--child-i <uint256|bytes32>] [--child-data <hex>]",
+      "  dac child-dac-vote-proposal --deal <dealAddress> --child-proposal-id <uint256> [--support true]",
+      "  dac child-dac-return-profits --deal <dealAddress> --token <address> --amount <uint256>",
+      "  dac child-dac-reinvest-profits --deal <dealAddress> --token <address> --amount <uint256> --capital-call-hash <bytes32>",
       "  dac treasury-direct-spend --deal <dealAddress> --token <address> --destination <address> --amount <uint256>",
       "  dac treasury-permit2-spend --deal <dealAddress> --token <address> --spender <address> --amount <uint256> --expiration <uint48>",
       "  dac treasury-return-capital --deal <dealAddress> --token <address> --amount <uint256>",
@@ -138,11 +162,18 @@ function usage() {
       "  dac treasury-assign-claimer --deal <dealAddress> --agent <address> --token <address> --counterparty <address> --amount <uint160>",
       "  dac treasury-revoke-agent --deal <dealAddress> --token <address> --agent <address> --counterparty <address>",
       "  dac treasury-delegate-vote-rights --deal <dealAddress> --token <address> --delegatee <address>",
+      "  dac view-dac [--id <dacId> | --address <dacAddress>]",
+      "  dac view-deal [--id <dealId> | --address <dealAddress>]",
+      "  dac view-proposals [--dac-id <dacId> | --dac-address <dacAddress> | --deal-id <dealId> | --deal-address <dealAddress>]",
+      "  dac view-capital-calls [--dac-id <dacId> | --dac-address <dacAddress>]",
+      "  dac view-treasury-actions [--deal-id <dealId> | --deal-address <dealAddress>]",
       "",
       "Important flags:",
       "  --contracts-root /path/to/dac-cloud-contracts",
       "  --private-key 0x... (defaults to Anvil account #0)",
       "  --treasury-token 0x... (auto-fallback from basic-dac-seed manifest in create-dacs)",
+      "  --indexer-url http://127.0.0.1:8080/v1/graphql",
+      "  --limit N / --offset N (for indexer list reads)",
       "",
       "Proposal flow flags:",
       "  --auto-delegate true|false (default true)",
@@ -224,8 +255,9 @@ async function runDealProposalLifecycle(input: {
   args: Record<string, string>;
   deal: Address;
   params: ProposalParams;
+  executeDetailed?: boolean;
 }) {
-  const {args, deal, params} = input;
+  const {args, deal, params, executeDetailed} = input;
   const {account, core, rpcUrl} = await makeCoreFromArgs(args);
 
   const autoDelegate = toBoolArg(args["auto-delegate"], true);
@@ -254,6 +286,9 @@ async function runDealProposalLifecycle(input: {
   }
 
   let executeTx: Hex | undefined;
+  let executeDetails:
+    | {txHash: Hex; dacProposalId?: bigint; trancheId?: bigint; childProposalId?: bigint; childVoteProposalId?: bigint}
+    | undefined;
   if (proposalAddress && autoExecute && proposalId !== undefined) {
     let status = await core.checkProposalOutcome({proposalAddress});
     if (!status.resolved) {
@@ -263,7 +298,12 @@ async function runDealProposalLifecycle(input: {
     }
 
     if (status.resolved && status.outcome) {
-      executeTx = await core.executeDealProposal({dealAddress: deal, proposalId});
+      if (executeDetailed) {
+        executeDetails = await core.executeDealProposalDetailed({dealAddress: deal, proposalId});
+        executeTx = executeDetails.txHash;
+      } else {
+        executeTx = await core.executeDealProposal({dealAddress: deal, proposalId});
+      }
     } else if (!status.resolved) {
       throw new Error("Deal proposal is not resolved yet.");
     } else {
@@ -279,6 +319,7 @@ async function runDealProposalLifecycle(input: {
     proposalId,
     proposalAddress,
     executeTx,
+    executeDetails,
   };
 }
 
@@ -643,6 +684,17 @@ function bytes32Uint(value: bigint): Hex {
   return numberToHex(value, {size: 32});
 }
 
+function parseBytes32LikeArg(value: string | undefined, fallback: Hex): Hex {
+  if (!value) return fallback;
+  if (value.startsWith("0x")) {
+    if (value.length !== 66) {
+      throw new Error(`Expected bytes32 hex (66 chars), got ${value.length}`);
+    }
+    return value as Hex;
+  }
+  return bytes32Uint(BigInt(value));
+}
+
 async function createTreasuryDeal(args: Record<string, string>) {
   const {account, core, protocol, rpcUrl} = await makeCoreFromArgs(args);
   const dac = args.dac as Address | undefined;
@@ -905,6 +957,179 @@ async function approveTranche(args: Record<string, string>) {
   );
 }
 
+async function dealProposalVoteExecute(args: Record<string, string>) {
+  const {core, rpcUrl} = await makeCoreFromArgs(args);
+  const deal = args.deal as Address | undefined;
+  const proposalId = args["proposal-id"] ? BigInt(args["proposal-id"]) : undefined;
+  if (!deal || proposalId === undefined) {
+    throw new Error("--deal and --proposal-id are required");
+  }
+  const support = toBoolArg(args.support, true);
+  const proposalAddress = await core.getDealProposalVotingAddress({dealAddress: deal, proposalId});
+
+  await advanceTime(rpcUrl, Number(args["pre-vote-advance-seconds"] ?? "1"));
+  const voteTx = await core.voteProposal({proposalAddress, support});
+
+  let status = await core.checkProposalOutcome({proposalAddress});
+  if (!status.resolved) {
+    if (!args["advance-seconds"]) {
+      throw new Error("Proposal not resolved yet. Provide --advance-seconds if you intentionally want to wait.");
+    }
+    await advanceTime(rpcUrl, Number(args["advance-seconds"]));
+    status = await core.checkProposalOutcome({proposalAddress});
+  }
+
+  if (!status.resolved || !status.outcome) {
+    throw new Error("Deal proposal was not passed.");
+  }
+
+  const executed = await core.executeDealProposalDetailed({dealAddress: deal, proposalId});
+  process.stdout.write(
+    JSON.stringify({
+      action: "deal-proposal-vote-execute",
+      deal,
+      proposalId: proposalId.toString(),
+      proposalAddress,
+      voteTx,
+      executeTx: executed.txHash,
+      trancheId: executed.trancheId?.toString(),
+      dacProposalId: executed.dacProposalId?.toString(),
+      childProposalId: executed.childProposalId?.toString(),
+      childVoteProposalId: executed.childVoteProposalId?.toString(),
+    }) + "\n",
+  );
+}
+
+async function childDacCreateProposal(args: Record<string, string>) {
+  const deal = args.deal as Address | undefined;
+  const childTyp = args["child-typ"] as Hex | undefined;
+  if (!deal || !childTyp) {
+    throw new Error("--deal and --child-typ are required");
+  }
+
+  const childTarget = (args["child-target"] as Address | undefined) ?? "0x0000000000000000000000000000000000000000";
+  const childI = parseBytes32LikeArg(args["child-i"], bytes32Uint(0n));
+  const childData = (args["child-data"] as Hex | undefined) ?? "0x";
+
+  const childProposal: ProposalParams = {
+    typ: childTyp,
+    target: childTarget,
+    i: childI,
+    data: childData,
+  };
+
+  const result = await runDealProposalLifecycle({
+    args,
+    deal,
+    params: buildChildDacCreateProposalProposal(childProposal),
+    executeDetailed: true,
+  });
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "child-dac-create-proposal",
+      deal,
+      childProposal,
+      proposalTx: result.proposalTx,
+      proposalId: result.proposalId?.toString(),
+      proposalAddress: result.proposalAddress,
+      executeTx: result.executeTx,
+      spawnedChildProposalId: result.executeDetails?.childProposalId?.toString(),
+      spawnedChildVoteDealProposalId: result.executeDetails?.childVoteProposalId?.toString(),
+      note: "Run deal-proposal-vote-execute for spawnedChildVoteDealProposalId to cast child vote.",
+    }) + "\n",
+  );
+}
+
+async function childDacVoteProposal(args: Record<string, string>) {
+  const deal = args.deal as Address | undefined;
+  const childProposalId = args["child-proposal-id"] ? BigInt(args["child-proposal-id"]) : undefined;
+  if (!deal || childProposalId === undefined) {
+    throw new Error("--deal and --child-proposal-id are required");
+  }
+  const support = toBoolArg(args.support, true);
+
+  const result = await runDealProposalLifecycle({
+    args,
+    deal,
+    params: buildChildDacVoteProposalProposal(childProposalId, support),
+  });
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "child-dac-vote-proposal",
+      deal,
+      childProposalId: childProposalId.toString(),
+      support,
+      proposalTx: result.proposalTx,
+      proposalId: result.proposalId?.toString(),
+      proposalAddress: result.proposalAddress,
+      executeTx: result.executeTx,
+    }) + "\n",
+  );
+}
+
+async function childDacReturnProfits(args: Record<string, string>) {
+  const deal = args.deal as Address | undefined;
+  const token = args.token as Address | undefined;
+  const amount = args.amount ? BigInt(args.amount) : undefined;
+  if (!deal || !token || amount === undefined) {
+    throw new Error("--deal, --token and --amount are required");
+  }
+
+  const result = await runDealProposalLifecycle({
+    args,
+    deal,
+    params: buildChildDacReturnProfitsProposal(token, amount),
+  });
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "child-dac-return-profits",
+      deal,
+      token,
+      amount: amount.toString(),
+      proposalTx: result.proposalTx,
+      proposalId: result.proposalId?.toString(),
+      proposalAddress: result.proposalAddress,
+      executeTx: result.executeTx,
+    }) + "\n",
+  );
+}
+
+async function childDacReinvestProfits(args: Record<string, string>) {
+  const deal = args.deal as Address | undefined;
+  const token = args.token as Address | undefined;
+  const amount = args.amount ? BigInt(args.amount) : undefined;
+  const capitalCallHash = args["capital-call-hash"] as Hex | undefined;
+  if (!deal || !token || amount === undefined || !capitalCallHash) {
+    throw new Error("--deal, --token, --amount and --capital-call-hash are required");
+  }
+  if (!capitalCallHash.startsWith("0x") || capitalCallHash.length !== 66) {
+    throw new Error("--capital-call-hash must be bytes32 hex");
+  }
+
+  const result = await runDealProposalLifecycle({
+    args,
+    deal,
+    params: buildChildDacReinvestProfitsProposal(token, amount, capitalCallHash),
+  });
+
+  process.stdout.write(
+    JSON.stringify({
+      action: "child-dac-reinvest-profits",
+      deal,
+      token,
+      amount: amount.toString(),
+      capitalCallHash,
+      proposalTx: result.proposalTx,
+      proposalId: result.proposalId?.toString(),
+      proposalAddress: result.proposalAddress,
+      executeTx: result.executeTx,
+    }) + "\n",
+  );
+}
+
 async function treasuryDirectSpend(args: Record<string, string>) {
   const deal = args.deal as Address | undefined;
   const token = args.token as Address | undefined;
@@ -1146,6 +1371,90 @@ async function treasuryDelegateVoteRights(args: Record<string, string>) {
   );
 }
 
+async function viewDac(args: Record<string, string>) {
+  const client = makeIndexerFromArgs(args);
+  const id = args.id;
+  const address = args.address;
+
+  if (!id && !address) {
+    throw new Error("Provide --id or --address");
+  }
+
+  const dac = id ? await client.dacs.getById(id) : await client.dacs.getByAddress(address as string);
+  if (!dac) {
+    throw new Error("DAC not found in indexer");
+  }
+
+  process.stdout.write(JSON.stringify({action: "view-dac", dac}, null, 2) + "\n");
+}
+
+async function viewDeal(args: Record<string, string>) {
+  const client = makeIndexerFromArgs(args);
+  const id = args.id;
+  const address = args.address;
+
+  if (!id && !address) {
+    throw new Error("Provide --id or --address");
+  }
+
+  const deal = id ? await client.deals.getById(id) : await client.deals.getByAddress(address as string);
+  if (!deal) {
+    throw new Error("Deal not found in indexer");
+  }
+
+  process.stdout.write(JSON.stringify({action: "view-deal", deal}, null, 2) + "\n");
+}
+
+async function viewProposals(args: Record<string, string>) {
+  const client = makeIndexerFromArgs(args);
+  const page = parseListArgs(args);
+
+  let proposals: unknown[] = [];
+  if (args["dac-id"] || args["dac-address"]) {
+    const dacId = args["dac-id"] ?? (await client.dacs.getByAddress(args["dac-address"] as string))?.id;
+    if (!dacId) {
+      throw new Error("DAC not found in indexer");
+    }
+    proposals = await client.proposals.listByDac(dacId, page);
+  } else if (args["deal-id"] || args["deal-address"]) {
+    const dealId = args["deal-id"] ?? (await client.deals.getByAddress(args["deal-address"] as string))?.id;
+    if (!dealId) {
+      throw new Error("Deal not found in indexer");
+    }
+    proposals = await client.proposals.listByDeal(dealId, page);
+  } else {
+    throw new Error("Provide --dac-id/--dac-address or --deal-id/--deal-address");
+  }
+
+  process.stdout.write(JSON.stringify({action: "view-proposals", count: proposals.length, proposals}, null, 2) + "\n");
+}
+
+async function viewCapitalCalls(args: Record<string, string>) {
+  const client = makeIndexerFromArgs(args);
+  const page = parseListArgs(args);
+
+  const dacId = args["dac-id"] ?? (args["dac-address"] ? (await client.dacs.getByAddress(args["dac-address"]))?.id : undefined);
+  if (!dacId) {
+    throw new Error("Provide valid --dac-id or --dac-address");
+  }
+
+  const capitalCalls = await client.capitalCalls.listByDac(dacId, page);
+  process.stdout.write(JSON.stringify({action: "view-capital-calls", count: capitalCalls.length, capitalCalls}, null, 2) + "\n");
+}
+
+async function viewTreasuryActions(args: Record<string, string>) {
+  const client = makeIndexerFromArgs(args);
+  const page = parseListArgs(args);
+
+  const dealId = args["deal-id"] ?? (args["deal-address"] ? (await client.deals.getByAddress(args["deal-address"]))?.id : undefined);
+  if (!dealId) {
+    throw new Error("Provide valid --deal-id or --deal-address");
+  }
+
+  const treasuryActions = await client.treasuryActions.listByDeal(dealId, page);
+  process.stdout.write(JSON.stringify({action: "view-treasury-actions", count: treasuryActions.length, treasuryActions}, null, 2) + "\n");
+}
+
 async function main() {
   const [, , command, ...rawArgs] = process.argv;
   const args = parseArgs(rawArgs);
@@ -1223,6 +1532,26 @@ async function main() {
     await approveTranche(args);
     return;
   }
+  if (command === "deal-proposal-vote-execute") {
+    await dealProposalVoteExecute(args);
+    return;
+  }
+  if (command === "child-dac-create-proposal") {
+    await childDacCreateProposal(args);
+    return;
+  }
+  if (command === "child-dac-vote-proposal") {
+    await childDacVoteProposal(args);
+    return;
+  }
+  if (command === "child-dac-return-profits") {
+    await childDacReturnProfits(args);
+    return;
+  }
+  if (command === "child-dac-reinvest-profits") {
+    await childDacReinvestProfits(args);
+    return;
+  }
   if (command === "treasury-direct-spend") {
     await treasuryDirectSpend(args);
     return;
@@ -1249,6 +1578,26 @@ async function main() {
   }
   if (command === "treasury-delegate-vote-rights") {
     await treasuryDelegateVoteRights(args);
+    return;
+  }
+  if (command === "view-dac") {
+    await viewDac(args);
+    return;
+  }
+  if (command === "view-deal") {
+    await viewDeal(args);
+    return;
+  }
+  if (command === "view-proposals") {
+    await viewProposals(args);
+    return;
+  }
+  if (command === "view-capital-calls") {
+    await viewCapitalCalls(args);
+    return;
+  }
+  if (command === "view-treasury-actions") {
+    await viewTreasuryActions(args);
     return;
   }
 

@@ -1,5 +1,5 @@
 import {encodeAbiParameters, numberToHex, type Address, type Hex} from "viem";
-import {CORE_TREASURY_PROPOSAL_TYPE} from "./selectors";
+import {CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE, CORE_TREASURY_PROPOSAL_TYPE} from "./selectors";
 import type {TreasurySpendAllowance} from "./types";
 import type {ProposalParams} from "../../types";
 
@@ -145,6 +145,74 @@ export function buildTreasuryDelegateVoteRightsProposal(
     data: encodeAbiParameters(
       [{name: "token", type: "address"}, {name: "delegatee", type: "address"}],
       [token, delegatee],
+    ),
+  };
+}
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
+
+export function buildChildDacCreateProposalProposal(childProposal: ProposalParams): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.CREATE_DAC_PROPOSAL,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [
+        {
+          name: "childProposal",
+          type: "tuple",
+          components: [
+            {name: "typ", type: "bytes4"},
+            {name: "target", type: "address"},
+            {name: "i", type: "bytes32"},
+            {name: "data", type: "bytes"},
+          ],
+        },
+      ],
+      [childProposal],
+    ),
+  };
+}
+
+export function buildChildDacVoteProposalProposal(
+  childProposalId: bigint,
+  support: boolean,
+): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.VOTE_DAC_PROPOSAL,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(childProposalId),
+    data: encodeAbiParameters([{name: "support", type: "bool"}], [support]),
+  };
+}
+
+export function buildChildDacReturnProfitsProposal(
+  token: Address,
+  amount: bigint,
+): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.RETURN_PROFITS,
+    target: token,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters([{name: "amount", type: "uint256"}], [amount]),
+  };
+}
+
+export function buildChildDacReinvestProfitsProposal(
+  token: Address,
+  amount: bigint,
+  capitalCallHash: Hex,
+): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.REINVEST_PROFITS,
+    target: token,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [
+        {name: "amount", type: "uint256"},
+        {name: "capitalCallHash", type: "bytes32"},
+      ],
+      [amount, capitalCallHash],
     ),
   };
 }

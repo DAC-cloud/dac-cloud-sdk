@@ -4,6 +4,7 @@ This iteration includes:
 
 - `@dac-cloud/manifests`: loaders for contracts deployment manifests.
 - `@dac-cloud/core`: viem-based core client for DAC.cloud contracts.
+- `@dac-cloud/indexer`: typed GraphQL query client facade for DAC/Deal read-model access.
 - `@dac-cloud/cli`: load/stress helper CLI with concrete DAC-level proposal flows.
 
 ## Install and Build
@@ -12,6 +13,15 @@ This iteration includes:
 npm install
 npm run typecheck
 npm run build
+```
+
+## Indexer Codegen
+
+`@dac-cloud/indexer` now uses GraphQL Code Generator with typed documents generated from the live GraphQL endpoint.
+
+```bash
+INDEXER_SCHEMA_URL=http://127.0.0.1:8080/v1/graphql \
+  npm run codegen --workspace @dac-cloud/indexer
 ```
 
 ## CLI Quickstart
@@ -245,6 +255,80 @@ node packages/cli/dist/index.js treasury-delegate-vote-rights \
   --contracts-root /home/iliao/git/dac-cloud-contracts
 ```
 
+Child DAC deal minimal flows:
+
+```bash
+# 1) Create child DAC governance proposal through parent deal
+node packages/cli/dist/index.js child-dac-create-proposal \
+  --deal 0xChildDealAddress \
+  --child-typ 0x12345678 \
+  --child-target 0x0000000000000000000000000000000000000000 \
+  --child-i 0 \
+  --child-data 0x \
+  --stake-token 0xStakedAgentToken \
+  --private-key 0xAgentPrivateKey \
+  --contracts-root /home/iliao/git/dac-cloud-contracts
+
+# 2) Vote/execute spawned parent-deal proposal (returned as spawnedChildVoteDealProposalId)
+node packages/cli/dist/index.js deal-proposal-vote-execute \
+  --deal 0xChildDealAddress \
+  --proposal-id 42 \
+  --advance-seconds 604801 \
+  --private-key 0xAgentPrivateKey \
+  --contracts-root /home/iliao/git/dac-cloud-contracts
+
+# Direct child vote action proposal (creates a new vote proposal in parent deal)
+node packages/cli/dist/index.js child-dac-vote-proposal \
+  --deal 0xChildDealAddress \
+  --child-proposal-id 7 \
+  --support true \
+  --stake-token 0xStakedAgentToken \
+  --private-key 0xAgentPrivateKey \
+  --contracts-root /home/iliao/git/dac-cloud-contracts
+
+node packages/cli/dist/index.js child-dac-return-profits \
+  --deal 0xChildDealAddress \
+  --token 0xToken \
+  --amount 1000000 \
+  --stake-token 0xStakedAgentToken \
+  --private-key 0xAgentPrivateKey \
+  --contracts-root /home/iliao/git/dac-cloud-contracts
+
+node packages/cli/dist/index.js child-dac-reinvest-profits \
+  --deal 0xChildDealAddress \
+  --token 0xToken \
+  --amount 1000000 \
+  --capital-call-hash 0x0000000000000000000000000000000000000000000000000000000000000000 \
+  --stake-token 0xStakedAgentToken \
+  --private-key 0xAgentPrivateKey \
+  --contracts-root /home/iliao/git/dac-cloud-contracts
+```
+
+Indexer read commands:
+
+```bash
+node packages/cli/dist/index.js view-dac \
+  --address 0xYourDacCellAddress \
+  --indexer-url http://127.0.0.1:8080/v1/graphql
+
+node packages/cli/dist/index.js view-deal \
+  --address 0xDealAddress \
+  --indexer-url http://127.0.0.1:8080/v1/graphql
+
+node packages/cli/dist/index.js view-proposals \
+  --dac-address 0xYourDacCellAddress \
+  --limit 20 \
+  --indexer-url http://127.0.0.1:8080/v1/graphql
+
+node packages/cli/dist/index.js view-capital-calls \
+  --dac-address 0xYourDacCellAddress \
+  --indexer-url http://127.0.0.1:8080/v1/graphql
+
+node packages/cli/dist/index.js view-treasury-actions \
+  --deal-address 0xDealAddress \
+  --indexer-url http://127.0.0.1:8080/v1/graphql
+```
+
 Defaults:
 
 - chain id `31337`
@@ -266,4 +350,4 @@ Core module namespace:
 
 1. Add transaction recipes for governance + deals (module-aware).
 2. Add batch scenario templates in CLI (deals, tranches, votes).
-3. Add sdk-indexer package with generated GraphQL types.
+3. Add proposals/capital-calls/treasury query facade coverage in `@dac-cloud/indexer`.

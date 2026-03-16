@@ -65,6 +65,8 @@ export const dealCellAbi = parseAbi([
 export const dealAbi = parseAbi([
   ...commonErrorSignatures,
   "event DealManagementProposalCreated(address indexed cell,address indexed prop,uint256 id,bytes4 indexed typ,address target,bytes32 data1,bytes data2)",
+  "event ChildVoteCreated(uint256 indexed childProposalId, uint256 proposalId)",
+  "event ChildVoteCasted(uint256 indexed childProposalId, bool support)",
   "function createStakedAgentProposal((bytes4 typ,address target,bytes32 i,bytes data) params) returns (uint256 proposalId)",
   "function executeStakedAgentProposal(uint256 proposalId)",
   "function getProposal(uint256 proposalId) view returns (address)"

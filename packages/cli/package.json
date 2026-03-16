@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@dac-cloud/core": "0.1.0",
+    "@dac-cloud/indexer": "0.1.0",
     "@dac-cloud/manifests": "0.1.0",
     "viem": "^2.39.0"
   }

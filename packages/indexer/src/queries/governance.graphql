@@ -1,0 +1,119 @@
+fragment ProposalViewFields on Proposal {
+  id
+  chainId
+  proposalAddress
+  scope
+  dacId
+  dealId
+  proposalNumericId
+  kindSelector
+  targetAddress
+  tokenAddress
+  voteCount
+  yesVotes
+  noVotes
+  resolved
+  passed
+  executed
+  createdBlockNumber
+  createdBlockTimestamp
+  resolvedBlockNumber
+  executedBlockNumber
+}
+
+fragment CapitalCallViewFields on CapitalCall {
+  id
+  chainId
+  dacId
+  dacAddress
+  proposalNumericId
+  callHash
+  recipient
+  treasuryTokenAddress
+  tokenAmount
+  cashAmount
+  nonce
+  fulfillmentCount
+  totalFulfilledTokenAmount
+  totalFulfilledCashAmount
+  lastPayer
+  createdBlockNumber
+  createdBlockTimestamp
+  fulfilledBlockNumber
+  updatedBlockNumber
+}
+
+fragment TreasuryActionViewFields on TreasuryAction {
+  id
+  chainId
+  dealId
+  treasuryDealId
+  treasuryAddress
+  actionType
+  tokenAddress
+  agent
+  counterpartyAddress
+  sourceAddress
+  destinationAddress
+  amount
+  dealSize
+  createdBlockNumber
+  createdBlockTimestamp
+  createdTransactionHash
+}
+
+query GetProposalById($id: String!) {
+  Proposal(where: { id: { _eq: $id } }, limit: 1) {
+    ...ProposalViewFields
+  }
+}
+
+query GetProposalByAddress($proposalAddress: String!) {
+  Proposal(where: { proposalAddress: { _eq: $proposalAddress } }, limit: 1) {
+    ...ProposalViewFields
+  }
+}
+
+query ListProposalsByDac($dacId: String!, $limit: Int!, $offset: Int!) {
+  Proposal(
+    where: { dacId: { _eq: $dacId } }
+    limit: $limit
+    offset: $offset
+    order_by: [{ proposalNumericId: desc }, { createdBlockNumber: desc }]
+  ) {
+    ...ProposalViewFields
+  }
+}
+
+query ListProposalsByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
+  Proposal(
+    where: { dealId: { _eq: $dealId } }
+    limit: $limit
+    offset: $offset
+    order_by: [{ proposalNumericId: desc }, { createdBlockNumber: desc }]
+  ) {
+    ...ProposalViewFields
+  }
+}
+
+query ListCapitalCallsByDac($dacId: String!, $limit: Int!, $offset: Int!) {
+  CapitalCall(
+    where: { dacId: { _eq: $dacId } }
+    limit: $limit
+    offset: $offset
+    order_by: [{ proposalNumericId: desc }, { createdBlockNumber: desc }]
+  ) {
+    ...CapitalCallViewFields
+  }
+}
+
+query ListTreasuryActionsByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
+  TreasuryAction(
+    where: { dealId: { _eq: $dealId } }
+    limit: $limit
+    offset: $offset
+    order_by: [{ createdBlockNumber: desc }]
+  ) {
+    ...TreasuryActionViewFields
+  }
+}

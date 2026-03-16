@@ -39,7 +39,7 @@ export interface DacCoreClient {
   createDealManagementProposal(args: {dealAddress: Address; params: ProposalParams}): Promise<{txHash: Hex; proposalId?: bigint; proposalAddress?: Address}>;
   getDealProposalVotingAddress(args: {dealAddress: Address; proposalId: bigint}): Promise<Address>;
   executeDealProposal(args: {dealAddress: Address; proposalId: bigint}): Promise<Hex>;
-  executeDealProposalDetailed(args: {dealAddress: Address; proposalId: bigint}): Promise<{txHash: Hex; dacProposalId?: bigint; trancheId?: bigint}>;
+  executeDealProposalDetailed(args: {dealAddress: Address; proposalId: bigint}): Promise<{txHash: Hex; dacProposalId?: bigint; trancheId?: bigint; childProposalId?: bigint; childVoteProposalId?: bigint}>;
   fulfillCapitalCall(args: {dacCell: Address; call: CapitalCall}): Promise<Hex>;
   depositTreasury(args: {dacCell: Address; token: Address; amount: bigint}): Promise<Hex>;
   recoverTreasury(args: {dacCell: Address; token: Address}): Promise<Hex>;
@@ -395,6 +395,8 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
       let dacProposalId: bigint | undefined;
       let trancheId: bigint | undefined;
+      let childProposalId: bigint | undefined;
+      let childVoteProposalId: bigint | undefined;
 
       for (const log of receipt.logs) {
         try {
@@ -413,7 +415,24 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         }
       }
 
-      return {txHash, dacProposalId, trancheId};
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: dealAbi,
+            data: log.data,
+            topics: log.topics,
+          });
+          if (decoded.eventName === "ChildVoteCreated") {
+            childProposalId = decoded.args.childProposalId;
+            childVoteProposalId = decoded.args.proposalId;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      return {txHash, dacProposalId, trancheId, childProposalId, childVoteProposalId};
     },
 
     async fulfillCapitalCall({dacCell, call}) {

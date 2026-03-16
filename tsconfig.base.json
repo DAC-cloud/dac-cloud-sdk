@@ -15,7 +15,8 @@
     "baseUrl": ".",
     "paths": {
       "@dac-cloud/manifests": ["packages/manifests/src/index.ts"],
-      "@dac-cloud/core": ["packages/core/src/index.ts"]
+      "@dac-cloud/core": ["packages/core/src/index.ts"],
+      "@dac-cloud/indexer": ["packages/indexer/src/index.ts"]
     }
   }
 }

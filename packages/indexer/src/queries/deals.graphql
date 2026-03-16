@@ -1,0 +1,49 @@
+fragment DealViewFields on Deal {
+  id
+  chainId
+  dacId
+  dealNumericId
+  proposalNumericId
+  creator
+  kindSelector
+  cellAddress
+  dealAddress
+  stakeTokenAddress
+  managedTreasuryAddress
+  childDacAddress
+  active
+  closed
+  recovered
+  proposalCount
+  executedProposalCount
+  trancheCount
+  createdBlockNumber
+  createdBlockTimestamp
+  updatedBlockNumber
+}
+
+query GetDealById($id: String!) {
+  Deal(where: { id: { _eq: $id } }, limit: 1) {
+    ...DealViewFields
+  }
+}
+
+query GetDealByAddress($dealAddress: String!, $cellAddress: String!) {
+  byDealAddress: Deal(where: { dealAddress: { _eq: $dealAddress } }, limit: 1) {
+    ...DealViewFields
+  }
+  byCellAddress: Deal(where: { cellAddress: { _eq: $cellAddress } }, limit: 1) {
+    ...DealViewFields
+  }
+}
+
+query ListDealsByDac($dacId: String!, $limit: Int!, $offset: Int!) {
+  Deal(
+    where: { dacId: { _eq: $dacId } }
+    limit: $limit
+    offset: $offset
+    order_by: [{ dealNumericId: desc }]
+  ) {
+    ...DealViewFields
+  }
+}

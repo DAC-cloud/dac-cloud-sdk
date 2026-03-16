@@ -1,0 +1,38 @@
+fragment DacViewFields on Dac {
+  id
+  chainId
+  address
+  name
+  description
+  mainTokenAddress
+  agentTokenAddress
+  dealManagerAddress
+  started
+  dividendsEnabled
+  proposalCount
+  executedProposalCount
+  dealCount
+  activeDealCount
+  capitalCallCount
+  createdBlockNumber
+  createdBlockTimestamp
+  updatedBlockNumber
+}
+
+query GetDacById($id: String!) {
+  Dac(where: { id: { _eq: $id } }, limit: 1) {
+    ...DacViewFields
+  }
+}
+
+query GetDacByAddress($address: String!) {
+  Dac(where: { address: { _eq: $address } }, limit: 1) {
+    ...DacViewFields
+  }
+}
+
+query ListDacs($limit: Int!, $offset: Int!) {
+  Dac(limit: $limit, offset: $offset, order_by: [{ createdBlockNumber: desc }]) {
+    ...DacViewFields
+  }
+}
