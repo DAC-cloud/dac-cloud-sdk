@@ -11,7 +11,14 @@ export const CORE_DEAL_KIND = CORE_DEAL_KIND_FROM_MODULE;
 export const CORE_EVALUATOR_KIND = CORE_EVALUATOR_KIND_FROM_MODULE;
 
 export const DEAL_PROPOSAL_TYPE = {
+  UPDATE_VOTING_CONFIG: toFunctionSelector("updateVotingConfig()"),
   REQUEST_TRANCHE: toFunctionSelector("requestTranche()"),
+  ADD_STAKE: toFunctionSelector("addStake()"),
+  PERMIT_UNSTAKE: toFunctionSelector("permitUnstake()"),
+  ENABLE_VETO_RIGHT: toFunctionSelector("enableVetoRight()"),
+  TOGGLE_WHITELIST: toFunctionSelector("toggleWhitelist()"),
+  TOGGLE_EARLY_RETURNS: toFunctionSelector("toggleEarlyReturns()"),
+  PERMIT_EVALUATOR_ADD: toFunctionSelector("permitEvaluatorAdd()"),
 } as const;
 
 export const CORE_DEAL_PROPOSAL_TYPE = CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE;

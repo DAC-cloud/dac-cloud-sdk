@@ -35,11 +35,18 @@ export interface DacCoreClient {
   checkProposalOutcome(args: {proposalAddress: Address}): Promise<{resolved: boolean; outcome: boolean}>;
   executeDacProposal(args: {dacCell: Address; proposalId: bigint}): Promise<Hex>;
   stakeAgentToDeal(args: {agentToken: Address; dealCell: Address; amount: bigint}): Promise<Hex>;
+  unstakeFromDeal(args: {dealCell: Address}): Promise<Hex>;
+  claimMainToken(args: {dealCell: Address; evaluatorId: bigint}): Promise<Hex>;
   getStakeToken(args: {dealCell: Address}): Promise<Address>;
   createDealManagementProposal(args: {dealAddress: Address; params: ProposalParams}): Promise<{txHash: Hex; proposalId?: bigint; proposalAddress?: Address}>;
   getDealProposalVotingAddress(args: {dealAddress: Address; proposalId: bigint}): Promise<Address>;
   executeDealProposal(args: {dealAddress: Address; proposalId: bigint}): Promise<Hex>;
   executeDealProposalDetailed(args: {dealAddress: Address; proposalId: bigint}): Promise<{txHash: Hex; dacProposalId?: bigint; trancheId?: bigint; childProposalId?: bigint; childVoteProposalId?: bigint}>;
+  evaluateDeal(args: {dealManager: Address; dealId: bigint; evaluatorId: bigint}): Promise<Hex>;
+  forceReturnCapital(args: {dealManager: Address; dealId: bigint}): Promise<Hex>;
+  sendDacLegalWrapperMessage(args: {dacCell: Address; kind: Hex; message: Hex}): Promise<Hex>;
+  sendDealLegalWrapperMessage(args: {dealManager: Address; dealId: bigint; kind: Hex; message: Hex}): Promise<Hex>;
+  claimDividend(args: {dacCell: Address; proposalId: bigint; index: bigint; receiver: Address; amount: bigint; proof: Hex[]}): Promise<Hex>;
   fulfillCapitalCall(args: {dacCell: Address; call: CapitalCall}): Promise<Hex>;
   depositTreasury(args: {dacCell: Address; token: Address; amount: bigint}): Promise<Hex>;
   recoverTreasury(args: {dacCell: Address; token: Address}): Promise<Hex>;
@@ -313,6 +320,33 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       });
     },
 
+    async unstakeFromDeal({dealCell}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for unstakeFromDeal");
+      }
+
+      return walletClient.writeContract({
+        address: dealCell,
+        abi: dealCellAbi,
+        functionName: "unstake",
+        account: walletClient.account,
+      });
+    },
+
+    async claimMainToken({dealCell, evaluatorId}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for claimMainToken");
+      }
+
+      return walletClient.writeContract({
+        address: dealCell,
+        abi: dealCellAbi,
+        functionName: "claimMainToken",
+        args: [evaluatorId],
+        account: walletClient.account,
+      });
+    },
+
     async getStakeToken({dealCell}) {
       return publicClient.readContract({
         address: dealCell,
@@ -433,6 +467,76 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       }
 
       return {txHash, dacProposalId, trancheId, childProposalId, childVoteProposalId};
+    },
+
+    async evaluateDeal({dealManager, dealId, evaluatorId}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for evaluateDeal");
+      }
+
+      return walletClient.writeContract({
+        address: dealManager,
+        abi: dealManagerAbi,
+        functionName: "evaluateDeal",
+        args: [dealId, evaluatorId],
+        account: walletClient.account,
+      });
+    },
+
+    async forceReturnCapital({dealManager, dealId}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for forceReturnCapital");
+      }
+
+      return walletClient.writeContract({
+        address: dealManager,
+        abi: dealManagerAbi,
+        functionName: "forceReturnCapital",
+        args: [dealId],
+        account: walletClient.account,
+      });
+    },
+
+    async sendDacLegalWrapperMessage({dacCell, kind, message}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for sendDacLegalWrapperMessage");
+      }
+
+      return walletClient.writeContract({
+        address: dacCell,
+        abi: dacCellAbi,
+        functionName: "logLegalWrapperMessage",
+        args: [kind, message],
+        account: walletClient.account,
+      });
+    },
+
+    async sendDealLegalWrapperMessage({dealManager, dealId, kind, message}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for sendDealLegalWrapperMessage");
+      }
+
+      return walletClient.writeContract({
+        address: dealManager,
+        abi: dealManagerAbi,
+        functionName: "legalWrapperMessage",
+        args: [dealId, kind, message],
+        account: walletClient.account,
+      });
+    },
+
+    async claimDividend({dacCell, proposalId, index, receiver, amount, proof}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for claimDividend");
+      }
+
+      return walletClient.writeContract({
+        address: dacCell,
+        abi: dacCellAbi,
+        functionName: "claimDividend",
+        args: [proposalId, index, receiver, amount, proof],
+        account: walletClient.account,
+      });
     },
 
     async fulfillCapitalCall({dacCell, call}) {

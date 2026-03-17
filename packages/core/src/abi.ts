@@ -20,6 +20,8 @@ export const dacCellAbi = parseAbi([
   "function recoverTreasury(address token)",
   "function createManagementProposal((bytes4 typ,address target,bytes32 i,bytes data) params) returns (uint256 id)",
   "function fulfillCapitalCall((address treasuryToken, uint256 nonce, address tokenRecipient, uint256 tokenAmount, uint256 cashAmount) call) returns (bool)",
+  "function logLegalWrapperMessage(bytes4 kind, bytes message)",
+  "function claimDividend(uint256 proposalId, uint256 index, address receiver, uint256 amount, bytes32[] proof)",
   "function executeDACProposal(uint256 id)",
   "function getProposalVoting(uint256 proposalId) view returns (address)"
 ]);
@@ -30,7 +32,10 @@ export const dealManagerAbi = parseAbi([
   "event TrancheCreated(address indexed dac, uint256 indexed id, uint256 indexed proposalId, uint256 trancheId)",
   "function createDealProposal((bytes4 dealKind,string name,string description,string linkHash,address moduleFactory,address governanceFactory,address dealTarget,address proposer,bool vetoEnabled,address fundingToken,uint256 fundingAmount,uint256 rewardsLimit,uint256 approveDeadline,uint256 dealDeadline,bytes dealConfig,bytes4 evaluatorSelector,bytes evaluatorConfig) params) returns (uint256 id, address dealCell, address dealAddr, address evaluatorAddr)",
   "function deals(uint256 id) view returns (address)",
-  "function isRecoverable(uint256 id) view returns (bool)"
+  "function isRecoverable(uint256 id) view returns (bool)",
+  "function evaluateDeal(uint256 id, uint256 evaluatorId)",
+  "function legalWrapperMessage(uint256 id, bytes4 kind, bytes message)",
+  "function forceReturnCapital(uint256 id)"
 ]);
 
 export const votingProposalAbi = parseAbi([
@@ -59,7 +64,9 @@ export const agentTokenAbi = parseAbi([
 
 export const dealCellAbi = parseAbi([
   ...commonErrorSignatures,
-  "function stakeToken() view returns (address)"
+  "function stakeToken() view returns (address)",
+  "function unstake()",
+  "function claimMainToken(uint256 evaluatorId)"
 ]);
 
 export const dealAbi = parseAbi([
