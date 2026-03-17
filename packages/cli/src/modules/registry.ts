@@ -5,6 +5,7 @@ import type {
   CliModuleSpec,
   DealKindSpec,
   EvaluatorKindSpec,
+  KernelDealProposalHookSpec,
   ResolvedDealProposalType,
 } from "./types";
 
@@ -220,4 +221,36 @@ export function listKnownModuleDealProposalTypes(): string[] {
     MODULES.flatMap((module) => module.dealProposalTypes),
   ).map((entry) => `${entry.moduleId}:${entry.key}`);
   return entries.sort((a, b) => a.localeCompare(b));
+}
+
+export function resolveKernelDealProposalHook(
+  proposalType: string,
+  dealKindSelector?: Hex,
+): KernelDealProposalHookSpec | undefined {
+  if (!dealKindSelector) {
+    return undefined;
+  }
+
+  const normalizedType = normalizeAlias(proposalType);
+  const normalizedSelector = dealKindSelector.toLowerCase();
+
+  const matches = MODULES.flatMap((module) => (
+    (module.kernelDealProposalHooks ?? []).filter((hook) => (
+      normalizeAlias(hook.key) === normalizedType
+      && hook.dealKindSelectors.some((selector) => selector.toLowerCase() === normalizedSelector)
+    ))
+  ));
+
+  if (matches.length === 0) {
+    return undefined;
+  }
+  if (matches.length === 1) {
+    return matches[0];
+  }
+
+  const variants = matches.map((entry) => `${entry.moduleId}:${entry.key}`).join(", ");
+  throw new Error(
+    `Ambiguous kernel proposal hook for '${proposalType}' and deal kind '${dealKindSelector}'. `
+    + `Matches: ${variants}`,
+  );
 }

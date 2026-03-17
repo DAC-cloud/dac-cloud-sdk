@@ -39,11 +39,19 @@ export interface ModuleDealProposalSpec {
   build(context: ModuleDealProposalBuildContext): ProposalParams | Promise<ProposalParams>;
 }
 
+export interface KernelDealProposalHookSpec {
+  moduleId: string;
+  key: string;
+  dealKindSelectors: Hex[];
+  build(context: ModuleDealProposalBuildContext): ProposalParams | undefined | Promise<ProposalParams | undefined>;
+}
+
 export interface CliModuleSpec {
   moduleId: string;
   dealKinds: DealKindSpec[];
   evaluatorKinds: EvaluatorKindSpec[];
   dealProposalTypes: ModuleDealProposalSpec[];
+  kernelDealProposalHooks?: KernelDealProposalHookSpec[];
 }
 
 export interface ResolvedDealProposalType {

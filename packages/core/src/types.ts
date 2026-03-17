@@ -50,6 +50,7 @@ export interface DealParams {
   fundingAmount: bigint;
   rewardsLimit: bigint;
   approveDeadline: bigint;
+  evaluationDeadline: bigint;
   dealDeadline: bigint;
   dealConfig: Hex;
   evaluatorSelector: Hex;

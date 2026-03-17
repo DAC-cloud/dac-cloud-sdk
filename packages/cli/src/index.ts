@@ -41,6 +41,24 @@ function buildProgram(): Command {
     .option("--evaluator-id <uint256>", "Deal evaluator id")
     .option("--input <path>", "JSON input file for complex proposal/message payloads")
     .option("--from-request", "For add-stake proposals: source amount from request allowance");
+  program.addHelpText("after", `
+Config resolution order:
+  1) CLI flags
+  2) --config <path> (.env format)
+  3) ./config.env
+  4) process environment
+
+Option keys support both plain and DAC_ prefixed env names.
+Example: --rpc-url resolves from RPC_URL or DAC_RPC_URL.
+
+Defaults:
+  --chain-id 31337
+  --rpc-url http://127.0.0.1:8545
+  --indexer-url http://127.0.0.1:8080/v1/graphql
+  --private-key anvil account #0
+
+All command outputs are JSON. Bigint values are serialized as decimal strings.
+`);
 
   const resolverFactory = loadOptionResolver;
 

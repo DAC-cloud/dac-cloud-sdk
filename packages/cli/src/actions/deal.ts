@@ -10,7 +10,6 @@ import {z} from "zod";
 import {
   asAddress,
   asBytes4,
-  asBytes32,
   dacAddressFromCompositeId,
   parseBoolText,
   resolveDealIdOrThrow,
@@ -21,6 +20,7 @@ import {
 import {
   listKnownModuleDealProposalTypes,
   resolveDealKindSpec,
+  resolveKernelDealProposalHook,
   resolveDealProposalType,
   resolveEvaluatorKindSpec,
 } from "../modules/registry";
@@ -114,6 +114,7 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
     fundingAmount: z.union([z.string(), z.number(), z.bigint()]),
     rewardsLimit: z.union([z.string(), z.number(), z.bigint()]).optional(),
     approveDeadline: z.union([z.string(), z.number(), z.bigint()]).optional(),
+    evaluationDeadline: z.union([z.string(), z.number(), z.bigint()]).optional(),
     dealDeadline: z.union([z.string(), z.number(), z.bigint()]).optional(),
     dealConfig: z.unknown(),
     evaluatorSelector: z.string(),
@@ -144,6 +145,13 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
     );
   }
 
+  const resolvedDealDeadline = parsed.dealDeadline
+    ? parseBigNumberish(parsed.dealDeadline, "dealDeadline")
+    : now + 30n * 24n * 60n * 60n;
+  const resolvedEvaluationDeadline = parsed.evaluationDeadline
+    ? parseBigNumberish(parsed.evaluationDeadline, "evaluationDeadline")
+    : resolvedDealDeadline;
+
   const dealParams: DealParams = {
     dealKind: dealKind.selector,
     name: parsed.name,
@@ -158,7 +166,8 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
     fundingAmount: parseBigNumberish(parsed.fundingAmount, "fundingAmount"),
     rewardsLimit: parsed.rewardsLimit ? parseBigNumberish(parsed.rewardsLimit, "rewardsLimit") : 500_000_000n,
     approveDeadline: parsed.approveDeadline ? parseBigNumberish(parsed.approveDeadline, "approveDeadline") : now + 7n * 24n * 60n * 60n,
-    dealDeadline: parsed.dealDeadline ? parseBigNumberish(parsed.dealDeadline, "dealDeadline") : now + 30n * 24n * 60n * 60n,
+    evaluationDeadline: resolvedEvaluationDeadline,
+    dealDeadline: resolvedDealDeadline,
     dealConfig,
     evaluatorSelector: evaluator.selector,
     evaluatorConfig,
@@ -180,6 +189,10 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
     evaluatorAddress: created.evaluatorAddress,
     moduleId: dealKind.moduleId,
     evaluatorModuleId: evaluator.moduleId,
+    approveDeadline: dealParams.approveDeadline,
+    evaluationDeadline: dealParams.evaluationDeadline,
+    dealDeadline: dealParams.dealDeadline,
+    rewardsLimit: dealParams.rewardsLimit,
   });
 }
 
@@ -278,14 +291,16 @@ async function cmdRequest(resolver: OptionResolver, amountText: string): Promise
   });
 }
 
-const BASE_DEAL_PROPOSAL_TYPES = new Set<string>([
+const BASE_DEAL_PROPOSAL_TYPE_LIST = [
   "update-voting-config",
   "toggle-whitelist",
   "toggle-early-returns",
   "enable-veto-right",
   "request-tranche",
   "add-stake",
-]);
+] as const;
+
+const BASE_DEAL_PROPOSAL_TYPES = new Set<string>(BASE_DEAL_PROPOSAL_TYPE_LIST);
 
 async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, args: string[]): Promise<void> {
   const {core} = await makeCoreContext(resolver);
@@ -301,9 +316,21 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     throw new Error(`'${proposalTypeRaw}' is a kernel deal proposal type. Remove module prefix.`);
   }
 
-  let params: ProposalParams;
+  let params: ProposalParams | undefined;
 
-  if (proposalType === "update-voting-config") {
+  const kernelHook = resolveKernelDealProposalHook(proposalType, resolved.kindSelector);
+  if (kernelHook) {
+    params = await kernelHook.build({
+      args,
+      input,
+      resolver,
+      core,
+      indexer,
+      resolvedDeal: resolved,
+    });
+  }
+
+  if (!params && proposalType === "update-voting-config") {
     if (args.length !== 5 && !input) {
       throw new Error("deal propose update-voting-config requires positional args or --input json");
     }
@@ -337,7 +364,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
         }],
       ),
     };
-  } else if (proposalType === "toggle-whitelist") {
+  } else if (!params && proposalType === "toggle-whitelist") {
     if (args.length !== 1 && !input) {
       throw new Error("deal propose toggle-whitelist requires positional arg or --input json");
     }
@@ -348,7 +375,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
       i: numberToHex(0n, {size: 32}),
       data: encodeAbiParameters([{name: "enabled", type: "bool"}], [enabled]),
     };
-  } else if (proposalType === "toggle-early-returns") {
+  } else if (!params && proposalType === "toggle-early-returns") {
     if (args.length !== 1 && !input) {
       throw new Error("deal propose toggle-early-returns requires positional arg or --input json");
     }
@@ -359,7 +386,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
       i: numberToHex(0n, {size: 32}),
       data: encodeAbiParameters([{name: "enabled", type: "bool"}], [enabled]),
     };
-  } else if (proposalType === "enable-veto-right") {
+  } else if (!params && proposalType === "enable-veto-right") {
     requireNArgs(args, 0, "deal propose enable-veto-right requires no args");
     params = {
       typ: DEAL_PROPOSAL_TYPE.ENABLE_VETO_RIGHT,
@@ -367,65 +394,24 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
       i: numberToHex(0n, {size: 32}),
       data: "0x",
     };
-  } else if (proposalType === "request-tranche") {
-    const capitalCallHashOption = resolver.resolveString("capital-call-hash")
-      ?? (input ? readStringField(input, "capitalCallHash", "--input") : undefined);
-    const capitalCallNonceOption = resolver.resolveString("capital-call-nonce")
-      ?? (resolved.childDacAddress && args.length === 1 ? args[0] : undefined);
-    const capitalCallNonceFromInput = input && input["capitalCallNonce"] !== undefined
-      ? readBigIntField(input, "capitalCallNonce", "--input").toString()
-      : undefined;
-    const effectiveCapitalCallNonce = capitalCallNonceOption ?? capitalCallNonceFromInput;
-    if (capitalCallHashOption || effectiveCapitalCallNonce) {
-      if (!resolved.childDacAddress) {
-        throw new Error("Capital-call based tranche request requires a DACDeal with childDacAddress in indexer.");
-      }
-      const childDac = await indexer.dacs.getByAddress(resolved.childDacAddress);
-      if (!childDac) {
-        throw new Error("Child DAC not found in indexer.");
-      }
-      const calls = await indexer.capitalCalls.listByDac(childDac.id, {limit: 500, offset: 0});
-      const call = calls.find((entry) => {
-        if (capitalCallHashOption && entry.callHash.toLowerCase() !== capitalCallHashOption.toLowerCase()) {
-          return false;
-        }
-        if (effectiveCapitalCallNonce && BigInt(entry.nonce) !== BigInt(effectiveCapitalCallNonce)) {
-          return false;
-        }
-        return true;
-      });
-      if (!call) {
-        throw new Error("Matching child capital call not found.");
-      }
-
-      const amount = BigInt(call.cashAmount);
-      const callHash = asBytes32(call.callHash, "callHash") as Hex;
-      params = {
-        typ: DEAL_PROPOSAL_TYPE.REQUEST_TRANCHE,
-        target: asAddress(call.treasuryTokenAddress, "capital call treasury token"),
-        i: numberToHex(amount, {size: 32}),
-        data: encodeAbiParameters(
-          [
-            {name: "fundingAmount", type: "uint256"},
-            {name: "callHash", type: "bytes32"},
-          ],
-          [amount, callHash],
-        ),
-      };
-    } else {
-      if (args.length !== 2 && !input) {
-        throw new Error("deal propose request-tranche requires positional args or --input json");
-      }
-      const token = args[0] ?? readStringField(input, "token", "--input");
-      const amount = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "amount", "--input");
-      params = {
-        typ: DEAL_PROPOSAL_TYPE.REQUEST_TRANCHE,
-        target: asAddress(token, "token"),
-        i: numberToHex(amount, {size: 32}),
-        data: "0x",
-      };
+  } else if (!params && proposalType === "request-tranche") {
+    if ((args.length !== 2 && args.length !== 3) && !input) {
+      throw new Error("deal propose request-tranche requires <token> <amount> [rewards] or --input json");
     }
-  } else if (proposalType === "add-stake") {
+    const token = args[0] ?? readStringField(input, "token", "--input");
+    const amount = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "amount", "--input");
+    const rewards = args[2] !== undefined ? BigInt(args[2]) : (
+      input?.rewards !== undefined
+        ? readBigIntField(input, "rewards", "--input")
+        : 0n
+    );
+    params = {
+      typ: DEAL_PROPOSAL_TYPE.REQUEST_TRANCHE,
+      target: asAddress(token, "token"),
+      i: numberToHex(amount, {size: 32}),
+      data: encodeAbiParameters([{name: "rewards", type: "uint256"}], [rewards]),
+    };
+  } else if (!params && proposalType === "add-stake") {
     const fromRequest = resolver.resolveBoolean("from-request", false);
     if (!fromRequest && args.length !== 2 && !input) {
       throw new Error("deal propose add-stake requires positional args or --input json");
@@ -471,7 +457,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
       i: numberToHex(amount, {size: 32}),
       data: "0x",
     };
-  } else {
+  } else if (!params) {
     const moduleProposal = resolvedType.spec;
     if (!moduleProposal) {
       const supportedKernel = [...BASE_DEAL_PROPOSAL_TYPES].sort((a, b) => a.localeCompare(b));
@@ -490,6 +476,10 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
       indexer,
       resolvedDeal: resolved,
     });
+  }
+
+  if (!params) {
+    throw new Error(`Unable to build proposal params for type '${proposalTypeRaw}'.`);
   }
 
   const created = await core.createDealManagementProposal({dealAddress, params});
@@ -771,10 +761,27 @@ export function registerDealCommands(program: Command, resolverFactory: (options
       await cmdRequest(resolver, amount);
     });
 
-  deal
+  const propose = deal
     .command("propose <proposalType> [args...]")
-    .description("Create a deal governance proposal")
-    .action(async function handlePropose(proposalType: string, args: string[]) {
+    .description("Create a deal governance proposal");
+  const kernelTypes = BASE_DEAL_PROPOSAL_TYPE_LIST.join(", ");
+  const moduleTypes = listKnownModuleDealProposalTypes().join(", ");
+  propose.addHelpText("after", `
+Kernel deal proposal types:
+  ${kernelTypes}
+
+Known module deal proposal types:
+  ${moduleTypes}
+
+Request-tranche usage:
+  Generic: dac deal propose request-tranche <token> <amount> [rewards]
+  DACDeal by call nonce: dac deal propose request-tranche <capitalCallNonce> [rewards]
+  DACDeal by flags: dac deal propose request-tranche [rewards] --capital-call-hash <bytes32>
+                    dac deal propose request-tranche [rewards] --capital-call-nonce <uint256>
+
+Complex payloads can use --input <json> (for example update-voting-config, treasury module types).
+`);
+  propose.action(async function handlePropose(proposalType: string, args: string[]) {
       const resolver = await resolverFactory(this.optsWithGlobals());
       await cmdPropose(resolver, proposalType, args);
     });

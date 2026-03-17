@@ -11,6 +11,7 @@ import {
   buildTreasuryReturnCapitalProposal,
   buildTreasuryRevokeAgentProposal,
   coreModule,
+  DEAL_PROPOSAL_TYPE,
   CORE_DEAL_KIND,
   CORE_EVALUATOR_KIND,
   type ProposalParams,
@@ -100,6 +101,91 @@ function ensureArgsOrInput(
   if (args.length !== expected && !input) {
     throw new Error(`${hint} requires positional args or --input json`);
   }
+}
+
+function isDecimalUint(value: string): boolean {
+  return /^[0-9]+$/.test(value);
+}
+
+async function buildDacDealRequestTrancheKernelHook(context: ModuleDealProposalBuildContext): Promise<ProposalParams | undefined> {
+  const {args, input, resolver, indexer, resolvedDeal} = context;
+
+  const capitalCallHashOption = resolver.resolveString("capital-call-hash")
+    ?? (input && input["capitalCallHash"] !== undefined ? readStringField(input, "capitalCallHash", "--input") : undefined);
+  const capitalCallNonceOption = resolver.resolveString("capital-call-nonce")
+    ?? (input && input["capitalCallNonce"] !== undefined ? readBigIntField(input, "capitalCallNonce", "--input").toString() : undefined);
+
+  let positionalNonce: string | undefined;
+  let positionalRewards: bigint | undefined;
+
+  if (!capitalCallHashOption && !capitalCallNonceOption) {
+    if (args.length === 0 || !isDecimalUint(args[0])) {
+      return undefined;
+    }
+    if (args.length > 2) {
+      throw new Error("DACDeal request-tranche capital-call flow accepts <capitalCallNonce> [rewards].");
+    }
+    positionalNonce = args[0];
+    positionalRewards = args[1] !== undefined ? BigInt(args[1]) : undefined;
+  } else {
+    if (args.length > 1) {
+      throw new Error("When using --capital-call-hash/--capital-call-nonce, only optional [rewards] positional arg is allowed.");
+    }
+    positionalRewards = args[0] !== undefined ? BigInt(args[0]) : undefined;
+  }
+
+  const effectiveNonce = capitalCallNonceOption ?? positionalNonce;
+  if (!capitalCallHashOption && !effectiveNonce) {
+    return undefined;
+  }
+
+  if (!resolvedDeal.childDacAddress) {
+    throw new Error("Capital-call based tranche request requires a DACDeal with childDacAddress in indexer.");
+  }
+
+  const normalizedHash = capitalCallHashOption
+    ? asBytes32(capitalCallHashOption, "capital call hash").toLowerCase()
+    : undefined;
+
+  const childDac = await indexer.dacs.getByAddress(resolvedDeal.childDacAddress);
+  if (!childDac) {
+    throw new Error("Child DAC not found in indexer.");
+  }
+
+  const calls = await indexer.capitalCalls.listByDac(childDac.id, {limit: 500, offset: 0});
+  const call = calls.find((entry) => {
+    if (normalizedHash && entry.callHash.toLowerCase() !== normalizedHash) {
+      return false;
+    }
+    if (effectiveNonce && BigInt(entry.nonce) !== BigInt(effectiveNonce)) {
+      return false;
+    }
+    return true;
+  });
+  if (!call) {
+    throw new Error("Matching child capital call not found.");
+  }
+
+  const amount = BigInt(call.cashAmount);
+  const rewards = positionalRewards ?? (
+    input?.rewards !== undefined
+      ? readBigIntField(input, "rewards", "--input")
+      : 0n
+  );
+  const callHash = asBytes32(call.callHash, "callHash") as Hex;
+
+  return {
+    typ: DEAL_PROPOSAL_TYPE.REQUEST_TRANCHE,
+    target: asAddress(call.treasuryTokenAddress, "capital call treasury token"),
+    i: numberToHex(amount, {size: 32}),
+    data: encodeAbiParameters(
+      [
+        {name: "rewards", type: "uint256"},
+        {name: "callHash", type: "bytes32"},
+      ],
+      [rewards, callHash],
+    ),
+  };
 }
 
 function encodePermit2TreasuryDealConfig(config: unknown): Hex {
@@ -410,5 +496,13 @@ export const coreCliModule: CliModuleSpec = {
     {moduleId: "core", key: "child-vote-proposal", aliases: ["child-vote-proposal"], build: buildChildVoteProposal},
     {moduleId: "core", key: "child-return-profits", aliases: ["child-return-profits"], build: buildChildReturnProfitsProposal},
     {moduleId: "core", key: "child-reinvest-profits", aliases: ["child-reinvest-profits"], build: buildChildReinvestProfitsProposal},
+  ],
+  kernelDealProposalHooks: [
+    {
+      moduleId: "core",
+      key: "request-tranche",
+      dealKindSelectors: [CORE_DEAL_KIND.DAC_DEAL],
+      build: buildDacDealRequestTrancheKernelHook,
+    },
   ],
 };

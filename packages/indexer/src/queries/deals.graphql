@@ -17,6 +17,13 @@ fragment DealViewFields on Deal {
   proposalCount
   executedProposalCount
   trancheCount
+  approveDeadline
+  evaluationDeadline
+  dealDeadline
+  rewardsLimit
+  rewardsAllocated
+  totalRewardAllocatedAmount
+  totalRewardClaimedAmount
   createdBlockNumber
   createdBlockTimestamp
   updatedBlockNumber

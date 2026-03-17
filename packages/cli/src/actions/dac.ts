@@ -29,30 +29,32 @@ import type {OptionResolver} from "../runtime/config";
 import {advanceTime, makeCoreContext, makeIndexer} from "../runtime/chain";
 import {printJson, readJsonFile} from "../runtime/io";
 
+const DAC_PROPOSAL_TYPES = [
+  "update-voting-config",
+  "update-legal-wrapper",
+  "approve-offchain-action",
+  "mint-agent-tokens",
+  "revoke-agent-tokens",
+  "mint-main-tokens",
+  "burn-main-tokens",
+  "toggle-dividends",
+  "dividend-payout",
+  "delegate-from-balance",
+  "capital-call",
+  "add-module",
+  "remove-module",
+  "recover-deal",
+  "deal-message",
+  "cast-veto-deal",
+  "add-evaluator",
+] as const;
+
 function bytes32Random(): Hex {
   return `0x${randomBytes(32).toString("hex")}` as Hex;
 }
 
 function proposalTypeFromText(text: string) {
-  return z.enum([
-    "update-voting-config",
-    "update-legal-wrapper",
-    "approve-offchain-action",
-    "mint-agent-tokens",
-    "revoke-agent-tokens",
-    "mint-main-tokens",
-    "burn-main-tokens",
-    "toggle-dividends",
-    "dividend-payout",
-    "delegate-from-balance",
-    "capital-call",
-    "add-module",
-    "remove-module",
-    "recover-deal",
-    "deal-message",
-    "cast-veto-deal",
-    "add-evaluator",
-  ]).parse(text);
+  return z.enum(DAC_PROPOSAL_TYPES).parse(text);
 }
 
 function requireNArgs(args: string[], expected: number, hint: string): void {
@@ -725,10 +727,20 @@ export function registerDacCommands(program: Command, resolverFactory: (options:
       await cmdDelegate(resolver);
     });
 
-  program
+  const propose = program
     .command("propose <proposalType> [args...]")
-    .description("Create a DAC governance proposal")
-    .action(async function handlePropose(proposalType: string, args: string[]) {
+    .description("Create a DAC governance proposal");
+  propose.addHelpText("after", `
+DAC proposal types:
+  ${DAC_PROPOSAL_TYPES.join(", ")}
+
+Proposal args can be passed either as positional arguments or via --input <json>.
+Examples:
+  dac propose mint-agent-tokens <amount> <agent>
+  dac propose capital-call <recipient> <treasuryToken> <tokenAmount> <cashAmount>
+  dac propose update-voting-config --input ./vote-config.json
+`);
+  propose.action(async function handlePropose(proposalType: string, args: string[]) {
       const resolver = await resolverFactory(this.optsWithGlobals());
       await cmdPropose(resolver, proposalType, args);
     });
