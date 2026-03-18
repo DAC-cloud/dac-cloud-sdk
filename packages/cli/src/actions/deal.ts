@@ -24,6 +24,7 @@ import {
   resolveDealProposalType,
   resolveEvaluatorKindSpec,
 } from "../modules/registry";
+import {addCommandHelp, applyOptions} from "../cli/options";
 import type {OptionResolver} from "../runtime/config";
 import {advanceTime, makeCoreContext, makeIndexer} from "../runtime/chain";
 import {printJson, readJsonFile} from "../runtime/io";
@@ -721,49 +722,101 @@ async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: stri
 export function registerDealCommands(program: Command, resolverFactory: (options: Record<string, unknown>) => Promise<OptionResolver>): void {
   const deal = program.command("deal").description("Deal-level operations");
 
-  deal
-    .command("create <dealFile>")
-    .description("Create a deal from JSON file")
-    .action(async function handleCreate(dealFile: string) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdCreate(resolver, dealFile);
-    });
+  const create = deal.command("create <dealFile>").description("Create a deal from JSON file");
+  applyOptions(create, ["cell-address", "dac-address"]);
+  addCommandHelp(create, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address"], label: "DAC selector"},
+    ],
+    notes: [
+      "dealFile must contain dealKind/evaluatorSelector and module-specific config payloads.",
+    ],
+    examples: [
+      "dac deal create ./deal.json --cell-address 0x...",
+    ],
+  });
+  create.action(async function handleCreate(dealFile: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdCreate(resolver, dealFile);
+  });
 
-  deal
-    .command("stake <amount>")
-    .description("Stake AgentToken into a deal")
-    .action(async function handleStake(amount: string) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdStake(resolver, amount);
-    });
+  const stake = deal.command("stake <amount>").description("Stake AgentToken into a deal");
+  applyOptions(stake, ["cell-address", "dac-address", "deal-cell", "deal-id", "id", "deal-address", "address", "deal", "auto-delegate"]);
+  addCommandHelp(stake, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address"], label: "DAC selector"},
+      {mode: "oneOf", options: ["deal-cell", "deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
+    ],
+  });
+  stake.action(async function handleStake(amount: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdStake(resolver, amount);
+  });
 
-  deal
-    .command("unstake")
-    .description("Unstake from a deal after permit/close rules are satisfied")
-    .action(async function handleUnstake() {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdUnstake(resolver);
-    });
+  const unstake = deal.command("unstake").description("Unstake from a deal after permit/close rules are satisfied");
+  applyOptions(unstake, ["deal-cell", "deal-id", "id", "deal-address", "address", "deal"]);
+  addCommandHelp(unstake, {
+    requirements: [
+      {mode: "oneOf", options: ["deal-cell", "deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
+    ],
+  });
+  unstake.action(async function handleUnstake() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdUnstake(resolver);
+  });
 
-  deal
-    .command("delegate")
-    .description("Delegate StakedAgent voting power")
-    .action(async function handleDelegate() {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdDelegate(resolver);
-    });
+  const delegate = deal.command("delegate").description("Delegate StakedAgent voting power");
+  applyOptions(delegate, ["stake-token", "deal-cell", "deal-id", "id", "deal-address", "address", "deal", "delegatee"]);
+  addCommandHelp(delegate, {
+    requirements: [
+      {mode: "oneOf", options: ["stake-token", "deal-cell", "deal-id", "id", "deal-address", "address", "deal"], label: "Stake token or deal selector"},
+    ],
+  });
+  delegate.action(async function handleDelegate() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdDelegate(resolver);
+  });
 
-  deal
-    .command("request <amount>")
-    .description("Request stake in active deal (AgentToken approve -> StakeRequested)")
-    .action(async function handleRequest(amount: string) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdRequest(resolver, amount);
-    });
+  const request = deal.command("request <amount>").description("Request stake in active deal (AgentToken approve -> StakeRequested)");
+  applyOptions(request, ["cell-address", "dac-address", "deal-id", "id", "deal-address", "address", "deal"]);
+  addCommandHelp(request, {
+    requirements: [
+      {mode: "oneOf", options: ["deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
+    ],
+    notes: [
+      "If DAC is omitted, CLI derives it from indexer deal metadata.",
+    ],
+  });
+  request.action(async function handleRequest(amount: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdRequest(resolver, amount);
+  });
 
   const propose = deal
     .command("propose <proposalType> [args...]")
     .description("Create a deal governance proposal");
+  applyOptions(propose, [
+    "deal-address",
+    "deal",
+    "deal-id",
+    "id",
+    "address",
+    "input",
+    "from-request",
+    "cell-address",
+    "dac-address",
+    "capital-call-hash",
+    "capital-call-nonce",
+  ]);
+  addCommandHelp(propose, {
+    requirements: [
+      {mode: "oneOf", options: ["deal-address", "deal", "deal-id", "id", "address"], label: "Deal selector"},
+    ],
+    notes: [
+      "`--input` can replace positional args for complex payloads.",
+      "`--from-request` applies to kernel `add-stake` proposal flow.",
+    ],
+  });
   const kernelTypes = BASE_DEAL_PROPOSAL_TYPE_LIST.join(", ");
   const moduleTypes = listKnownModuleDealProposalTypes().join(", ");
   propose.addHelpText("after", `
@@ -787,59 +840,91 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
     });
 
   const vote = deal.command("vote").description("Vote deal proposals");
-  vote
-    .command("proposal <proposalId> <support>")
-    .description("Vote for a deal proposal")
-    .action(async function handleVote(proposalId: string, support: string) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdVoteProposal(resolver, proposalId, support);
-    });
+  const voteProposal = vote.command("proposal <proposalId> <support>").description("Vote for a deal proposal");
+  applyOptions(voteProposal, ["deal-address", "deal", "deal-id", "id", "address", "pre-vote-advance-seconds"]);
+  addCommandHelp(voteProposal, {
+    requirements: [
+      {mode: "oneOf", options: ["deal-address", "deal", "deal-id", "id", "address"], label: "Deal selector"},
+    ],
+  });
+  voteProposal.action(async function handleVote(proposalId: string, support: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdVoteProposal(resolver, proposalId, support);
+  });
 
-  deal
-    .command("execute <proposalId>")
-    .description("Execute a passed deal proposal")
-    .action(async function handleExecute(proposalId: string) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdExecute(resolver, proposalId);
-    });
+  const execute = deal.command("execute <proposalId>").description("Execute a passed deal proposal");
+  applyOptions(execute, ["deal-address", "deal", "deal-id", "id", "address", "advance-seconds"]);
+  addCommandHelp(execute, {
+    requirements: [
+      {mode: "oneOf", options: ["deal-address", "deal", "deal-id", "id", "address"], label: "Deal selector"},
+    ],
+  });
+  execute.action(async function handleExecute(proposalId: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdExecute(resolver, proposalId);
+  });
 
-  deal
-    .command("evaluate [evaluatorId]")
-    .description("Evaluate a deal via DealManager.evaluateDeal")
-    .action(async function handleEvaluate(evaluatorId: string | undefined) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdEvaluate(resolver, evaluatorId);
-    });
+  const evaluate = deal.command("evaluate [evaluatorId]").description("Evaluate a deal via DealManager.evaluateDeal");
+  applyOptions(evaluate, ["evaluator-id", "deal-id", "id", "deal-address", "address", "deal", "cell-address", "dac-address"]);
+  addCommandHelp(evaluate, {
+    requirements: [
+      {mode: "oneOf", options: ["deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
+    ],
+  });
+  evaluate.action(async function handleEvaluate(evaluatorId: string | undefined) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdEvaluate(resolver, evaluatorId);
+  });
 
-  deal
-    .command("claim [evaluatorId]")
-    .description("Claim unlocked MainToken rewards from deal cell")
-    .action(async function handleClaim(evaluatorId: string | undefined) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdClaim(resolver, evaluatorId);
-    });
+  const claim = deal.command("claim [evaluatorId]").description("Claim unlocked MainToken rewards from deal cell");
+  applyOptions(claim, ["evaluator-id", "deal-cell", "deal-id", "id", "deal-address", "address", "deal"]);
+  addCommandHelp(claim, {
+    requirements: [
+      {mode: "oneOf", options: ["deal-cell", "deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
+    ],
+  });
+  claim.action(async function handleClaim(evaluatorId: string | undefined) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdClaim(resolver, evaluatorId);
+  });
 
-  deal
-    .command("legal-message [dealNumericId] <messageFile>")
-    .description("Send legal wrapper message via DealManager.legalWrapperMessage")
-    .action(async function handleLegalMessage(dealNumericId: string | undefined, messageFile: string) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdLegalMessage(resolver, messageFile, dealNumericId);
-    });
+  const legalMessage = deal.command("legal-message [dealNumericId] <messageFile>")
+    .description("Send legal wrapper message via DealManager.legalWrapperMessage");
+  applyOptions(legalMessage, ["deal-id", "id", "deal-address", "address", "deal", "cell-address", "dac-address"]);
+  addCommandHelp(legalMessage, {
+    notes: [
+      "If dealNumericId is not provided, CLI resolves deal id from deal selector options.",
+      "When explicit dealNumericId is used, pass DAC with --cell-address or --dac-address.",
+    ],
+  });
+  legalMessage.action(async function handleLegalMessage(dealNumericId: string | undefined, messageFile: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdLegalMessage(resolver, messageFile, dealNumericId);
+  });
 
-  deal
-    .command("withdraw <dealNumericId>")
-    .description("Force return capital after deadline via DealManager.forceReturnCapital")
-    .action(async function handleWithdraw(dealNumericId: string) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdWithdraw(resolver, dealNumericId);
-    });
+  const withdraw = deal.command("withdraw <dealNumericId>")
+    .description("Force return capital after deadline via DealManager.forceReturnCapital");
+  applyOptions(withdraw, ["cell-address", "dac-address"]);
+  addCommandHelp(withdraw, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address"], label: "DAC selector"},
+    ],
+  });
+  withdraw.action(async function handleWithdraw(dealNumericId: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdWithdraw(resolver, dealNumericId);
+  });
 
-  deal
-    .command("view [resource] [id]")
-    .description("View deal/indexer state")
-    .action(async function handleView(resource: string | undefined, id: string | undefined) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdView(resolver, resource, id);
-    });
+  const view = deal.command("view [resource] [id]").description("View deal/indexer state");
+  applyOptions(view, ["deal-id", "id", "deal-address", "address", "query-limit", "query-offset", "limit", "offset"]);
+  addCommandHelp(view, {
+    notes: [
+      "For resource=deal, provide deal id/address using positional [id], --deal-id, --deal-address, or --address.",
+      "For resource=proposals/treasury-actions, deal id is resolved from --deal-id or deal address options.",
+    ],
+  });
+  view.action(async function handleView(resource: string | undefined, id: string | undefined) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdView(resolver, resource, id);
+  });
 }

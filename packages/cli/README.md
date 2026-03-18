@@ -59,7 +59,7 @@ If not provided by flags/config/env:
 
 ## Global Flags
 
-Common flags used across commands:
+Global (root) flags are infrastructure/runtime related:
 
 - `--config <path>`
 - `--private-key <hex>`
@@ -67,13 +67,9 @@ Common flags used across commands:
 - `--rpc-url <url>`
 - `--contracts-root <path>`
 - `--indexer-url <url>`
-- `--cell-address <address>`
-- `--deal-id <id>` / `--deal-address <address>` / `--deal-cell <address>`
-- `--query-limit <number>` / `--query-offset <number>`
-- `--pre-vote-advance-seconds <number>` / `--advance-seconds <number>`
-- `--auto-delegate`
-- `--auto-approve`
-- `--input <path>`
+
+Operation-specific flags are declared on each subcommand.
+Use `dac <command> --help` to see full options and resolved requirement groups for that command.
 
 All outputs are JSON; bigint values are serialized as decimal strings.
 

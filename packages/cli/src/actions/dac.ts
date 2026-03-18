@@ -25,6 +25,7 @@ import {
   asBytes32,
   parseBoolText,
 } from "./shared";
+import {addCommandHelp, applyOptions, type OptionKey} from "../cli/options";
 import type {OptionResolver} from "../runtime/config";
 import {advanceTime, makeCoreContext, makeIndexer} from "../runtime/chain";
 import {printJson, readJsonFile} from "../runtime/io";
@@ -711,25 +712,55 @@ async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: stri
 }
 
 export function registerDacCommands(program: Command, resolverFactory: (options: Record<string, unknown>) => Promise<OptionResolver>): void {
-  program
-    .command("create")
-    .description("Deploy a DACCell")
-    .action(async function handleCreate() {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdCreate(resolver);
-    });
+  const create = program.command("create").description("Deploy a DACCell");
+  applyOptions(create, [
+    "name",
+    "description",
+    "symbol",
+    "treasury-token",
+    "commitment",
+    "allocation",
+    "max-supply",
+    "default-quorum",
+    "dividends-enabled",
+    "defer-birth-role",
+    "auto-delegate",
+  ]);
+  addCommandHelp(create, {
+    requirements: [
+      {mode: "allOf", options: ["name", "description", "treasury-token", "commitment", "allocation"]},
+    ],
+    examples: [
+      "dac create --name \"Ops DAC\" --description \"Operations\" --treasury-token 0x... --commitment 1000 --allocation 1000000",
+    ],
+  });
+  create.action(async function handleCreate() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdCreate(resolver);
+  });
 
-  program
-    .command("delegate")
-    .description("Delegate DAC MainToken votes")
-    .action(async function handleDelegate() {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdDelegate(resolver);
-    });
+  const delegate = program.command("delegate").description("Delegate DAC MainToken votes");
+  applyOptions(delegate, ["cell-address", "dac-address", "dac", "delegatee"]);
+  addCommandHelp(delegate, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
+    ],
+    examples: [
+      "dac delegate --cell-address 0x... --delegatee 0x...",
+    ],
+  });
+  delegate.action(async function handleDelegate() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdDelegate(resolver);
+  });
 
-  const propose = program
-    .command("propose <proposalType> [args...]")
-    .description("Create a DAC governance proposal");
+  const propose = program.command("propose <proposalType> [args...]").description("Create a DAC governance proposal");
+  applyOptions(propose, ["cell-address", "dac-address", "dac", "input"]);
+  addCommandHelp(propose, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
+    ],
+  });
   propose.addHelpText("after", `
 DAC proposal types:
   ${DAC_PROPOSAL_TYPES.join(", ")}
@@ -746,67 +777,120 @@ Examples:
     });
 
   const vote = program.command("vote").description("Vote DAC proposals");
-  vote
-    .command("proposal <proposalId> <support>")
-    .description("Vote for a DAC proposal")
-    .action(async function handleVoteProposal(proposalId: string, support: string) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdVoteProposal(resolver, proposalId, support);
-    });
+  const voteProposal = vote.command("proposal <proposalId> <support>").description("Vote for a DAC proposal");
+  applyOptions(voteProposal, ["cell-address", "dac-address", "dac", "pre-vote-advance-seconds"]);
+  addCommandHelp(voteProposal, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
+    ],
+  });
+  voteProposal.action(async function handleVoteProposal(proposalId: string, support: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdVoteProposal(resolver, proposalId, support);
+  });
 
-  program
-    .command("execute <proposalId>")
-    .description("Execute a passed DAC proposal")
-    .action(async function handleExecute(proposalId: string) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdExecute(resolver, proposalId);
-    });
+  const execute = program.command("execute <proposalId>").description("Execute a passed DAC proposal");
+  applyOptions(execute, ["cell-address", "dac-address", "dac", "advance-seconds"]);
+  addCommandHelp(execute, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
+    ],
+  });
+  execute.action(async function handleExecute(proposalId: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdExecute(resolver, proposalId);
+  });
 
-  program
-    .command("join")
-    .description("Fulfill a capital call")
-    .action(async function handleJoin() {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdJoin(resolver);
-    });
+  const joinOptionKeys: OptionKey[] = [
+    "cell-address",
+    "dac-address",
+    "dac",
+    "dac-id",
+    "id",
+    "address",
+    "treasury-token",
+    "recipient",
+    "token-amount",
+    "cash-amount",
+    "nonce",
+    "auto-approve",
+  ];
+  const join = program.command("join").description("Fulfill a capital call");
+  applyOptions(join, joinOptionKeys);
+  addCommandHelp(join, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac", "dac-id", "id", "address"], label: "DAC selector"},
+    ],
+    notes: [
+      "Explicit capital call fields are optional. If omitted, CLI auto-selects a pending call for the caller from indexer data.",
+    ],
+  });
+  join.action(async function handleJoin() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdJoin(resolver);
+  });
 
-  program
-    .command("recover-treasury")
-    .description("Recover treasury accounting for token")
-    .action(async function handleRecoverTreasury() {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdRecoverTreasury(resolver);
-    });
+  const recoverTreasury = program.command("recover-treasury").description("Recover treasury accounting for token");
+  applyOptions(recoverTreasury, ["cell-address", "dac-address", "dac", "token"]);
+  addCommandHelp(recoverTreasury, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
+      {mode: "allOf", options: ["token"]},
+    ],
+  });
+  recoverTreasury.action(async function handleRecoverTreasury() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdRecoverTreasury(resolver);
+  });
 
-  program
-    .command("deposit-treasury")
-    .description("Deposit treasury funds into DACCell")
-    .action(async function handleDepositTreasury() {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdDepositTreasury(resolver);
-    });
+  const depositTreasury = program.command("deposit-treasury").description("Deposit treasury funds into DACCell");
+  applyOptions(depositTreasury, ["cell-address", "dac-address", "dac", "token", "amount", "auto-approve"]);
+  addCommandHelp(depositTreasury, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
+      {mode: "allOf", options: ["token", "amount"]},
+    ],
+  });
+  depositTreasury.action(async function handleDepositTreasury() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdDepositTreasury(resolver);
+  });
 
-  program
-    .command("legal-message <messageFile>")
-    .description("Send legal wrapper message to DACCell (requires legal wrapper caller)")
-    .action(async function handleLegalMessage(messageFile: string) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdLegalMessage(resolver, messageFile);
-    });
+  const legalMessage = program.command("legal-message <messageFile>")
+    .description("Send legal wrapper message to DACCell (requires legal wrapper caller)");
+  applyOptions(legalMessage, ["cell-address", "dac-address", "dac"]);
+  addCommandHelp(legalMessage, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
+    ],
+  });
+  legalMessage.action(async function handleLegalMessage(messageFile: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdLegalMessage(resolver, messageFile);
+  });
 
-  program
-    .command("claim-dividend <proofFile>")
-    .description("Claim dividends using merkle proof JSON")
-    .action(async function handleClaimDividend(proofFile: string) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdClaimDividend(resolver, proofFile);
-    });
+  const claimDividend = program.command("claim-dividend <proofFile>").description("Claim dividends using merkle proof JSON");
+  applyOptions(claimDividend, ["cell-address", "dac-address", "dac"]);
+  addCommandHelp(claimDividend, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
+    ],
+  });
+  claimDividend.action(async function handleClaimDividend(proofFile: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdClaimDividend(resolver, proofFile);
+  });
 
-  program
-    .command("view [resource] [id]")
-    .description("View DAC/indexer state")
-    .action(async function handleView(resource: string | undefined, id: string | undefined) {
-      const resolver = await resolverFactory(this.optsWithGlobals());
-      await cmdView(resolver, resource, id);
-    });
+  const view = program.command("view [resource] [id]").description("View DAC/indexer state");
+  applyOptions(view, ["dac-id", "id", "cell-address", "dac-address", "address", "query-limit", "query-offset", "limit", "offset"]);
+  addCommandHelp(view, {
+    notes: [
+      "For resource=dac, provide DAC id/address using positional [id], --dac-id, --cell-address, --dac-address, or --address.",
+      "For resource=proposals/deals/capital-calls, DAC id is resolved from --dac-id or DAC address options.",
+    ],
+  });
+  view.action(async function handleView(resource: string | undefined, id: string | undefined) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdView(resolver, resource, id);
+  });
 }
