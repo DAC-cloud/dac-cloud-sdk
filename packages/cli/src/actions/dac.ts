@@ -100,7 +100,7 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
   const founderCommitment = resolver.requireBigInt("commitment", "--commitment is required for dac create");
   const founderAllocation = resolver.requireBigInt("allocation", "--allocation is required for dac create");
   const mainTokenMaxSupply = resolver.resolveBigInt("max-supply", 1_000_000_000n * 10n ** 18n) ?? (1_000_000_000n * 10n ** 18n);
-  const defaultQuorum = resolver.resolveBigInt("default-quorum", 2_000_000_000n) ?? 2_000_000_000n;
+  const defaultQuorum = resolver.resolveBigInt("default-quorum", 5n * 10n ** 17n) ?? 5n * 10n ** 17n; // 0.5 * MANTISSA
   const dividendsEnabled = resolver.resolveBoolean("dividends-enabled", false);
 
   const config: DACConfig = {
