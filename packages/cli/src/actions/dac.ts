@@ -10,6 +10,8 @@ import {
   buildRevokeAgentTokensProposal,
   type CapitalCall,
   type DACConfig,
+  type ExistingTokenDacConfig,
+  type GovernanceStrategyConfig,
   type ProposalParams,
 } from "@dac-cloud/core";
 import {type Command} from "commander";
@@ -32,6 +34,9 @@ import {printJson, readJsonFile} from "../runtime/io";
 
 const DAC_PROPOSAL_TYPES = [
   "update-voting-config",
+  "update-governance-strategy",
+  "update-deal-creation-config",
+  "update-governance-oracle",
   "update-legal-wrapper",
   "approve-offchain-action",
   "mint-agent-tokens",
@@ -47,6 +52,7 @@ const DAC_PROPOSAL_TYPES = [
   "recover-deal",
   "deal-message",
   "cast-veto-deal",
+  "challenge-deal",
   "add-evaluator",
 ] as const;
 
@@ -119,11 +125,13 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
 
   const deferBirthRole = resolver.resolveString("defer-birth-role") as Address | undefined;
   const result = await core.deployDac({config, salt: bytes32Random(), deferBirthRole});
+  const addresses = result.dac ? await core.getDacAddresses(result.dac) : undefined;
 
   const autoDelegate = resolver.resolveBoolean("auto-delegate", false);
   let delegateTx: Hex | undefined;
-  if (autoDelegate && result.dac && result.mainToken) {
-    delegateTx = await core.delegateVotes({token: result.mainToken, delegatee: account.address});
+  const mainToken = result.mainToken ?? addresses?.mainToken;
+  if (autoDelegate && mainToken) {
+    delegateTx = await core.delegateVotes({token: mainToken, delegatee: account.address});
   }
 
   printJson({
@@ -133,6 +141,83 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
     dac: result.dac,
     mainToken: result.mainToken,
     agentToken: result.agentToken,
+    addresses,
+    delegateTx,
+  });
+}
+
+async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
+  const {account, core} = await makeCoreContext(resolver);
+
+  const name = resolver.requireString("name", "--name is required for dac create-existing-token");
+  const description = resolver.requireString("description", "--description is required for dac create-existing-token");
+  const symbol = resolver.resolveString("symbol", "DAC") ?? "DAC";
+  const underlyingToken = asAddress(
+    resolver.requireString("underlying-token", "--underlying-token is required for dac create-existing-token"),
+    "Underlying token",
+  );
+  const treasurySeedAmount = resolver.requireBigInt(
+    "treasury-seed-amount",
+    "--treasury-seed-amount is required for dac create-existing-token",
+  );
+  const oracleAdmin = asAddress(
+    resolver.resolveString("oracle-admin", account.address) ?? account.address,
+    "Oracle admin",
+  );
+  const initialOraclePublisher = asAddress(
+    resolver.resolveString("initial-oracle-publisher", account.address) ?? account.address,
+    "Initial oracle publisher",
+  );
+  const dividendsEnabled = resolver.resolveBoolean("dividends-enabled", false);
+
+  const governanceStrategy: GovernanceStrategyConfig = {
+    quorumPercent: resolver.resolveBigInt("quorum-percent", 5n * 10n ** 17n) ?? 5n * 10n ** 17n,
+    highQuorumPercent: resolver.resolveBigInt("high-quorum-percent", 75n * 10n ** 16n) ?? 75n * 10n ** 16n,
+    blockingPercent: resolver.resolveBigInt("blocking-percent", 25n * 10n ** 16n) ?? 25n * 10n ** 16n,
+    duration: resolver.resolveBigInt("voting-duration", 7n * 24n * 60n * 60n) ?? 7n * 24n * 60n * 60n,
+    qualification: resolver.resolveBigInt("qualification", 0n) ?? 0n,
+    executionValidityDuration: resolver.resolveBigInt("execution-validity-duration", 7n * 24n * 60n * 60n) ?? 7n * 24n * 60n * 60n,
+    oraclePublishDeadline: resolver.resolveBigInt("oracle-publish-deadline", 24n * 60n * 60n) ?? 24n * 60n * 60n,
+    fallbackWarmupDuration: resolver.resolveBigInt("fallback-warmup-duration", 24n * 60n * 60n) ?? 24n * 60n * 60n,
+    fallbackDuration: resolver.resolveBigInt("fallback-duration", 7n * 24n * 60n * 60n) ?? 7n * 24n * 60n * 60n,
+  };
+
+  const config: ExistingTokenDacConfig = {
+    symbol: symbol.slice(0, 8),
+    name,
+    description,
+    underlyingToken,
+    treasurySeedAmount,
+    oracleAdmin,
+    initialOraclePublisher,
+    dividendsEnabled,
+    governanceStrategy,
+  };
+
+  const result = await core.deployExistingTokenDac({config, salt: bytes32Random()});
+  const addresses = result.dac ? await core.getDacAddresses(result.dac) : undefined;
+
+  const autoDelegate = resolver.resolveBoolean("auto-delegate", false);
+  let delegateTx: Hex | undefined;
+  const mainToken = result.mainToken ?? addresses?.mainToken;
+  if (autoDelegate && mainToken) {
+    delegateTx = await core.delegateVotes({token: mainToken, delegatee: account.address});
+  }
+
+  printJson({
+    action: "dac.create.existing-token",
+    creator: account.address,
+    txHash: result.txHash,
+    dac: result.dac,
+    mainToken: result.mainToken,
+    wrappedMainToken: result.wrappedMainToken,
+    underlyingToken: result.underlyingToken,
+    agentToken: result.agentToken,
+    governanceOracle: result.governanceOracle,
+    assetController: result.assetController,
+    treasurySeedAmount: result.treasurySeedAmount,
+    governanceStrategy,
+    addresses,
     delegateTx,
   });
 }
@@ -167,7 +252,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
 
   let params: ProposalParams;
   if (proposalType === "update-voting-config") {
-    if (args.length !== 5 && !input) {
+    if (args.length !== 5 && args.length !== 6 && !input) {
       throw new Error("dac propose update-voting-config requires positional args or --input json");
     }
     const quorumPercent = args[0] !== undefined ? BigInt(args[0]) : readBigIntField(input, "quorumPercent", "--input");
@@ -175,6 +260,11 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     const highQuorumPercent = args[2] !== undefined ? BigInt(args[2]) : readBigIntField(input, "highQuorumPercent", "--input");
     const duration = args[3] !== undefined ? BigInt(args[3]) : readBigIntField(input, "duration", "--input");
     const qualification = args[4] !== undefined ? BigInt(args[4]) : readBigIntField(input, "qualification", "--input");
+    const executionValidityDuration = args[5] !== undefined
+      ? BigInt(args[5])
+      : input?.executionValidityDuration !== undefined
+        ? readBigIntField(input, "executionValidityDuration", "--input")
+        : duration;
     params = {
       typ: DAC_PROPOSAL_TYPE.UPDATE_VOTING_CONFIG,
       target: zero,
@@ -189,6 +279,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
             {name: "highQuorumPercent", type: "uint256"},
             {name: "duration", type: "uint256"},
             {name: "qualification", type: "uint256"},
+            {name: "executionValidityDuration", type: "uint256"},
           ],
         }],
         [{
@@ -197,8 +288,88 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
           highQuorumPercent,
           duration,
           qualification,
+          executionValidityDuration,
         }],
       ),
+    };
+  } else if (proposalType === "update-governance-strategy") {
+    if (args.length !== 9 && !input) {
+      throw new Error("dac propose update-governance-strategy requires positional args or --input json");
+    }
+    const quorumPercent = args[0] !== undefined ? BigInt(args[0]) : readBigIntField(input, "quorumPercent", "--input");
+    const highQuorumPercent = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "highQuorumPercent", "--input");
+    const blockingPercent = args[2] !== undefined ? BigInt(args[2]) : readBigIntField(input, "blockingPercent", "--input");
+    const duration = args[3] !== undefined ? BigInt(args[3]) : readBigIntField(input, "duration", "--input");
+    const qualification = args[4] !== undefined ? BigInt(args[4]) : readBigIntField(input, "qualification", "--input");
+    const executionValidityDuration = args[5] !== undefined ? BigInt(args[5]) : readBigIntField(input, "executionValidityDuration", "--input");
+    const oraclePublishDeadline = args[6] !== undefined ? BigInt(args[6]) : readBigIntField(input, "oraclePublishDeadline", "--input");
+    const fallbackWarmupDuration = args[7] !== undefined ? BigInt(args[7]) : readBigIntField(input, "fallbackWarmupDuration", "--input");
+    const fallbackDuration = args[8] !== undefined ? BigInt(args[8]) : readBigIntField(input, "fallbackDuration", "--input");
+    params = {
+      typ: DAC_PROPOSAL_TYPE.UPDATE_GOVERNANCE_STRATEGY,
+      target: zero,
+      i: numberToHex(0n, {size: 32}),
+      data: encodeAbiParameters(
+        [{
+          name: "config",
+          type: "tuple",
+          components: [
+            {name: "quorumPercent", type: "uint256"},
+            {name: "highQuorumPercent", type: "uint256"},
+            {name: "blockingPercent", type: "uint256"},
+            {name: "duration", type: "uint256"},
+            {name: "qualification", type: "uint256"},
+            {name: "executionValidityDuration", type: "uint256"},
+            {name: "oraclePublishDeadline", type: "uint256"},
+            {name: "fallbackWarmupDuration", type: "uint256"},
+            {name: "fallbackDuration", type: "uint256"},
+          ],
+        }],
+        [{
+          quorumPercent,
+          highQuorumPercent,
+          blockingPercent,
+          duration,
+          qualification,
+          executionValidityDuration,
+          oraclePublishDeadline,
+          fallbackWarmupDuration,
+          fallbackDuration,
+        }],
+      ),
+    };
+  } else if (proposalType === "update-deal-creation-config") {
+    if (args.length !== 2 && !input) {
+      throw new Error("dac propose update-deal-creation-config requires positional args or --input json");
+    }
+    const minAgentBalance = args[0] !== undefined ? BigInt(args[0]) : readBigIntField(input, "minAgentBalance", "--input");
+    const minInitialAgentStake = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "minInitialAgentStake", "--input");
+    params = {
+      typ: DAC_PROPOSAL_TYPE.UPDATE_DEAL_CREATION_CONFIG,
+      target: zero,
+      i: numberToHex(0n, {size: 32}),
+      data: encodeAbiParameters(
+        [{
+          name: "config",
+          type: "tuple",
+          components: [
+            {name: "minAgentBalance", type: "uint256"},
+            {name: "minInitialAgentStake", type: "uint256"},
+          ],
+        }],
+        [{minAgentBalance, minInitialAgentStake}],
+      ),
+    };
+  } else if (proposalType === "update-governance-oracle") {
+    if (args.length !== 1 && !input) {
+      throw new Error("dac propose update-governance-oracle requires positional arg or --input json");
+    }
+    const oracle = args[0] ?? readStringField(input, "oracle", "--input");
+    params = {
+      typ: DAC_PROPOSAL_TYPE.UPDATE_GOVERNANCE_ORACLE,
+      target: asAddress(oracle, "governance oracle"),
+      i: numberToHex(0n, {size: 32}),
+      data: "0x",
     };
   } else if (proposalType === "update-legal-wrapper") {
     if (args.length !== 4 && !input) {
@@ -349,9 +520,9 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
         [dealId, asBytes4(messageKind, "message kind"), z.string().regex(/^0x[0-9a-fA-F]*$/).parse(messageData) as Hex],
       ),
     };
-  } else if (proposalType === "cast-veto-deal") {
+  } else if (proposalType === "cast-veto-deal" || proposalType === "challenge-deal") {
     if (args.length !== 2 && !input) {
-      throw new Error("dac propose cast-veto-deal requires positional args or --input json");
+      throw new Error("dac propose challenge-deal requires positional args or --input json");
     }
     const dealId = args[0] !== undefined ? BigInt(args[0]) : readBigIntField(input, "dealId", "--input");
     const dealProposalId = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "dealProposalId", "--input");
@@ -664,11 +835,32 @@ async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: stri
   const client = makeIndexer(resolver);
   const page = resolvePage(resolver);
 
-  const resource = z.enum(["dac", "proposal", "proposals", "deals", "capital-calls"]).catch("dac").parse(resourceRaw ?? "dac");
+  const resource = z.enum([
+    "dac",
+    "dacs",
+    "proposal",
+    "dac-proposal",
+    "proposals",
+    "dac-proposals",
+    "deals",
+    "capital-calls",
+    "treasury-holdings",
+    "treasury-movements",
+    "treasury-delegations",
+    "governance-oracles",
+    "wrapper-actions",
+    "account",
+  ]).catch("dac").parse(resourceRaw ?? "dac");
+
+  if (resource === "dacs") {
+    const dacs = await client.dacs.list(page);
+    printJson({action: "dac.view.dacs", count: dacs.length, dacs});
+    return;
+  }
 
   if (resource === "dac") {
     const directId = id ?? resolver.resolveString(["dac-id", "id"]);
-    const address = resolver.resolveString(["cell-address", "dac-address", "address"]);
+    const address = resolver.resolveString(["cell-address", "dac-address", "dac", "address"]);
 
     if (!directId && !address) {
       throw new Error("Provide DAC id/address via positional id, --dac-id, or --cell-address");
@@ -684,11 +876,27 @@ async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: stri
   }
 
   if (resource === "proposal") {
-    if (!id) {
+    const proposalId = id ?? resolver.resolveString("id");
+    if (!proposalId) {
       throw new Error("dac view proposal requires <proposalId>");
     }
-    const proposal = await viewProposalByIdOrThrow(resolver, id);
+    const proposal = await viewProposalByIdOrThrow(resolver, proposalId);
     printJson({action: "dac.view.proposal", proposal});
+    return;
+  }
+
+  if (resource === "dac-proposal") {
+    const proposalId = id ?? resolver.resolveString("id");
+    if (!proposalId) {
+      throw new Error("dac view dac-proposal requires <proposalId>");
+    }
+
+    const proposal = await client.proposals.getDacProposal(proposalId);
+    if (!proposal) {
+      throw new Error("DAC proposal not found in indexer");
+    }
+
+    printJson({action: "dac.view.dac-proposal", proposal});
     return;
   }
 
@@ -699,6 +907,13 @@ async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: stri
     return;
   }
 
+  if (resource === "dac-proposals") {
+    const dacId = await resolveDacIdOrThrow(resolver);
+    const proposals = await client.proposals.listDacProposalsByDac(dacId, page);
+    printJson({action: "dac.view.dac-proposals", dacId, count: proposals.length, proposals});
+    return;
+  }
+
   if (resource === "deals") {
     const dacId = await resolveDacIdOrThrow(resolver);
     const deals = await client.deals.listByDac(dacId, page);
@@ -706,13 +921,59 @@ async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: stri
     return;
   }
 
+  if (resource === "account") {
+    const address = id ?? resolver.resolveString("address");
+    if (!address) {
+      throw new Error("dac view account requires <address> or --address");
+    }
+
+    const account = await client.accounts.getByAddress(address);
+    if (!account) {
+      throw new Error("Account not found in indexer");
+    }
+
+    printJson({action: "dac.view.account", account});
+    return;
+  }
+
   const dacId = await resolveDacIdOrThrow(resolver);
-  const capitalCalls = await client.capitalCalls.listByDac(dacId, page);
-  printJson({action: "dac.view.capital-calls", dacId, count: capitalCalls.length, capitalCalls});
+
+  if (resource === "capital-calls") {
+    const capitalCalls = await client.capitalCalls.listByDac(dacId, page);
+    printJson({action: "dac.view.capital-calls", dacId, count: capitalCalls.length, capitalCalls});
+    return;
+  }
+
+  if (resource === "treasury-holdings") {
+    const holdings = await client.treasury.listHoldingsByDac(dacId, page);
+    printJson({action: "dac.view.treasury-holdings", dacId, count: holdings.length, holdings});
+    return;
+  }
+
+  if (resource === "treasury-movements") {
+    const movements = await client.treasury.listMovementsByDac(dacId, page);
+    printJson({action: "dac.view.treasury-movements", dacId, count: movements.length, movements});
+    return;
+  }
+
+  if (resource === "treasury-delegations") {
+    const delegations = await client.treasury.listDelegationsByDac(dacId, page);
+    printJson({action: "dac.view.treasury-delegations", dacId, count: delegations.length, delegations});
+    return;
+  }
+
+  if (resource === "governance-oracles") {
+    const oracles = await client.oracle.listByDac(dacId, page);
+    printJson({action: "dac.view.governance-oracles", dacId, count: oracles.length, oracles});
+    return;
+  }
+
+  const wrapperActions = await client.wrapper.listByDac(dacId, page);
+  printJson({action: "dac.view.wrapper-actions", dacId, count: wrapperActions.length, wrapperActions});
 }
 
 export function registerDacCommands(program: Command, resolverFactory: (options: Record<string, unknown>) => Promise<OptionResolver>): void {
-  const create = program.command("create").description("Deploy a DACCell");
+  const create = program.command("create").description("Deploy a native DACCell");
   applyOptions(create, [
     "name",
     "description",
@@ -730,6 +991,9 @@ export function registerDacCommands(program: Command, resolverFactory: (options:
     requirements: [
       {mode: "allOf", options: ["name", "description", "treasury-token", "commitment", "allocation"]},
     ],
+    notes: [
+      "This command deploys the native DAC mode. Use `dac create-existing-token` for wrapping an existing ERC-20 into DAC governance.",
+    ],
     examples: [
       "dac create --name \"Ops DAC\" --description \"Operations\" --treasury-token 0x... --commitment 1000 --allocation 1000000",
     ],
@@ -737,6 +1001,43 @@ export function registerDacCommands(program: Command, resolverFactory: (options:
   create.action(async function handleCreate() {
     const resolver = await resolverFactory(this.optsWithGlobals());
     await cmdCreate(resolver);
+  });
+
+  const createExistingToken = program.command("create-existing-token").description("Deploy an existing-token DACCell");
+  applyOptions(createExistingToken, [
+    "name",
+    "description",
+    "symbol",
+    "underlying-token",
+    "treasury-seed-amount",
+    "oracle-admin",
+    "initial-oracle-publisher",
+    "dividends-enabled",
+    "quorum-percent",
+    "blocking-percent",
+    "high-quorum-percent",
+    "voting-duration",
+    "qualification",
+    "execution-validity-duration",
+    "oracle-publish-deadline",
+    "fallback-warmup-duration",
+    "fallback-duration",
+    "auto-delegate",
+  ]);
+  addCommandHelp(createExistingToken, {
+    requirements: [
+      {mode: "allOf", options: ["name", "description", "underlying-token", "treasury-seed-amount"]},
+    ],
+    notes: [
+      "Governance strategy flags are optional; CLI applies protocol-aligned defaults for quorum, timing, and hybrid oracle fallback windows.",
+    ],
+    examples: [
+      "dac create-existing-token --name \"USDC DAC\" --description \"Treasury wrapper\" --underlying-token 0x... --treasury-seed-amount 1000000",
+    ],
+  });
+  createExistingToken.action(async function handleCreateExistingToken() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdCreateExistingToken(resolver);
   });
 
   const delegate = program.command("delegate").description("Delegate DAC MainToken votes");
@@ -882,11 +1183,13 @@ Examples:
   });
 
   const view = program.command("view [resource] [id]").description("View DAC/indexer state");
-  applyOptions(view, ["dac-id", "id", "cell-address", "dac-address", "address", "query-limit", "query-offset", "limit", "offset"]);
+  applyOptions(view, ["dac-id", "id", "cell-address", "dac-address", "dac", "address", "query-limit", "query-offset", "limit", "offset"]);
   addCommandHelp(view, {
     notes: [
-      "For resource=dac, provide DAC id/address using positional [id], --dac-id, --cell-address, --dac-address, or --address.",
-      "For resource=proposals/deals/capital-calls, DAC id is resolved from --dac-id or DAC address options.",
+      "Resources: dac, dacs, proposal, dac-proposal, proposals, dac-proposals, deals, capital-calls, treasury-holdings, treasury-movements, treasury-delegations, governance-oracles, wrapper-actions, account.",
+      "For resource=dac, provide DAC id/address using positional [id], --dac-id, --cell-address, --dac-address, --dac, or --address.",
+      "For DAC-scoped list resources, DAC id is resolved from --dac-id or DAC address options.",
+      "For resource=account, [id] is treated as wallet address and can be replaced by --address.",
     ],
   });
   view.action(async function handleView(resource: string | undefined, id: string | undefined) {

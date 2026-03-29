@@ -332,7 +332,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
   }
 
   if (!params && proposalType === "update-voting-config") {
-    if (args.length !== 5 && !input) {
+    if (args.length !== 5 && args.length !== 6 && !input) {
       throw new Error("deal propose update-voting-config requires positional args or --input json");
     }
     const quorumPercent = args[0] !== undefined ? BigInt(args[0]) : readBigIntField(input, "quorumPercent", "--input");
@@ -340,6 +340,11 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     const highQuorumPercent = args[2] !== undefined ? BigInt(args[2]) : readBigIntField(input, "highQuorumPercent", "--input");
     const duration = args[3] !== undefined ? BigInt(args[3]) : readBigIntField(input, "duration", "--input");
     const qualification = args[4] !== undefined ? BigInt(args[4]) : readBigIntField(input, "qualification", "--input");
+    const executionValidityDuration = args[5] !== undefined
+      ? BigInt(args[5])
+      : input?.executionValidityDuration !== undefined
+        ? readBigIntField(input, "executionValidityDuration", "--input")
+        : duration;
     params = {
       typ: DEAL_PROPOSAL_TYPE.UPDATE_VOTING_CONFIG,
       target: "0x0000000000000000000000000000000000000000",
@@ -354,6 +359,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
             {name: "highQuorumPercent", type: "uint256"},
             {name: "duration", type: "uint256"},
             {name: "qualification", type: "uint256"},
+            {name: "executionValidityDuration", type: "uint256"},
           ],
         }],
         [{
@@ -362,6 +368,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
           highQuorumPercent,
           duration,
           qualification,
+          executionValidityDuration,
         }],
       ),
     };

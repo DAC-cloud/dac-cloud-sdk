@@ -1,0 +1,105 @@
+fragment MainTokenHolderViewFields on MainTokenHolder {
+  id
+  chainId
+  dacId
+  dealId
+  accountId
+  balance
+  totalReceivedAmount
+  totalSentAmount
+  isHolder
+  createdBlockNumber
+  updatedBlockNumber
+  lastTransferBlockNumber
+}
+
+fragment DacAgentViewFields on DacAgent {
+  id
+  chainId
+  dacId
+  accountId
+  walletAgentTokenAmount
+  totalMintedAmount
+  totalRevokedAmount
+  currentStakedAmount
+  totalStakedAmount
+  totalReleasedAmount
+  totalSlashedAmount
+  totalClaimedMainTokenAmount
+  activeDealCount
+  isActive
+  createdBlockNumber
+  updatedBlockNumber
+  lastActivityBlockNumber
+}
+
+fragment DealAgentPositionViewFields on DealAgentPosition {
+  id
+  chainId
+  dacId
+  dealId
+  dacAgentId
+  accountId
+  currentStakedAmount
+  totalStakedAmount
+  totalReleasedAmount
+  totalSlashedAmount
+  totalClaimedMainTokenAmount
+  isActive
+  createdBlockNumber
+  updatedBlockNumber
+  lastStakedBlockNumber
+  lastReleasedBlockNumber
+  lastSlashedBlockNumber
+  lastClaimedRewardBlockNumber
+}
+
+fragment DacGovernanceAccountViewFields on DacGovernanceAccount {
+  id
+  chainId
+  dacId
+  accountId
+  delegateAddress
+  currentVotingPower
+  hasVotingPower
+  createdBlockNumber
+  updatedBlockNumber
+}
+
+fragment DealGovernanceAccountViewFields on DealGovernanceAccount {
+  id
+  chainId
+  dacId
+  dealId
+  accountId
+  delegateAddress
+  currentVotingPower
+  hasVotingPower
+  createdBlockNumber
+  updatedBlockNumber
+}
+
+query GetAccountByAddress($address: String!) {
+  Account(where: {address: {_eq: $address}}, limit: 1) {
+    id
+    chainId
+    address
+    createdBlockNumber
+    updatedBlockNumber
+    mainTokenHoldings(order_by: [{updatedBlockNumber: desc}]) {
+      ...MainTokenHolderViewFields
+    }
+    dacGovernanceAccounts(order_by: [{currentVotingPower: desc}, {updatedBlockNumber: desc}]) {
+      ...DacGovernanceAccountViewFields
+    }
+    dacAgents(order_by: [{updatedBlockNumber: desc}]) {
+      ...DacAgentViewFields
+    }
+    dealAgentPositions(order_by: [{updatedBlockNumber: desc}]) {
+      ...DealAgentPositionViewFields
+    }
+    dealGovernanceAccounts(order_by: [{currentVotingPower: desc}, {updatedBlockNumber: desc}]) {
+      ...DealGovernanceAccountViewFields
+    }
+  }
+}

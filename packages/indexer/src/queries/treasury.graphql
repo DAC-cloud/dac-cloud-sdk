@@ -1,0 +1,144 @@
+fragment CapitalCallViewFields on CapitalCall {
+  id
+  chainId
+  dacId
+  dacAddress
+  proposalNumericId
+  callHash
+  recipient
+  treasuryTokenAddress
+  tokenAmount
+  cashAmount
+  nonce
+  fulfillmentCount
+  totalFulfilledTokenAmount
+  totalFulfilledCashAmount
+  lastPayer
+  createdBlockNumber
+  createdBlockTimestamp
+  fulfilledBlockNumber
+  updatedBlockNumber
+}
+
+fragment TreasuryHoldingViewFields on TreasuryHolding {
+  id
+  chainId
+  dacId
+  assetControllerAddress
+  treasuryHolderAddress
+  tokenAddress
+  balance
+  committedAmount
+  freeAmount
+  creditedAmount
+  debitedAmount
+  updatedBlockNumber
+  updatedBlockTimestamp
+}
+
+fragment TreasuryMovementViewFields on TreasuryMovement {
+  id
+  chainId
+  dacId
+  assetControllerAddress
+  treasuryHolderAddress
+  tokenAddress
+  dealId
+  proposalNumericId
+  direction
+  movementType
+  amount
+  counterpartyAddress
+  createdBlockNumber
+  createdBlockTimestamp
+  createdTransactionHash
+}
+
+fragment DacTreasuryDelegationViewFields on DacTreasuryDelegation {
+  id
+  chainId
+  dacId
+  assetControllerAddress
+  treasuryHolderAddress
+  delegatedTokenAddress
+  delegateeAddress
+  active
+  createdBlockNumber
+  createdBlockTimestamp
+  createdTransactionHash
+  updatedBlockNumber
+}
+
+fragment TreasuryActionViewFields on TreasuryAction {
+  id
+  chainId
+  dealId
+  treasuryDealId
+  treasuryAddress
+  actionType
+  tokenAddress
+  agent
+  counterpartyAddress
+  sourceAddress
+  destinationAddress
+  amount
+  dealSize
+  createdBlockNumber
+  createdBlockTimestamp
+  createdTransactionHash
+}
+
+query ListCapitalCallsByDac($dacId: String!, $limit: Int!, $offset: Int!) {
+  CapitalCall(
+    where: {dacId: {_eq: $dacId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{proposalNumericId: desc}, {createdBlockNumber: desc}]
+  ) {
+    ...CapitalCallViewFields
+  }
+}
+
+query ListTreasuryHoldingsByDac($dacId: String!, $limit: Int!, $offset: Int!) {
+  TreasuryHolding(
+    where: {dacId: {_eq: $dacId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{updatedBlockNumber: desc}]
+  ) {
+    ...TreasuryHoldingViewFields
+  }
+}
+
+query ListTreasuryMovementsByDac($dacId: String!, $limit: Int!, $offset: Int!) {
+  TreasuryMovement(
+    where: {dacId: {_eq: $dacId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{createdBlockNumber: desc}]
+  ) {
+    ...TreasuryMovementViewFields
+  }
+}
+
+query ListDacTreasuryDelegationsByDac($dacId: String!, $limit: Int!, $offset: Int!) {
+  DacTreasuryDelegation(
+    where: {dacId: {_eq: $dacId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{updatedBlockNumber: desc}]
+  ) {
+    ...DacTreasuryDelegationViewFields
+  }
+}
+
+query ListTreasuryActionsByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
+  TreasuryAction(
+    where: {dealId: {_eq: $dealId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{createdBlockNumber: desc}]
+  ) {
+    ...TreasuryActionViewFields
+  }
+}

@@ -1,0 +1,57 @@
+fragment GovernanceOraclePublisherViewFields on GovernanceOraclePublisher {
+  id
+  chainId
+  governanceOracleId
+  publisherAddress
+  allowed
+  updatedBlockNumber
+}
+
+fragment GovernanceOracleViewFields on GovernanceOracle {
+  id
+  chainId
+  dacId
+  address
+  active
+  createdBlockNumber
+  updatedBlockNumber
+  publishers(order_by: [{updatedBlockNumber: desc}]) {
+    ...GovernanceOraclePublisherViewFields
+  }
+}
+
+fragment WrapperActionViewFields on WrapperAction {
+  id
+  chainId
+  dacId
+  tokenAddress
+  caller
+  recipient
+  actionType
+  amount
+  createdBlockNumber
+  createdBlockTimestamp
+  createdTransactionHash
+}
+
+query ListGovernanceOraclesByDac($dacId: String!, $limit: Int!, $offset: Int!) {
+  GovernanceOracle(
+    where: {dacId: {_eq: $dacId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{updatedBlockNumber: desc}]
+  ) {
+    ...GovernanceOracleViewFields
+  }
+}
+
+query ListWrapperActionsByDac($dacId: String!, $limit: Int!, $offset: Int!) {
+  WrapperAction(
+    where: {dacId: {_eq: $dacId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{createdBlockNumber: desc}]
+  ) {
+    ...WrapperActionViewFields
+  }
+}

@@ -1,9 +1,13 @@
+import {dirname, resolve} from "node:path";
+import {fileURLToPath} from "node:url";
 import type {CodegenConfig} from "@graphql-codegen/cli";
 
-const schemaUrl = process.env.INDEXER_SCHEMA_URL ?? "http://127.0.0.1:8080/v1/graphql";
+const here = dirname(fileURLToPath(import.meta.url));
+const localSchemaPath = resolve(here, "../../../dac-cloud-indexer/schema.graphql");
+const schemaSource = process.env.INDEXER_SCHEMA_URL ?? process.env.INDEXER_SCHEMA_PATH ?? localSchemaPath;
 
 const config: CodegenConfig = {
-  schema: schemaUrl,
+  schema: schemaSource,
   documents: ["src/queries/**/*.graphql"],
   ignoreNoDocuments: false,
   generates: {
@@ -13,7 +17,10 @@ const config: CodegenConfig = {
         useTypeImports: true,
         enumsAsTypes: true,
         avoidOptionals: false,
+        onlyOperationTypes: true,
         scalars: {
+          BigInt: "string",
+          Bytes: "string",
           numeric: "string",
           timestamptz: "string",
           jsonb: "unknown",

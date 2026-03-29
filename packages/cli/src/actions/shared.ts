@@ -62,7 +62,7 @@ export async function resolveDacIdOrThrow(resolver: OptionResolver): Promise<str
     return direct;
   }
 
-  const address = resolver.resolveString(["cell-address", "dac-address", "address"]);
+  const address = resolver.resolveString(["cell-address", "dac-address", "dac", "address"]);
   if (!address) {
     throw new Error("Provide --dac-id or --cell-address");
   }
@@ -81,7 +81,7 @@ export async function resolveDealIdOrThrow(resolver: OptionResolver): Promise<st
     return direct;
   }
 
-  const address = resolver.resolveString(["deal-address", "address"]);
+  const address = resolver.resolveString(["deal-address", "address", "deal"]);
   if (!address) {
     throw new Error("Provide --deal-id or --deal-address");
   }

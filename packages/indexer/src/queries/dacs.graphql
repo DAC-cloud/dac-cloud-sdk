@@ -2,37 +2,74 @@ fragment DacViewFields on Dac {
   id
   chainId
   address
+  mode
   name
   description
+  creator
   mainTokenAddress
+  wrappedMainTokenAddress
+  underlyingTokenAddress
   agentTokenAddress
   dealManagerAddress
+  moduleRegistryAddress
+  assetControllerAddress
+  governanceSchemaAddress
+  governanceOracleAddress
+  treasuryHolderAddress
+  treasurySeedAmount
+  legalWrapperAddress
+  legalWrapperOperatingAgreementIpfs
+  legalWrapperRegisteredAgent
+  coreModuleFactoryAddress
   started
   dividendsEnabled
+  votingQuorumPercent
+  votingBlockingPercent
+  votingHighQuorumPercent
+  votingDuration
+  votingQualification
+  executionValidityDuration
+  dealCreationMinAgentBalance
+  dealCreationMinInitialAgentStake
+  oraclePublishDeadline
+  fallbackWarmupDuration
+  fallbackDuration
+  supportsMint
+  supportsBurn
+  supportsCapitalCall
+  supportsWrap
+  supportsUnwrap
+  supportsReserveBackedClaims
   proposalCount
   executedProposalCount
   dealCount
   activeDealCount
+  moduleCount
   capitalCallCount
+  mainTokenHolderCount
+  releasedMainTokenAmount
+  mainTokenObligations
   createdBlockNumber
   createdBlockTimestamp
+  createdTransactionHash
   updatedBlockNumber
+  updatedBlockTimestamp
 }
 
 query GetDacById($id: String!) {
-  Dac(where: { id: { _eq: $id } }, limit: 1) {
+  Dac(where: {id: {_eq: $id}}, limit: 1) {
     ...DacViewFields
   }
 }
 
 query GetDacByAddress($address: String!) {
-  Dac(where: { address: { _eq: $address } }, limit: 1) {
+  Dac(where: {address: {_eq: $address}}, limit: 1) {
     ...DacViewFields
   }
 }
 
 query ListDacs($limit: Int!, $offset: Int!) {
-  Dac(limit: $limit, offset: $offset, order_by: [{ createdBlockNumber: desc }]) {
+  Dac(limit: $limit, offset: $offset, order_by: [{createdBlockNumber: desc}]) {
     ...DacViewFields
   }
 }

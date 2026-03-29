@@ -1,4 +1,4 @@
-fragment ProposalViewFields on Proposal {
+fragment ProposalBaseFields on Proposal {
   id
   chainId
   proposalAddress
@@ -7,113 +7,207 @@ fragment ProposalViewFields on Proposal {
   dealId
   proposalNumericId
   kindSelector
+  kindName
   targetAddress
+  data1
+  data2
   tokenAddress
+  totalVotingPower
+  quorum
+  blockingQuorum
+  snapshotReference
+  snapshotReferenceKind
+  snapshotTime
+  endTime
+  proposalVariant
   voteCount
+  merkleVoteCount
   yesVotes
   noVotes
   resolved
   passed
   executed
+  executionValidityDuration
+  resolutionTime
+  executionDeadline
+  executionExpired
+  currentPhase
+  phaseStartTime
+  phaseEndTime
+  currentPhaseSnapshotBlock
   createdBlockNumber
   createdBlockTimestamp
+  createdTransactionHash
   resolvedBlockNumber
   executedBlockNumber
 }
 
-fragment CapitalCallViewFields on CapitalCall {
+fragment ProposalPhaseEventViewFields on ProposalPhaseEvent {
   id
   chainId
-  dacId
-  dacAddress
+  dacProposalId
   proposalNumericId
-  callHash
-  recipient
-  treasuryTokenAddress
-  tokenAmount
-  cashAmount
-  nonce
-  fulfillmentCount
-  totalFulfilledTokenAmount
-  totalFulfilledCashAmount
-  lastPayer
-  createdBlockNumber
-  createdBlockTimestamp
-  fulfilledBlockNumber
-  updatedBlockNumber
-}
-
-fragment TreasuryActionViewFields on TreasuryAction {
-  id
-  chainId
-  dealId
-  treasuryDealId
-  treasuryAddress
-  actionType
-  tokenAddress
-  agent
-  counterpartyAddress
-  sourceAddress
-  destinationAddress
-  amount
-  dealSize
+  phase
+  snapshotBlock
+  startTime
+  endTime
+  totalVotingPower
+  quorum
+  blockingQuorum
   createdBlockNumber
   createdBlockTimestamp
   createdTransactionHash
 }
 
+fragment OracleSnapshotViewFields on OracleSnapshot {
+  id
+  chainId
+  dacId
+  dacProposalId
+  proposalNumericId
+  governanceOracleId
+  snapshotBlock
+  merkleRoot
+  totalUnderlyingVotingPower
+  publishedAt
+  createdBlockNumber
+  createdBlockTimestamp
+  createdTransactionHash
+}
+
+fragment MerkleVoteViewFields on MerkleVote {
+  id
+  chainId
+  dacProposalId
+  dacId
+  accountId
+  voter
+  support
+  weight
+  merkleIndex
+  createdBlockNumber
+  createdBlockTimestamp
+  createdTransactionHash
+}
+
+fragment DealProposalChallengeViewFields on DealProposalChallenge {
+  id
+  chainId
+  dealId
+  dealProposalId
+  dacProposalId
+  proposalNumericId
+  createdBlockNumber
+  createdBlockTimestamp
+  createdTransactionHash
+}
+
+fragment DacProposalViewFields on DacProposal {
+  id
+  chainId
+  proposalId
+  dacId
+  governanceType
+  createdBlockNumber
+  proposal {
+    ...ProposalBaseFields
+  }
+  phaseEvents(order_by: [{createdBlockNumber: asc}]) {
+    ...ProposalPhaseEventViewFields
+  }
+  oracleSnapshots(order_by: [{createdBlockNumber: asc}]) {
+    ...OracleSnapshotViewFields
+  }
+  merkleVotes(order_by: [{createdBlockNumber: asc}]) {
+    ...MerkleVoteViewFields
+  }
+  challengedDeals(order_by: [{createdBlockNumber: asc}]) {
+    ...DealProposalChallengeViewFields
+  }
+}
+
+fragment DealProposalViewFields on DealProposal {
+  id
+  chainId
+  proposalId
+  dacId
+  dealId
+  challengeable
+  challenged
+  challengeCount
+  createdBlockNumber
+  proposal {
+    ...ProposalBaseFields
+  }
+  challenges(order_by: [{createdBlockNumber: asc}]) {
+    ...DealProposalChallengeViewFields
+  }
+}
+
 query GetProposalById($id: String!) {
-  Proposal(where: { id: { _eq: $id } }, limit: 1) {
-    ...ProposalViewFields
+  Proposal(where: {id: {_eq: $id}}, limit: 1) {
+    ...ProposalBaseFields
   }
 }
 
 query GetProposalByAddress($proposalAddress: String!) {
-  Proposal(where: { proposalAddress: { _eq: $proposalAddress } }, limit: 1) {
-    ...ProposalViewFields
+  Proposal(where: {proposalAddress: {_eq: $proposalAddress}}, limit: 1) {
+    ...ProposalBaseFields
+  }
+}
+
+query GetDacProposalByProposalId($proposalId: String!) {
+  DacProposal(where: {proposalId: {_eq: $proposalId}}, limit: 1) {
+    ...DacProposalViewFields
+  }
+}
+
+query GetDealProposalByProposalId($proposalId: String!) {
+  DealProposal(where: {proposalId: {_eq: $proposalId}}, limit: 1) {
+    ...DealProposalViewFields
   }
 }
 
 query ListProposalsByDac($dacId: String!, $limit: Int!, $offset: Int!) {
   Proposal(
-    where: { dacId: { _eq: $dacId } }
+    where: {dacId: {_eq: $dacId}}
     limit: $limit
     offset: $offset
-    order_by: [{ proposalNumericId: desc }, { createdBlockNumber: desc }]
+    order_by: [{proposalNumericId: desc}, {createdBlockNumber: desc}]
   ) {
-    ...ProposalViewFields
+    ...ProposalBaseFields
   }
 }
 
 query ListProposalsByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
   Proposal(
-    where: { dealId: { _eq: $dealId } }
+    where: {dealId: {_eq: $dealId}}
     limit: $limit
     offset: $offset
-    order_by: [{ proposalNumericId: desc }, { createdBlockNumber: desc }]
+    order_by: [{proposalNumericId: desc}, {createdBlockNumber: desc}]
   ) {
-    ...ProposalViewFields
+    ...ProposalBaseFields
   }
 }
 
-query ListCapitalCallsByDac($dacId: String!, $limit: Int!, $offset: Int!) {
-  CapitalCall(
-    where: { dacId: { _eq: $dacId } }
+query ListDacProposalsByDac($dacId: String!, $limit: Int!, $offset: Int!) {
+  DacProposal(
+    where: {dacId: {_eq: $dacId}}
     limit: $limit
     offset: $offset
-    order_by: [{ proposalNumericId: desc }, { createdBlockNumber: desc }]
+    order_by: [{createdBlockNumber: desc}]
   ) {
-    ...CapitalCallViewFields
+    ...DacProposalViewFields
   }
 }
 
-query ListTreasuryActionsByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
-  TreasuryAction(
-    where: { dealId: { _eq: $dealId } }
+query ListDealProposalsByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
+  DealProposal(
+    where: {dealId: {_eq: $dealId}}
     limit: $limit
     offset: $offset
-    order_by: [{ createdBlockNumber: desc }]
+    order_by: [{createdBlockNumber: desc}]
   ) {
-    ...TreasuryActionViewFields
+    ...DealProposalViewFields
   }
 }

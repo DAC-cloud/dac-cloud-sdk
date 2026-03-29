@@ -76,6 +76,7 @@ All outputs are JSON; bigint values are serialized as decimal strings.
 ## DAC Commands
 
 - `dac create`
+- `dac create-existing-token`
 - `dac delegate`
 - `dac propose <proposalType> [args...]`
 - `dac vote proposal <proposalId> <support>`
@@ -85,11 +86,14 @@ All outputs are JSON; bigint values are serialized as decimal strings.
 - `dac deposit-treasury`
 - `dac legal-message <messageFile>`
 - `dac claim-dividend <proofFile>`
-- `dac view [dac|proposal|proposals|deals|capital-calls] [id]`
+- `dac view [dac|dacs|proposal|dac-proposal|proposals|dac-proposals|deals|capital-calls|treasury-holdings|treasury-movements|treasury-delegations|governance-oracles|wrapper-actions|account] [id]`
 
 ### DAC Proposal Types
 
 - `update-voting-config`
+- `update-governance-strategy`
+- `update-deal-creation-config`
+- `update-governance-oracle`
 - `update-legal-wrapper`
 - `approve-offchain-action`
 - `mint-agent-tokens`
@@ -105,6 +109,7 @@ All outputs are JSON; bigint values are serialized as decimal strings.
 - `recover-deal`
 - `deal-message`
 - `cast-veto-deal`
+- `challenge-deal`
 - `add-evaluator`
 
 ## Deal Commands

@@ -1,6 +1,19 @@
 import type {Address, Hex} from "viem";
 
-export interface DACConfig {
+export type DacMode = "NATIVE" | "EXISTING_TOKEN";
+
+export const ASSET_CAPABILITY = {
+  MINT: 0,
+  BURN: 1,
+  CAPITAL_CALL: 2,
+  WRAP: 3,
+  UNWRAP: 4,
+  RESERVE_BACKED_CLAIMS: 5,
+} as const;
+
+export type AssetCapability = typeof ASSET_CAPABILITY[keyof typeof ASSET_CAPABILITY];
+
+export interface NativeDacConfig {
   symbol: string;
   name: string;
   description: string;
@@ -11,6 +24,32 @@ export interface DACConfig {
   treasuryToken: Address;
   founderCommitment: bigint;
   dividendsEnabled: boolean;
+}
+
+export type DACConfig = NativeDacConfig;
+
+export interface GovernanceStrategyConfig {
+  quorumPercent: bigint;
+  highQuorumPercent: bigint;
+  blockingPercent: bigint;
+  duration: bigint;
+  qualification: bigint;
+  executionValidityDuration: bigint;
+  oraclePublishDeadline: bigint;
+  fallbackWarmupDuration: bigint;
+  fallbackDuration: bigint;
+}
+
+export interface ExistingTokenDacConfig {
+  symbol: string;
+  name: string;
+  description: string;
+  underlyingToken: Address;
+  treasurySeedAmount: bigint;
+  oracleAdmin: Address;
+  initialOraclePublisher: Address;
+  dividendsEnabled: boolean;
+  governanceStrategy: GovernanceStrategyConfig;
 }
 
 export interface ProposalParams {
@@ -34,6 +73,36 @@ export interface VotingConfig {
   highQuorumPercent: bigint;
   duration: bigint;
   qualification: bigint;
+  executionValidityDuration: bigint;
+}
+
+export type DacVotingConfig = VotingConfig;
+
+export interface DealCreationConfig {
+  minAgentBalance: bigint;
+  minInitialAgentStake: bigint;
+}
+
+export interface DacCapabilities {
+  supportsMint: boolean;
+  supportsBurn: boolean;
+  supportsCapitalCall: boolean;
+  supportsWrap: boolean;
+  supportsUnwrap: boolean;
+  supportsReserveBackedClaims: boolean;
+}
+
+export interface DacAddresses {
+  dac: Address;
+  mainToken: Address;
+  agentToken: Address;
+  dealManager: Address;
+  moduleRegistry: Address;
+  assetController: Address;
+  governanceSchema: Address;
+  treasuryHolder?: Address;
+  governanceOracle?: Address;
+  mode?: DacMode;
 }
 
 export interface DealParams {
@@ -45,6 +114,8 @@ export interface DealParams {
   governanceFactory: Address;
   dealTarget: Address;
   proposer: Address;
+  // Wire-level field name kept for contract compatibility.
+  // Semantically this now enables DAC challengeability.
   vetoEnabled: boolean;
   fundingToken: Address;
   fundingAmount: bigint;

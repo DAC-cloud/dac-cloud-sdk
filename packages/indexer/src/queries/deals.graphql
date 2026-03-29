@@ -8,49 +8,168 @@ fragment DealViewFields on Deal {
   kindSelector
   cellAddress
   dealAddress
+  moduleFactoryAddress
+  governanceFactoryAddress
+  dealTargetAddress
+  proposer
+  vetoEnabled
+  earlyReturnsEnabled
+  whitelistOnly
+  dealChallengeEnabled
+  votingQuorumPercent
+  votingBlockingPercent
+  votingHighQuorumPercent
+  votingDuration
+  votingQualification
+  executionValidityDuration
+  name
+  description
+  linkHash
+  evaluatorSelector
   stakeTokenAddress
   managedTreasuryAddress
   childDacAddress
+  childDacId
+  childMainTokenAddress
+  childAgentTokenAddress
   active
   closed
   recovered
   proposalCount
   executedProposalCount
-  trancheCount
+  totalAgentTokens
+  stakerCount
+  currentStakedAmount
+  totalStakedAmount
+  totalReleasedStakeAmount
+  totalSlashedStakeAmount
+  totalRewardAllocatedAmount
+  totalRewardClaimedAmount
+  rewardsLimit
+  rewardsAllocated
   approveDeadline
   evaluationDeadline
   dealDeadline
-  rewardsLimit
-  rewardsAllocated
-  totalRewardAllocatedAmount
-  totalRewardClaimedAmount
+  trancheCount
+  evaluatorCount
+  relatedContractCount
+  lastEvaluatedBlockNumber
+  totalEvaluationCount
   createdBlockNumber
   createdBlockTimestamp
+  createdTransactionHash
+  activatedBlockNumber
+  closedBlockNumber
+  recoveredBlockNumber
   updatedBlockNumber
 }
 
+fragment DealRelatedContractViewFields on DealRelatedContract {
+  id
+  chainId
+  dealId
+  dacId
+  dealAddress
+  dealCellAddress
+  relatedContractAddress
+  roleHex
+  roleText
+  controlled
+  managed
+  createdBlockNumber
+  createdBlockTimestamp
+  createdTransactionHash
+}
+
+fragment DealGovernanceAccountViewFields on DealGovernanceAccount {
+  id
+  chainId
+  dacId
+  dealId
+  accountId
+  delegateAddress
+  currentVotingPower
+  hasVotingPower
+  createdBlockNumber
+  updatedBlockNumber
+}
+
+fragment DealAgentPositionViewFields on DealAgentPosition {
+  id
+  chainId
+  dacId
+  dealId
+  dacAgentId
+  accountId
+  currentStakedAmount
+  totalStakedAmount
+  totalReleasedAmount
+  totalSlashedAmount
+  totalClaimedMainTokenAmount
+  isActive
+  createdBlockNumber
+  updatedBlockNumber
+  lastStakedBlockNumber
+  lastReleasedBlockNumber
+  lastSlashedBlockNumber
+  lastClaimedRewardBlockNumber
+}
+
 query GetDealById($id: String!) {
-  Deal(where: { id: { _eq: $id } }, limit: 1) {
+  Deal(where: {id: {_eq: $id}}, limit: 1) {
     ...DealViewFields
   }
 }
 
 query GetDealByAddress($dealAddress: String!, $cellAddress: String!) {
-  byDealAddress: Deal(where: { dealAddress: { _eq: $dealAddress } }, limit: 1) {
+  byDealAddress: Deal(where: {dealAddress: {_eq: $dealAddress}}, limit: 1) {
     ...DealViewFields
   }
-  byCellAddress: Deal(where: { cellAddress: { _eq: $cellAddress } }, limit: 1) {
+  byCellAddress: Deal(where: {cellAddress: {_eq: $cellAddress}}, limit: 1) {
     ...DealViewFields
   }
 }
 
 query ListDealsByDac($dacId: String!, $limit: Int!, $offset: Int!) {
   Deal(
-    where: { dacId: { _eq: $dacId } }
+    where: {dacId: {_eq: $dacId}}
     limit: $limit
     offset: $offset
-    order_by: [{ dealNumericId: desc }]
+    order_by: [{dealNumericId: desc}]
   ) {
     ...DealViewFields
+  }
+}
+
+query ListDealRelatedContractsByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
+  DealRelatedContract(
+    where: {dealId: {_eq: $dealId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{createdBlockNumber: desc}]
+  ) {
+    ...DealRelatedContractViewFields
+  }
+}
+
+query ListDealGovernanceAccountsByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
+  DealGovernanceAccount(
+    where: {dealId: {_eq: $dealId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{currentVotingPower: desc}, {updatedBlockNumber: desc}]
+  ) {
+    ...DealGovernanceAccountViewFields
+  }
+}
+
+query ListDealAgentPositionsByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
+  DealAgentPosition(
+    where: {dealId: {_eq: $dealId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{currentStakedAmount: desc}, {updatedBlockNumber: desc}]
+  ) {
+    ...DealAgentPositionViewFields
   }
 }

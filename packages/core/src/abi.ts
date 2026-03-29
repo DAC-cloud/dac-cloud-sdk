@@ -4,7 +4,9 @@ import {commonErrorSignatures} from "./errors";
 export const dacFactoryAbi = parseAbi([
   ...commonErrorSignatures,
   "event DACDeployed(address indexed dac, address mainToken, address agentToken, bool init)",
+  "event ExistingTokenDACDeployed(address indexed dac, address indexed underlyingToken, address indexed wrappedToken, address governanceOracle, address agentToken, address assetController, address creator, uint256 treasurySeedAmount)",
   "function deployDAC((string symbol,string name,string description,uint256 mainTokenMaxSupply,uint256 defaultQuorum,address founder,uint256 founderAllocation,address treasuryToken,uint256 founderCommitment,bool dividendsEnabled) config, bytes32 salt, address deferBirthRole) returns (address dacAddr, address mainTokenAddr, address agentTokenAddr)",
+  "function deployExistingTokenDAC(bytes encodedConfig, bytes32 salt) returns (address dacAddr, address wrappedMainTokenAddr, address agentTokenAddr, address governanceOracleAddr)",
   "function startDAC(address dacCell, (string symbol,string name,string description,uint256 mainTokenMaxSupply,uint256 defaultQuorum,address founder,uint256 founderAllocation,address treasuryToken,uint256 founderCommitment,bool dividendsEnabled) config, address mainTokenAddr, address agentTokenAddr)"
 ]);
 
@@ -15,7 +17,10 @@ export const dacCellAbi = parseAbi([
   "function getMainToken() view returns (address)",
   "function getAgentToken() view returns (address)",
   "function getDealManager() view returns (address)",
-  "function getVotingConfig() view returns ((uint256 quorumPercent, uint256 blockingPercent, uint256 highQuorumPercent, uint256 duration, uint256 qualification))",
+  "function getModuleRegistry() view returns (address)",
+  "function getAssetController() view returns (address)",
+  "function getGovernanceSchema() view returns (address)",
+  "function getVotingConfig() view returns ((uint256 quorumPercent, uint256 blockingPercent, uint256 highQuorumPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration))",
   "function depositTreasury(address token, uint256 amount)",
   "function recoverTreasury(address token)",
   "function createManagementProposal((bytes4 typ,address target,bytes32 i,bytes data) params) returns (uint256 id)",
@@ -24,6 +29,21 @@ export const dacCellAbi = parseAbi([
   "function claimDividend(uint256 proposalId, uint256 index, address receiver, uint256 amount, bytes32[] proof)",
   "function executeDACProposal(uint256 id)",
   "function getProposalVoting(uint256 proposalId) view returns (address)"
+]);
+
+export const assetControllerAbi = parseAbi([
+  ...commonErrorSignatures,
+  "function treasuryHolder() view returns (address)",
+  "function supportsCapability(uint8 capability) view returns (bool)"
+]);
+
+export const governanceSchemaAbi = parseAbi([
+  ...commonErrorSignatures,
+  "function getVotingConfig() view returns ((uint256 quorumPercent, uint256 blockingPercent, uint256 highQuorumPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration))",
+  "function getDealCreationConfig() view returns ((uint256 minAgentBalance, uint256 minInitialAgentStake))",
+  "function getStrategyConfig() view returns ((uint256 quorumPercent, uint256 highQuorumPercent, uint256 blockingPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration, uint256 oraclePublishDeadline, uint256 fallbackWarmupDuration, uint256 fallbackDuration))",
+  "function getGovernanceOracle() view returns (address oracle)",
+  "function getProposal(uint256 id) view returns (address proposal)"
 ]);
 
 export const dealManagerAbi = parseAbi([
