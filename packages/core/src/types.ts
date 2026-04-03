@@ -2,6 +2,16 @@ import type {Address, Hex} from "viem";
 
 export type DacMode = "NATIVE" | "EXISTING_TOKEN";
 
+export const PROPOSAL_PHASE = {
+  AWAITING_ORACLE_SNAPSHOT: 0,
+  PRIMARY_VOTING: 1,
+  FALLBACK_WARMUP: 2,
+  FALLBACK_VOTING: 3,
+  RESOLVED: 4,
+} as const;
+
+export type ProposalPhase = typeof PROPOSAL_PHASE[keyof typeof PROPOSAL_PHASE];
+
 export const ASSET_CAPABILITY = {
   MINT: 0,
   BURN: 1,
@@ -103,6 +113,43 @@ export interface DacAddresses {
   treasuryHolder?: Address;
   governanceOracle?: Address;
   mode?: DacMode;
+}
+
+export interface GovernanceOracleSnapshot {
+  snapshotBlock: bigint;
+  merkleRoot: Hex;
+  totalUnderlyingVotingPower: bigint;
+  publishedAt: bigint;
+}
+
+export interface HybridProposalState {
+  proposalAddress: Address;
+  wrappedToken: Address;
+  governanceOracle: Address;
+  phase: ProposalPhase;
+  phaseName: string;
+  primarySnapshotBlock: bigint;
+  fallbackSnapshotBlock: bigint;
+  phaseStartTime: bigint;
+  phaseEndTime: bigint;
+  oracleSnapshotDeadline: bigint;
+  totalVotingPower: bigint;
+  quorum: bigint;
+  blockingQuorum: bigint;
+  yesVotes: bigint;
+  noVotes: bigint;
+  highQuorum: boolean;
+  blockingEnabled: boolean;
+  resolutionTime: bigint;
+  executionDeadline: bigint;
+  executionExpired: boolean;
+  executed: boolean;
+  resolved: boolean;
+  outcome: boolean;
+  executableNow: boolean;
+  oracleMerkleRoot: Hex;
+  totalUnderlyingVotingPower: bigint;
+  strategy: GovernanceStrategyConfig;
 }
 
 export interface DealParams {

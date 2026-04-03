@@ -37,6 +37,15 @@ export const assetControllerAbi = parseAbi([
   "function supportsCapability(uint8 capability) view returns (bool)"
 ]);
 
+export const wrappedMainTokenAbi = parseAbi([
+  ...commonErrorSignatures,
+  "function underlying() view returns (address)",
+  "function wrap(uint256 amount) returns (uint256 wrappedAmount)",
+  "function wrapTo(address recipient, uint256 amount) returns (uint256 wrappedAmount)",
+  "function unwrap(uint256 amount) returns (uint256 underlyingAmount)",
+  "function unwrapTo(address recipient, uint256 amount) returns (uint256 underlyingAmount)"
+]);
+
 export const governanceSchemaAbi = parseAbi([
   ...commonErrorSignatures,
   "function getVotingConfig() view returns ((uint256 quorumPercent, uint256 blockingPercent, uint256 highQuorumPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration))",
@@ -44,6 +53,16 @@ export const governanceSchemaAbi = parseAbi([
   "function getStrategyConfig() view returns ((uint256 quorumPercent, uint256 highQuorumPercent, uint256 blockingPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration, uint256 oraclePublishDeadline, uint256 fallbackWarmupDuration, uint256 fallbackDuration))",
   "function getGovernanceOracle() view returns (address oracle)",
   "function getProposal(uint256 id) view returns (address proposal)"
+]);
+
+export const governanceOracleAbi = parseAbi([
+  ...commonErrorSignatures,
+  "function setPublisher(address publisher, bool allowed)",
+  "function isPublisher(address publisher) view returns (bool)",
+  "function isActive() view returns (bool)",
+  "function deactivate()",
+  "function publishSnapshot(uint256 proposalId, uint256 snapshotBlock, bytes32 merkleRoot, uint256 totalUnderlyingVotingPower)",
+  "function getSnapshot(uint256 proposalId) view returns ((uint256 snapshotBlock, bytes32 merkleRoot, uint256 totalUnderlyingVotingPower, uint256 publishedAt))"
 ]);
 
 export const dealManagerAbi = parseAbi([
@@ -61,8 +80,43 @@ export const dealManagerAbi = parseAbi([
 export const votingProposalAbi = parseAbi([
   ...commonErrorSignatures,
   "function vote(bool support)",
-  "function isResolved() returns (bool)",
-  "function outcome() returns (bool)"
+  "function isResolved() view returns (bool)",
+  "function outcome() view returns (bool)"
+]);
+
+export const hybridDacManagementProposalAbi = parseAbi([
+  ...commonErrorSignatures,
+  "function wrappedToken() view returns (address)",
+  "function governanceOracle() view returns (address)",
+  "function phase() view returns (uint8)",
+  "function primarySnapshotBlock() view returns (uint256)",
+  "function fallbackSnapshotBlock() view returns (uint256)",
+  "function phaseStartTime() view returns (uint256)",
+  "function phaseEndTime() view returns (uint256)",
+  "function oracleSnapshotDeadline() view returns (uint256)",
+  "function totalVotingPower() view returns (uint256)",
+  "function quorum() view returns (uint256)",
+  "function blockingQuorum() view returns (uint256)",
+  "function yesVotes() view returns (uint256)",
+  "function noVotes() view returns (uint256)",
+  "function highQuorum() view returns (bool)",
+  "function blockingEnabled() view returns (bool)",
+  "function resolutionTime() view returns (uint256)",
+  "function oracleMerkleRoot() view returns (bytes32)",
+  "function totalUnderlyingVotingPower() view returns (uint256)",
+  "function getStrategy() view returns ((uint256 quorumPercent, uint256 highQuorumPercent, uint256 blockingPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration, uint256 oraclePublishDeadline, uint256 fallbackWarmupDuration, uint256 fallbackDuration))",
+  "function activatePrimaryVoting()",
+  "function beginFallbackWarmup()",
+  "function triggerEmergencyFallback()",
+  "function activateFallbackVoting()",
+  "function voteWrapped(bool support)",
+  "function voteMerkle(bool support, uint256 index, uint256 amount, bytes32[] proof)",
+  "function isResolved() view returns (bool)",
+  "function outcome() view returns (bool)",
+  "function isExecutableNow() view returns (bool)",
+  "function isExecutionExpired() view returns (bool)",
+  "function isExecuted() view returns (bool)",
+  "function executionDeadline() view returns (uint256)"
 ]);
 
 export const erc20VotesAbi = parseAbi([

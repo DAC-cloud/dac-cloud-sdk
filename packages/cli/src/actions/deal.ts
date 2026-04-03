@@ -1,6 +1,8 @@
 import {resolve as resolvePath} from "node:path";
 import {
   DEAL_PROPOSAL_TYPE,
+  buildEnableDealChallengeRightProposal,
+  buildUpdateDealVotingConfigProposal,
   type DealParams,
   type ProposalParams,
 } from "@dac-cloud/core";
@@ -12,7 +14,9 @@ import {
   asBytes4,
   dacAddressFromCompositeId,
   parseBoolText,
+  resolveDacRecordOrThrow,
   resolveDealIdOrThrow,
+  resolveDealProposalByNumericIdOrThrow,
   resolveDealRecordOrThrow,
   resolvePage,
   viewProposalByIdOrThrow,
@@ -94,10 +98,8 @@ async function resolveDealCellAddressForStake(resolver: OptionResolver): Promise
 async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<void> {
   const {account, core, protocol} = await makeCoreContext(resolver);
 
-  const dac = asAddress(
-    resolver.requireString(["cell-address", "dac-address"], "--cell-address is required for deal create"),
-    "DAC address",
-  );
+  const dacRecord = await resolveDacRecordOrThrow(resolver);
+  const dac = dacRecord.address;
 
   const content = await readJsonFile<Record<string, unknown>>(resolvePath(dealFile));
 
@@ -123,7 +125,7 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
   });
 
   const parsed = schema.parse(content);
-  const now = (await core.publicClient.getBlock()).timestamp;
+  const now = BigInt(Math.floor(Date.now() / 1000));
 
   const dealKind = resolveDealKindSpec(parsed.dealKind);
   const evaluator = resolveEvaluatorKindSpec(parsed.evaluatorSelector);
@@ -174,7 +176,11 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
     evaluatorConfig,
   };
 
-  const dealManager = await core.getDealManager(dac);
+  if (!dacRecord.dealManagerAddress) {
+    throw new Error("DAC deal manager address is missing in indexer.");
+  }
+
+  const dealManager = dacRecord.dealManagerAddress;
   const created = await core.createDealProposalDetailed({dealManager, params: dealParams});
 
   printJson({
@@ -200,19 +206,24 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
 async function cmdStake(resolver: OptionResolver, amountText: string): Promise<void> {
   const {account, core} = await makeCoreContext(resolver);
   const amount = BigInt(amountText);
-  const dealCell = await resolveDealCellAddressForStake(resolver);
-  const dac = asAddress(
-    resolver.requireString(["cell-address", "dac-address"], "--cell-address is required for deal stake"),
-    "DAC address",
-  );
+  const dealRecord = await resolveDealRecordOrThrow(resolver);
+  const dealCell = dealRecord.cellAddress;
+  const dacRecord = await resolveDacRecordOrThrow(resolver);
+  const dac = dacRecord.address;
 
-  const agentToken = await core.getAgentToken(dac);
+  if (!dacRecord.agentTokenAddress) {
+    throw new Error("DAC agent token address is missing in indexer.");
+  }
+
+  const agentToken = dacRecord.agentTokenAddress;
   const txHash = await core.stakeAgentToDeal({agentToken, dealCell, amount});
-  const stakeToken = await core.getStakeToken({dealCell});
+  const stakeToken = resolver.resolveString("stake-token")
+    ? asAddress(resolver.requireString("stake-token"), "stake token")
+    : dealRecord.stakeTokenAddress;
 
   const autoDelegate = resolver.resolveBoolean("auto-delegate", false);
   let delegateTx: Hex | undefined;
-  if (autoDelegate) {
+  if (autoDelegate && stakeToken) {
     delegateTx = await core.delegateVotes({token: stakeToken, delegatee: account.address});
   }
 
@@ -244,22 +255,25 @@ async function cmdUnstake(resolver: OptionResolver): Promise<void> {
 
 async function cmdDelegate(resolver: OptionResolver): Promise<void> {
   const {account, core} = await makeCoreContext(resolver);
+  const dealRecord = await resolveDealRecordOrThrow(resolver);
 
   const stakeTokenFromOption = resolver.resolveString("stake-token");
   const stakeToken = stakeTokenFromOption
     ? asAddress(stakeTokenFromOption, "stake token")
-    : await core.getStakeToken({dealCell: await resolveDealCellAddressForStake(resolver)});
+    : dealRecord.stakeTokenAddress;
+
+  if (!stakeToken) {
+    throw new Error("Deal stake token address is missing in indexer. Pass --stake-token explicitly.");
+  }
 
   const delegatee = asAddress(resolver.resolveString("delegatee", account.address) ?? account.address, "delegatee");
   const txHash = await core.delegateVotes({token: stakeToken, delegatee});
-  const votes = await core.getVotes({token: stakeToken, account: delegatee});
 
   printJson({
     action: "deal.delegate",
     stakeToken,
     delegatee,
     txHash,
-    votes,
   });
 }
 
@@ -267,11 +281,14 @@ async function cmdRequest(resolver: OptionResolver, amountText: string): Promise
   const amount = BigInt(amountText);
   const {core, account} = await makeCoreContext(resolver);
   const resolved = await resolveDealRecordOrThrow(resolver);
-  const dacAddress = resolver.resolveString(["cell-address", "dac-address"])
-    ? asAddress(resolver.requireString(["cell-address", "dac-address"]), "DAC address")
-    : dacAddressFromCompositeId(resolved.dacId);
+  const dacRecord = await resolveDacRecordOrThrow(resolver);
+  const dacAddress = dacRecord.address;
 
-  const agentToken = await core.getAgentToken(dacAddress);
+  if (!dacRecord.agentTokenAddress) {
+    throw new Error("DAC agent token address is missing in indexer.");
+  }
+
+  const agentToken = dacRecord.agentTokenAddress;
   const approveTx = await core.approveErc20({
     token: agentToken,
     spender: resolved.cellAddress,
@@ -345,33 +362,14 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
       : input?.executionValidityDuration !== undefined
         ? readBigIntField(input, "executionValidityDuration", "--input")
         : duration;
-    params = {
-      typ: DEAL_PROPOSAL_TYPE.UPDATE_VOTING_CONFIG,
-      target: "0x0000000000000000000000000000000000000000",
-      i: numberToHex(0n, {size: 32}),
-      data: encodeAbiParameters(
-        [{
-          name: "config",
-          type: "tuple",
-          components: [
-            {name: "quorumPercent", type: "uint256"},
-            {name: "blockingPercent", type: "uint256"},
-            {name: "highQuorumPercent", type: "uint256"},
-            {name: "duration", type: "uint256"},
-            {name: "qualification", type: "uint256"},
-            {name: "executionValidityDuration", type: "uint256"},
-          ],
-        }],
-        [{
-          quorumPercent,
-          blockingPercent,
-          highQuorumPercent,
-          duration,
-          qualification,
-          executionValidityDuration,
-        }],
-      ),
-    };
+    params = buildUpdateDealVotingConfigProposal({
+      quorumPercent,
+      blockingPercent,
+      highQuorumPercent,
+      duration,
+      qualification,
+      executionValidityDuration,
+    });
   } else if (!params && proposalType === "toggle-whitelist") {
     if (args.length !== 1 && !input) {
       throw new Error("deal propose toggle-whitelist requires positional arg or --input json");
@@ -396,12 +394,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     };
   } else if (!params && proposalType === "enable-veto-right") {
     requireNArgs(args, 0, "deal propose enable-veto-right requires no args");
-    params = {
-      typ: DEAL_PROPOSAL_TYPE.ENABLE_VETO_RIGHT,
-      target: "0x0000000000000000000000000000000000000000",
-      i: numberToHex(0n, {size: 32}),
-      data: "0x",
-    };
+    params = buildEnableDealChallengeRightProposal();
   } else if (!params && proposalType === "request-tranche") {
     if ((args.length !== 2 && args.length !== 3) && !input) {
       throw new Error("deal propose request-tranche requires <token> <amount> [rewards] or --input json");
@@ -445,7 +438,11 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
         const dacAddress = resolver.resolveString(["cell-address", "dac-address"])
           ? asAddress(resolver.requireString(["cell-address", "dac-address"]), "DAC address")
           : dacAddressFromCompositeId(resolved.dacId);
-        const agentToken = await core.getAgentToken(dacAddress);
+        const dacRecord = await resolveDacRecordOrThrow(resolver);
+        if (!dacRecord.agentTokenAddress) {
+          throw new Error("DAC agent token address is missing in indexer.");
+        }
+        const agentToken = dacRecord.agentTokenAddress;
         amount = await core.getErc20Allowance({
           token: agentToken,
           owner: agent,
@@ -508,16 +505,20 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
 
 async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string, supportText: string): Promise<void> {
   const {core, rpcUrl} = await makeCoreContext(resolver);
+  const proposal = await resolveDealProposalByNumericIdOrThrow(resolver, proposalIdText);
   const dealAddress = await resolveDealAddressForWrite(resolver);
   const proposalId = BigInt(proposalIdText);
   const support = parseBoolText(supportText);
 
-  const proposalAddress = await core.getDealProposalVotingAddress({dealAddress, proposalId});
+  if (!proposal.proposalAddress) {
+    throw new Error(`Deal proposal #${proposalIdText} is missing proposalAddress in indexer`);
+  }
+
+  const proposalAddress = asAddress(proposal.proposalAddress, "Proposal address");
   const preVoteAdvanceSeconds = resolver.resolveNumber("pre-vote-advance-seconds", 1) ?? 1;
   await advanceTime(rpcUrl, preVoteAdvanceSeconds);
 
   const voteTx = await core.voteProposal({proposalAddress, support});
-  const status = await core.checkProposalOutcome({proposalAddress});
 
   printJson({
     action: "deal.vote.proposal",
@@ -526,31 +527,19 @@ async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string,
     proposalAddress,
     support,
     voteTx,
-    status,
   });
 }
 
 async function cmdExecute(resolver: OptionResolver, proposalIdText: string): Promise<void> {
   const {core, rpcUrl} = await makeCoreContext(resolver);
+  const proposal = await resolveDealProposalByNumericIdOrThrow(resolver, proposalIdText);
   const dealAddress = await resolveDealAddressForWrite(resolver);
   const proposalId = BigInt(proposalIdText);
+  const proposalAddress = proposal.proposalAddress ? asAddress(proposal.proposalAddress, "Proposal address") : undefined;
 
-  const proposalAddress = await core.getDealProposalVotingAddress({dealAddress, proposalId});
-
-  let status = await core.checkProposalOutcome({proposalAddress});
-  if (!status.resolved) {
-    const advanceSeconds = resolver.resolveNumber("advance-seconds", 0) ?? 0;
-    if (advanceSeconds > 0) {
-      await advanceTime(rpcUrl, advanceSeconds);
-      status = await core.checkProposalOutcome({proposalAddress});
-    }
-  }
-
-  if (!status.resolved) {
-    throw new Error("Deal proposal is not resolved yet. Pass --advance-seconds to advance local chain time.");
-  }
-  if (!status.outcome) {
-    throw new Error("Deal proposal resolved with negative outcome.");
+  const advanceSeconds = resolver.resolveNumber("advance-seconds", 0) ?? 0;
+  if (advanceSeconds > 0) {
+    await advanceTime(rpcUrl, advanceSeconds);
   }
 
   const details = await core.executeDealProposalDetailed({dealAddress, proposalId});
@@ -572,10 +561,11 @@ async function cmdEvaluate(resolver: OptionResolver, evaluatorIdText?: string): 
   const {core, account} = await makeCoreContext(resolver);
   const resolved = await resolveDealRecordOrThrow(resolver);
   const evaluatorId = evaluatorIdText ? BigInt(evaluatorIdText) : (resolver.resolveBigInt("evaluator-id", 0n) ?? 0n);
-  const dacAddress = resolver.resolveString(["cell-address", "dac-address"])
-    ? asAddress(resolver.requireString(["cell-address", "dac-address"]), "DAC address")
-    : dacAddressFromCompositeId(resolved.dacId);
-  const dealManager = await core.getDealManager(dacAddress);
+  const dacRecord = await resolveDacRecordOrThrow(resolver);
+  if (!dacRecord.dealManagerAddress) {
+    throw new Error("DAC deal manager address is missing in indexer.");
+  }
+  const dealManager = dacRecord.dealManagerAddress;
 
   const txHash = await core.evaluateDeal({
     dealManager,
@@ -641,7 +631,11 @@ async function cmdLegalMessage(resolver: OptionResolver, messageFile: string, de
       : dacAddressFromCompositeId(resolved.dacId);
   }
 
-  const dealManager = await core.getDealManager(dacAddress);
+  const dacRecord = await resolveDacRecordOrThrow(resolver);
+  if (!dacRecord.dealManagerAddress) {
+    throw new Error("DAC deal manager address is missing in indexer.");
+  }
+  const dealManager = dacRecord.dealManagerAddress;
   const txHash = await core.sendDealLegalWrapperMessage({
     dealManager,
     dealId,
@@ -664,11 +658,12 @@ async function cmdLegalMessage(resolver: OptionResolver, messageFile: string, de
 async function cmdWithdraw(resolver: OptionResolver, dealNumericIdText: string): Promise<void> {
   const {core, account} = await makeCoreContext(resolver);
   const dealId = BigInt(dealNumericIdText);
-  const dac = asAddress(
-    resolver.requireString(["cell-address", "dac-address"], "--cell-address is required for deal withdraw"),
-    "DAC address",
-  );
-  const dealManager = await core.getDealManager(dac);
+  const dacRecord = await resolveDacRecordOrThrow(resolver);
+  const dac = dacRecord.address;
+  if (!dacRecord.dealManagerAddress) {
+    throw new Error("DAC deal manager address is missing in indexer.");
+  }
+  const dealManager = dacRecord.dealManagerAddress;
   const txHash = await core.forceReturnCapital({dealManager, dealId});
 
   printJson({

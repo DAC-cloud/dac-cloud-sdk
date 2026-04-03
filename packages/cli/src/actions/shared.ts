@@ -44,8 +44,24 @@ export interface ResolvedDealRecord {
   dealNumericId: bigint;
   dealAddress: Address;
   cellAddress: Address;
+  stakeTokenAddress?: Address;
   childDacAddress?: Address;
   kindSelector?: `0x${string}`;
+}
+
+export interface ResolvedDacRecord {
+  id: string;
+  address: Address;
+  mode: string;
+  mainTokenAddress?: Address;
+  underlyingTokenAddress?: Address;
+  agentTokenAddress?: Address;
+  dealManagerAddress?: Address;
+  moduleRegistryAddress?: Address;
+  assetControllerAddress?: Address;
+  governanceSchemaAddress?: Address;
+  governanceOracleAddress?: Address;
+  treasuryHolderAddress?: Address;
 }
 
 export function dacAddressFromCompositeId(id: string): Address {
@@ -73,6 +89,37 @@ export async function resolveDacIdOrThrow(resolver: OptionResolver): Promise<str
     throw new Error("DAC not found in indexer");
   }
   return found.id;
+}
+
+export async function resolveDacRecordOrThrow(resolver: OptionResolver): Promise<ResolvedDacRecord> {
+  const client = makeIndexer(resolver);
+  const directId = resolver.resolveString(["dac-id", "id"]);
+  const byAddress = resolver.resolveString(["cell-address", "dac-address", "dac", "address"]);
+
+  const found = directId
+    ? await client.dacs.getById(directId)
+    : byAddress
+      ? await client.dacs.getByAddress(byAddress)
+      : null;
+
+  if (!found) {
+    throw new Error("DAC not found in indexer. Provide --dac-id or --cell-address.");
+  }
+
+  return {
+    id: found.id,
+    address: asAddress(found.address, "DAC address"),
+    mode: found.mode,
+    mainTokenAddress: found.mainTokenAddress ? asAddress(found.mainTokenAddress, "Main token") : undefined,
+    underlyingTokenAddress: found.underlyingTokenAddress ? asAddress(found.underlyingTokenAddress, "Underlying token") : undefined,
+    agentTokenAddress: found.agentTokenAddress ? asAddress(found.agentTokenAddress, "Agent token") : undefined,
+    dealManagerAddress: found.dealManagerAddress ? asAddress(found.dealManagerAddress, "Deal manager") : undefined,
+    moduleRegistryAddress: found.moduleRegistryAddress ? asAddress(found.moduleRegistryAddress, "Module registry") : undefined,
+    assetControllerAddress: found.assetControllerAddress ? asAddress(found.assetControllerAddress, "Asset controller") : undefined,
+    governanceSchemaAddress: found.governanceSchemaAddress ? asAddress(found.governanceSchemaAddress, "Governance schema") : undefined,
+    governanceOracleAddress: found.governanceOracleAddress ? asAddress(found.governanceOracleAddress, "Governance oracle") : undefined,
+    treasuryHolderAddress: found.treasuryHolderAddress ? asAddress(found.treasuryHolderAddress, "Treasury holder") : undefined,
+  };
 }
 
 export async function resolveDealIdOrThrow(resolver: OptionResolver): Promise<string> {
@@ -119,6 +166,7 @@ export async function resolveDealRecordOrThrow(resolver: OptionResolver): Promis
     dealNumericId: BigInt(found.dealNumericId),
     dealAddress: asAddress(found.dealAddress, "Deal address"),
     cellAddress: asAddress(found.cellAddress, "Deal cell"),
+    stakeTokenAddress: found.stakeTokenAddress ? asAddress(found.stakeTokenAddress, "Stake token") : undefined,
     childDacAddress: found.childDacAddress ? asAddress(found.childDacAddress, "Child DAC address") : undefined,
     kindSelector: (found.kindSelector ?? undefined) as `0x${string}` | undefined,
   };
@@ -129,6 +177,26 @@ export async function viewProposalByIdOrThrow(resolver: OptionResolver, proposal
   const proposal = await client.proposals.getById(proposalId);
   if (!proposal) {
     throw new Error("Proposal not found in indexer");
+  }
+  return proposal;
+}
+
+export async function resolveDacProposalByNumericIdOrThrow(resolver: OptionResolver, proposalNumericIdText: string) {
+  const client = makeIndexer(resolver);
+  const dacId = await resolveDacIdOrThrow(resolver);
+  const proposal = await client.proposals.getByDacAndNumericId(dacId, proposalNumericIdText);
+  if (!proposal) {
+    throw new Error(`DAC proposal #${proposalNumericIdText} not found in indexer`);
+  }
+  return proposal;
+}
+
+export async function resolveDealProposalByNumericIdOrThrow(resolver: OptionResolver, proposalNumericIdText: string) {
+  const client = makeIndexer(resolver);
+  const dealId = await resolveDealIdOrThrow(resolver);
+  const proposal = await client.proposals.getByDealAndNumericId(dealId, proposalNumericIdText);
+  if (!proposal) {
+    throw new Error(`Deal proposal #${proposalNumericIdText} not found in indexer`);
   }
   return proposal;
 }

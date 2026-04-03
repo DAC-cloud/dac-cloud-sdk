@@ -84,6 +84,8 @@ All outputs are JSON; bigint values are serialized as decimal strings.
 - `dac join`
 - `dac recover-treasury`
 - `dac deposit-treasury`
+- `dac wrap`
+- `dac unwrap`
 - `dac legal-message <messageFile>`
 - `dac claim-dividend <proofFile>`
 - `dac view [dac|dacs|proposal|dac-proposal|proposals|dac-proposals|deals|capital-calls|treasury-holdings|treasury-movements|treasury-delegations|governance-oracles|wrapper-actions|account] [id]`

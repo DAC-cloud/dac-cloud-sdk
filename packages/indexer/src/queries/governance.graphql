@@ -156,6 +156,24 @@ query GetProposalByAddress($proposalAddress: String!) {
   }
 }
 
+query GetProposalByDacAndNumericId($dacId: String!, $proposalNumericId: numeric!) {
+  Proposal(
+    where: {dacId: {_eq: $dacId}, proposalNumericId: {_eq: $proposalNumericId}}
+    limit: 1
+  ) {
+    ...ProposalBaseFields
+  }
+}
+
+query GetProposalByDealAndNumericId($dealId: String!, $proposalNumericId: numeric!) {
+  Proposal(
+    where: {dealId: {_eq: $dealId}, proposalNumericId: {_eq: $proposalNumericId}}
+    limit: 1
+  ) {
+    ...ProposalBaseFields
+  }
+}
+
 query GetDacProposalByProposalId($proposalId: String!) {
   DacProposal(where: {proposalId: {_eq: $proposalId}}, limit: 1) {
     ...DacProposalViewFields

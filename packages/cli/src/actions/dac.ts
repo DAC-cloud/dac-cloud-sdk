@@ -4,10 +4,15 @@ import {
   DAC_PROPOSAL_TYPE,
   buildBurnMainTokensReserveProposal,
   buildCapitalCallProposal,
+  buildChallengeDealProposal,
   buildDelegateVoteRightsProposal,
   buildMintAgentTokensProposal,
   buildMintMainTokensReserveProposal,
   buildRevokeAgentTokensProposal,
+  buildUpdateDacVotingConfigProposal,
+  buildUpdateDealCreationConfigProposal,
+  buildUpdateGovernanceOracleProposal,
+  buildUpdateGovernanceStrategyProposal,
   type CapitalCall,
   type DACConfig,
   type ExistingTokenDacConfig,
@@ -19,6 +24,8 @@ import {encodeAbiParameters, numberToHex, type Address, type Hex} from "viem";
 import {z} from "zod";
 import {
   resolveDacAddressOrThrow,
+  resolveDacProposalByNumericIdOrThrow,
+  resolveDacRecordOrThrow,
   resolveDacIdOrThrow,
   resolvePage,
   viewProposalByIdOrThrow,
@@ -125,13 +132,11 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
 
   const deferBirthRole = resolver.resolveString("defer-birth-role") as Address | undefined;
   const result = await core.deployDac({config, salt: bytes32Random(), deferBirthRole});
-  const addresses = result.dac ? await core.getDacAddresses(result.dac) : undefined;
 
   const autoDelegate = resolver.resolveBoolean("auto-delegate", false);
   let delegateTx: Hex | undefined;
-  const mainToken = result.mainToken ?? addresses?.mainToken;
-  if (autoDelegate && mainToken) {
-    delegateTx = await core.delegateVotes({token: mainToken, delegatee: account.address});
+  if (autoDelegate && result.mainToken) {
+    delegateTx = await core.delegateVotes({token: result.mainToken, delegatee: account.address});
   }
 
   printJson({
@@ -141,7 +146,6 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
     dac: result.dac,
     mainToken: result.mainToken,
     agentToken: result.agentToken,
-    addresses,
     delegateTx,
   });
 }
@@ -195,13 +199,11 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
   };
 
   const result = await core.deployExistingTokenDac({config, salt: bytes32Random()});
-  const addresses = result.dac ? await core.getDacAddresses(result.dac) : undefined;
 
   const autoDelegate = resolver.resolveBoolean("auto-delegate", false);
   let delegateTx: Hex | undefined;
-  const mainToken = result.mainToken ?? addresses?.mainToken;
-  if (autoDelegate && mainToken) {
-    delegateTx = await core.delegateVotes({token: mainToken, delegatee: account.address});
+  if (autoDelegate && result.mainToken) {
+    delegateTx = await core.delegateVotes({token: result.mainToken, delegatee: account.address});
   }
 
   printJson({
@@ -217,19 +219,22 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
     assetController: result.assetController,
     treasurySeedAmount: result.treasurySeedAmount,
     governanceStrategy,
-    addresses,
     delegateTx,
   });
 }
 
 async function cmdDelegate(resolver: OptionResolver): Promise<void> {
   const {account, core} = await makeCoreContext(resolver);
-  const dac = resolveDacAddressOrThrow(resolver);
+  const dacRecord = await resolveDacRecordOrThrow(resolver);
+  const dac = dacRecord.address;
   const delegatee = asAddress(resolver.resolveString("delegatee", account.address) ?? account.address, "Delegatee");
 
-  const mainToken = await core.getMainToken(dac);
+  if (!dacRecord.mainTokenAddress) {
+    throw new Error("DAC main token address is missing in indexer.");
+  }
+
+  const mainToken = dacRecord.mainTokenAddress;
   const txHash = await core.delegateVotes({token: mainToken, delegatee});
-  const votes = await core.getVotes({token: mainToken, account: delegatee});
 
   printJson({
     action: "dac.delegate",
@@ -237,7 +242,84 @@ async function cmdDelegate(resolver: OptionResolver): Promise<void> {
     mainToken,
     delegatee,
     txHash,
-    votes,
+  });
+}
+
+async function cmdWrap(resolver: OptionResolver): Promise<void> {
+  const {account, core} = await makeCoreContext(resolver);
+  const dacRecord = await resolveDacRecordOrThrow(resolver);
+  const dac = dacRecord.address;
+  const amount = resolver.requireBigInt("amount", "--amount is required for dac wrap");
+
+  if (dacRecord.mode !== "EXISTING_TOKEN") {
+    throw new Error("dac wrap is only supported for existing-token DACs.");
+  }
+  if (!dacRecord.mainTokenAddress || !dacRecord.underlyingTokenAddress) {
+    throw new Error("Existing-token DAC addresses are incomplete in indexer.");
+  }
+
+  const wrappedToken = dacRecord.mainTokenAddress;
+  const underlyingToken = dacRecord.underlyingTokenAddress;
+  const recipientText = resolver.resolveString("recipient");
+  const recipient = recipientText ? asAddress(recipientText, "Wrap recipient") : account.address;
+
+  const autoApprove = resolver.resolveBoolean("auto-approve", true);
+  let approveTx: Hex | undefined;
+  if (autoApprove && amount > 0n) {
+    const allowance = await core.getErc20Allowance({token: underlyingToken, owner: account.address, spender: wrappedToken});
+    if (allowance < amount) {
+      approveTx = await core.approveErc20({token: underlyingToken, spender: wrappedToken, amount});
+    }
+  }
+
+  const txHash = recipient.toLowerCase() === account.address.toLowerCase()
+    ? await core.wrapMainToken({wrappedToken, amount})
+    : await core.wrapMainTokenTo({wrappedToken, recipient, amount});
+
+  printJson({
+    action: "dac.wrap",
+    caller: account.address,
+    dac,
+    wrappedToken,
+    underlyingToken,
+    recipient,
+    amount,
+    approveTx,
+    txHash,
+  });
+}
+
+async function cmdUnwrap(resolver: OptionResolver): Promise<void> {
+  const {account, core} = await makeCoreContext(resolver);
+  const dacRecord = await resolveDacRecordOrThrow(resolver);
+  const dac = dacRecord.address;
+  const amount = resolver.requireBigInt("amount", "--amount is required for dac unwrap");
+
+  if (dacRecord.mode !== "EXISTING_TOKEN") {
+    throw new Error("dac unwrap is only supported for existing-token DACs.");
+  }
+  if (!dacRecord.mainTokenAddress || !dacRecord.underlyingTokenAddress) {
+    throw new Error("Existing-token DAC addresses are incomplete in indexer.");
+  }
+
+  const wrappedToken = dacRecord.mainTokenAddress;
+  const underlyingToken = dacRecord.underlyingTokenAddress;
+  const recipientText = resolver.resolveString("recipient");
+  const recipient = recipientText ? asAddress(recipientText, "Unwrap recipient") : account.address;
+
+  const txHash = recipient.toLowerCase() === account.address.toLowerCase()
+    ? await core.unwrapMainToken({wrappedToken, amount})
+    : await core.unwrapMainTokenTo({wrappedToken, recipient, amount});
+
+  printJson({
+    action: "dac.unwrap",
+    caller: account.address,
+    dac,
+    wrappedToken,
+    underlyingToken,
+    recipient,
+    amount,
+    txHash,
   });
 }
 
@@ -265,33 +347,14 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
       : input?.executionValidityDuration !== undefined
         ? readBigIntField(input, "executionValidityDuration", "--input")
         : duration;
-    params = {
-      typ: DAC_PROPOSAL_TYPE.UPDATE_VOTING_CONFIG,
-      target: zero,
-      i: numberToHex(0n, {size: 32}),
-      data: encodeAbiParameters(
-        [{
-          name: "config",
-          type: "tuple",
-          components: [
-            {name: "quorumPercent", type: "uint256"},
-            {name: "blockingPercent", type: "uint256"},
-            {name: "highQuorumPercent", type: "uint256"},
-            {name: "duration", type: "uint256"},
-            {name: "qualification", type: "uint256"},
-            {name: "executionValidityDuration", type: "uint256"},
-          ],
-        }],
-        [{
-          quorumPercent,
-          blockingPercent,
-          highQuorumPercent,
-          duration,
-          qualification,
-          executionValidityDuration,
-        }],
-      ),
-    };
+    params = buildUpdateDacVotingConfigProposal({
+      quorumPercent,
+      blockingPercent,
+      highQuorumPercent,
+      duration,
+      qualification,
+      executionValidityDuration,
+    });
   } else if (proposalType === "update-governance-strategy") {
     if (args.length !== 9 && !input) {
       throw new Error("dac propose update-governance-strategy requires positional args or --input json");
@@ -305,72 +368,30 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     const oraclePublishDeadline = args[6] !== undefined ? BigInt(args[6]) : readBigIntField(input, "oraclePublishDeadline", "--input");
     const fallbackWarmupDuration = args[7] !== undefined ? BigInt(args[7]) : readBigIntField(input, "fallbackWarmupDuration", "--input");
     const fallbackDuration = args[8] !== undefined ? BigInt(args[8]) : readBigIntField(input, "fallbackDuration", "--input");
-    params = {
-      typ: DAC_PROPOSAL_TYPE.UPDATE_GOVERNANCE_STRATEGY,
-      target: zero,
-      i: numberToHex(0n, {size: 32}),
-      data: encodeAbiParameters(
-        [{
-          name: "config",
-          type: "tuple",
-          components: [
-            {name: "quorumPercent", type: "uint256"},
-            {name: "highQuorumPercent", type: "uint256"},
-            {name: "blockingPercent", type: "uint256"},
-            {name: "duration", type: "uint256"},
-            {name: "qualification", type: "uint256"},
-            {name: "executionValidityDuration", type: "uint256"},
-            {name: "oraclePublishDeadline", type: "uint256"},
-            {name: "fallbackWarmupDuration", type: "uint256"},
-            {name: "fallbackDuration", type: "uint256"},
-          ],
-        }],
-        [{
-          quorumPercent,
-          highQuorumPercent,
-          blockingPercent,
-          duration,
-          qualification,
-          executionValidityDuration,
-          oraclePublishDeadline,
-          fallbackWarmupDuration,
-          fallbackDuration,
-        }],
-      ),
-    };
+    params = buildUpdateGovernanceStrategyProposal({
+      quorumPercent,
+      highQuorumPercent,
+      blockingPercent,
+      duration,
+      qualification,
+      executionValidityDuration,
+      oraclePublishDeadline,
+      fallbackWarmupDuration,
+      fallbackDuration,
+    });
   } else if (proposalType === "update-deal-creation-config") {
     if (args.length !== 2 && !input) {
       throw new Error("dac propose update-deal-creation-config requires positional args or --input json");
     }
     const minAgentBalance = args[0] !== undefined ? BigInt(args[0]) : readBigIntField(input, "minAgentBalance", "--input");
     const minInitialAgentStake = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "minInitialAgentStake", "--input");
-    params = {
-      typ: DAC_PROPOSAL_TYPE.UPDATE_DEAL_CREATION_CONFIG,
-      target: zero,
-      i: numberToHex(0n, {size: 32}),
-      data: encodeAbiParameters(
-        [{
-          name: "config",
-          type: "tuple",
-          components: [
-            {name: "minAgentBalance", type: "uint256"},
-            {name: "minInitialAgentStake", type: "uint256"},
-          ],
-        }],
-        [{minAgentBalance, minInitialAgentStake}],
-      ),
-    };
+    params = buildUpdateDealCreationConfigProposal({minAgentBalance, minInitialAgentStake});
   } else if (proposalType === "update-governance-oracle") {
     if (args.length !== 1 && !input) {
       throw new Error("dac propose update-governance-oracle requires positional arg or --input json");
     }
     const oracle = args[0] ?? readStringField(input, "oracle", "--input");
-    params = {
-      typ: DAC_PROPOSAL_TYPE.UPDATE_GOVERNANCE_ORACLE,
-      target: asAddress(oracle, "governance oracle"),
-      i: numberToHex(0n, {size: 32}),
-      data: "0x",
-    };
+    params = buildUpdateGovernanceOracleProposal(asAddress(oracle, "governance oracle"));
   } else if (proposalType === "update-legal-wrapper") {
     if (args.length !== 4 && !input) {
       throw new Error("dac propose update-legal-wrapper requires positional args or --input json");
@@ -526,15 +547,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     }
     const dealId = args[0] !== undefined ? BigInt(args[0]) : readBigIntField(input, "dealId", "--input");
     const dealProposalId = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "dealProposalId", "--input");
-    params = {
-      typ: DAC_PROPOSAL_TYPE.CAST_VETO_DEAL,
-      target: zero,
-      i: numberToHex(0n, {size: 32}),
-      data: encodeAbiParameters(
-        [{name: "dealId", type: "uint256"}, {name: "dealProposalId", type: "uint256"}],
-        [dealId, dealProposalId],
-      ),
-    };
+    params = buildChallengeDealProposal(dealId, dealProposalId);
   } else {
     if (args.length !== 3 && !input) {
       throw new Error("dac propose add-evaluator requires positional args or --input json");
@@ -572,16 +585,20 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
 
 async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string, supportText: string): Promise<void> {
   const {core, rpcUrl} = await makeCoreContext(resolver);
+  const proposal = await resolveDacProposalByNumericIdOrThrow(resolver, proposalIdText);
   const dac = resolveDacAddressOrThrow(resolver);
   const proposalId = BigInt(proposalIdText);
   const support = parseBoolText(supportText);
 
-  const proposalAddress = await core.getDacProposalVotingAddress({dacCell: dac, proposalId});
+  if (!proposal.proposalAddress) {
+    throw new Error(`DAC proposal #${proposalIdText} is missing proposalAddress in indexer`);
+  }
+
+  const proposalAddress = asAddress(proposal.proposalAddress, "Proposal address");
   const preVoteAdvanceSeconds = resolver.resolveNumber("pre-vote-advance-seconds", 1) ?? 1;
   await advanceTime(rpcUrl, preVoteAdvanceSeconds);
 
   const voteTx = await core.voteProposal({proposalAddress, support});
-  const status = await core.checkProposalOutcome({proposalAddress});
 
   printJson({
     action: "dac.vote.proposal",
@@ -590,31 +607,19 @@ async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string,
     proposalAddress,
     support,
     voteTx,
-    status,
   });
 }
 
 async function cmdExecute(resolver: OptionResolver, proposalIdText: string): Promise<void> {
   const {core, rpcUrl} = await makeCoreContext(resolver);
+  const proposal = await resolveDacProposalByNumericIdOrThrow(resolver, proposalIdText);
   const dac = resolveDacAddressOrThrow(resolver);
   const proposalId = BigInt(proposalIdText);
+  const proposalAddress = proposal.proposalAddress ? asAddress(proposal.proposalAddress, "Proposal address") : undefined;
 
-  const proposalAddress = await core.getDacProposalVotingAddress({dacCell: dac, proposalId});
-
-  let status = await core.checkProposalOutcome({proposalAddress});
-  if (!status.resolved) {
-    const advanceSeconds = resolver.resolveNumber("advance-seconds", 0) ?? 0;
-    if (advanceSeconds > 0) {
-      await advanceTime(rpcUrl, advanceSeconds);
-      status = await core.checkProposalOutcome({proposalAddress});
-    }
-  }
-
-  if (!status.resolved) {
-    throw new Error("Proposal is not resolved yet. Pass --advance-seconds to advance local chain time.");
-  }
-  if (!status.outcome) {
-    throw new Error("Proposal resolved with negative outcome.");
+  const advanceSeconds = resolver.resolveNumber("advance-seconds", 0) ?? 0;
+  if (advanceSeconds > 0) {
+    await advanceTime(rpcUrl, advanceSeconds);
   }
 
   const executeTx = await core.executeDacProposal({dacCell: dac, proposalId});
@@ -1155,6 +1160,38 @@ Examples:
   depositTreasury.action(async function handleDepositTreasury() {
     const resolver = await resolverFactory(this.optsWithGlobals());
     await cmdDepositTreasury(resolver);
+  });
+
+  const wrap = program.command("wrap").description("Wrap underlying tokens into the existing-token DAC main token");
+  applyOptions(wrap, ["cell-address", "dac-address", "dac", "amount", "recipient", "auto-approve"]);
+  addCommandHelp(wrap, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
+      {mode: "allOf", options: ["amount"]},
+    ],
+    notes: [
+      "Only valid for existing-token DACs. By default the CLI wraps to the caller and auto-approves the underlying token if needed.",
+    ],
+  });
+  wrap.action(async function handleWrap() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdWrap(resolver);
+  });
+
+  const unwrap = program.command("unwrap").description("Unwrap existing-token DAC main token back into the underlying asset");
+  applyOptions(unwrap, ["cell-address", "dac-address", "dac", "amount", "recipient"]);
+  addCommandHelp(unwrap, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
+      {mode: "allOf", options: ["amount"]},
+    ],
+    notes: [
+      "Only valid for existing-token DACs. By default the CLI unwraps to the caller.",
+    ],
+  });
+  unwrap.action(async function handleUnwrap() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdUnwrap(resolver);
   });
 
   const legalMessage = program.command("legal-message <messageFile>")

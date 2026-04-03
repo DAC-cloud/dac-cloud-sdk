@@ -9,6 +9,8 @@ import {
   GetDealByIdDocument,
   GetDealProposalByProposalIdDocument,
   GetProposalByAddressDocument,
+  GetProposalByDacAndNumericIdDocument,
+  GetProposalByDealAndNumericIdDocument,
   GetProposalByIdDocument,
   ListCapitalCallsByDacDocument,
   ListDacProposalsByDacDocument,
@@ -42,6 +44,10 @@ import {
   type GetDealProposalByProposalIdQueryVariables,
   type GetProposalByAddressQuery,
   type GetProposalByAddressQueryVariables,
+  type GetProposalByDacAndNumericIdQuery,
+  type GetProposalByDacAndNumericIdQueryVariables,
+  type GetProposalByDealAndNumericIdQuery,
+  type GetProposalByDealAndNumericIdQueryVariables,
   type GetProposalByIdQuery,
   type GetProposalByIdQueryVariables,
   type ListCapitalCallsByDacQuery,
@@ -197,6 +203,22 @@ export function createIndexerClient(config: IndexerClientConfig) {
         const data = await gql.request<GetProposalByAddressQuery, GetProposalByAddressQueryVariables>(
           GetProposalByAddressDocument,
           {proposalAddress: normalizeAddress(proposalAddress)},
+        );
+        return data.Proposal[0] ?? null;
+      },
+
+      async getByDacAndNumericId(dacId: string, proposalNumericId: string) {
+        const data = await gql.request<GetProposalByDacAndNumericIdQuery, GetProposalByDacAndNumericIdQueryVariables>(
+          GetProposalByDacAndNumericIdDocument,
+          {dacId, proposalNumericId},
+        );
+        return data.Proposal[0] ?? null;
+      },
+
+      async getByDealAndNumericId(dealId: string, proposalNumericId: string) {
+        const data = await gql.request<GetProposalByDealAndNumericIdQuery, GetProposalByDealAndNumericIdQueryVariables>(
+          GetProposalByDealAndNumericIdDocument,
+          {dealId, proposalNumericId},
         );
         return data.Proposal[0] ?? null;
       },

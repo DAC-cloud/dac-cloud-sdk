@@ -8,14 +8,12 @@ import {
   type Chain,
   type Hex,
   type PrivateKeyAccount,
-  type PublicClient,
   type WalletClient,
 } from "viem";
 import {privateKeyToAccount} from "viem/accounts";
 import type {ProtocolManifest} from "@dac-cloud/manifests";
 import {
   agentTokenAbi,
-  assetControllerAbi,
   dacFactoryAbi,
   dacCellAbi,
   dealAbi,
@@ -23,20 +21,17 @@ import {
   dealManagerAbi,
   erc20Abi,
   erc20VotesAbi,
-  governanceSchemaAbi,
+  governanceOracleAbi,
+  hybridDacManagementProposalAbi,
   votingProposalAbi,
+  wrappedMainTokenAbi,
 } from "./abi";
 import type {
   CapitalCall,
   DACConfig,
-  DacAddresses,
-  DacCapabilities,
-  DealCreationConfig,
   DealParams,
   ExistingTokenDacConfig,
-  GovernanceStrategyConfig,
   ProposalParams,
-  VotingConfig,
 } from "./types";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
@@ -68,37 +63,31 @@ export interface DeployExistingTokenDacResult {
 }
 
 export interface DacCoreClient {
-  publicClient: PublicClient;
   walletClient?: WalletClient;
   protocol: ProtocolManifest;
   deployDac(args: {config: DACConfig; salt: Hex; deferBirthRole?: Address}): Promise<DeployDacResult>;
   deployExistingTokenDac(args: {config: ExistingTokenDacConfig; salt: Hex}): Promise<DeployExistingTokenDacResult>;
-  getDealManager(dacCell: Address): Promise<Address>;
-  getMainToken(dacCell: Address): Promise<Address>;
-  getAgentToken(dacCell: Address): Promise<Address>;
-  getModuleRegistry(dacCell: Address): Promise<Address>;
-  getAssetController(dacCell: Address): Promise<Address>;
-  getGovernanceSchema(dacCell: Address): Promise<Address>;
-  getTreasuryHolder(assetController: Address): Promise<Address>;
-  getGovernanceOracle(governanceSchema: Address): Promise<Address>;
-  getDealCreationConfig(governanceSchema: Address): Promise<DealCreationConfig>;
-  getGovernanceStrategyConfig(governanceSchema: Address): Promise<GovernanceStrategyConfig>;
-  getDacCapabilities(assetController: Address): Promise<DacCapabilities>;
-  getDacAddresses(dacCell: Address): Promise<DacAddresses>;
+  wrapMainToken(args: {wrappedToken: Address; amount: bigint}): Promise<Hex>;
+  wrapMainTokenTo(args: {wrappedToken: Address; recipient: Address; amount: bigint}): Promise<Hex>;
+  unwrapMainToken(args: {wrappedToken: Address; amount: bigint}): Promise<Hex>;
+  unwrapMainTokenTo(args: {wrappedToken: Address; recipient: Address; amount: bigint}): Promise<Hex>;
   createDealProposal(args: {dealManager: Address; params: DealParams}): Promise<Hex>;
   createDealProposalDetailed(args: {dealManager: Address; params: DealParams}): Promise<{txHash: Hex; dealId?: bigint; proposalId?: bigint; dealCell?: Address; dealAddress?: Address; evaluatorAddress?: Address}>;
   createDacManagementProposal(args: {dacCell: Address; params: ProposalParams}): Promise<{txHash: Hex; proposalId?: bigint; proposalAddress?: Address}>;
-  getDacProposalVotingAddress(args: {dacCell: Address; proposalId: bigint}): Promise<Address>;
-  getDacVotingConfig(args: {dacCell: Address}): Promise<VotingConfig>;
   voteProposal(args: {proposalAddress: Address; support: boolean}): Promise<Hex>;
-  checkProposalOutcome(args: {proposalAddress: Address}): Promise<{resolved: boolean; outcome: boolean}>;
   executeDacProposal(args: {dacCell: Address; proposalId: bigint}): Promise<Hex>;
+  setGovernanceOraclePublisher(args: {governanceOracle: Address; publisher: Address; allowed: boolean}): Promise<Hex>;
+  deactivateGovernanceOracle(governanceOracle: Address): Promise<Hex>;
+  publishGovernanceOracleSnapshot(args: {governanceOracle: Address; proposalId: bigint; snapshotBlock: bigint; merkleRoot: Hex; totalUnderlyingVotingPower: bigint}): Promise<Hex>;
+  activateHybridPrimaryVoting(proposalAddress: Address): Promise<Hex>;
+  beginHybridFallbackWarmup(proposalAddress: Address): Promise<Hex>;
+  triggerHybridEmergencyFallback(proposalAddress: Address): Promise<Hex>;
+  activateHybridFallbackVoting(proposalAddress: Address): Promise<Hex>;
+  voteMerkle(args: {proposalAddress: Address; support: boolean; index: bigint; amount: bigint; proof: Hex[]}): Promise<Hex>;
   stakeAgentToDeal(args: {agentToken: Address; dealCell: Address; amount: bigint}): Promise<Hex>;
   unstakeFromDeal(args: {dealCell: Address}): Promise<Hex>;
   claimMainToken(args: {dealCell: Address; evaluatorId: bigint}): Promise<Hex>;
-  getStakeToken(args: {dealCell: Address}): Promise<Address>;
   createDealManagementProposal(args: {dealAddress: Address; params: ProposalParams}): Promise<{txHash: Hex; proposalId?: bigint; proposalAddress?: Address}>;
-  getDealProposalVotingAddress(args: {dealAddress: Address; proposalId: bigint}): Promise<Address>;
   executeDealProposal(args: {dealAddress: Address; proposalId: bigint}): Promise<Hex>;
   executeDealProposalDetailed(args: {dealAddress: Address; proposalId: bigint}): Promise<{txHash: Hex; dacProposalId?: bigint; trancheId?: bigint; childProposalId?: bigint; childVoteProposalId?: bigint}>;
   evaluateDeal(args: {dealManager: Address; dealId: bigint; evaluatorId: bigint}): Promise<Hex>;
@@ -111,7 +100,6 @@ export interface DacCoreClient {
   recoverTreasury(args: {dacCell: Address; token: Address}): Promise<Hex>;
   approveErc20(args: {token: Address; spender: Address; amount: bigint}): Promise<Hex>;
   delegateVotes(args: {token: Address; delegatee: Address}): Promise<Hex>;
-  getVotes(args: {token: Address; account: Address}): Promise<bigint>;
   getErc20Allowance(args: {token: Address; owner: Address; spender: Address}): Promise<bigint>;
 }
 
@@ -169,7 +157,6 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
     : undefined;
 
   return {
-    publicClient,
     walletClient,
     protocol: options.protocol,
 
@@ -280,155 +267,60 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       };
     },
 
-    async getDealManager(dacCell) {
-      return publicClient.readContract({
-        address: dacCell,
-        abi: dacCellAbi,
-        functionName: "getDealManager",
+    async wrapMainToken({wrappedToken, amount}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for wrapMainToken");
+      }
+
+      return walletClient.writeContract({
+        address: wrappedToken,
+        abi: wrappedMainTokenAbi,
+        functionName: "wrap",
+        args: [amount],
+        account: walletClient.account,
       });
     },
 
-    async getMainToken(dacCell) {
-      return publicClient.readContract({
-        address: dacCell,
-        abi: dacCellAbi,
-        functionName: "getMainToken",
+    async wrapMainTokenTo({wrappedToken, recipient, amount}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for wrapMainTokenTo");
+      }
+
+      return walletClient.writeContract({
+        address: wrappedToken,
+        abi: wrappedMainTokenAbi,
+        functionName: "wrapTo",
+        args: [recipient, amount],
+        account: walletClient.account,
       });
     },
 
-    async getAgentToken(dacCell) {
-      return publicClient.readContract({
-        address: dacCell,
-        abi: dacCellAbi,
-        functionName: "getAgentToken",
+    async unwrapMainToken({wrappedToken, amount}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for unwrapMainToken");
+      }
+
+      return walletClient.writeContract({
+        address: wrappedToken,
+        abi: wrappedMainTokenAbi,
+        functionName: "unwrap",
+        args: [amount],
+        account: walletClient.account,
       });
     },
 
-    async getModuleRegistry(dacCell) {
-      return publicClient.readContract({
-        address: dacCell,
-        abi: dacCellAbi,
-        functionName: "getModuleRegistry",
+    async unwrapMainTokenTo({wrappedToken, recipient, amount}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for unwrapMainTokenTo");
+      }
+
+      return walletClient.writeContract({
+        address: wrappedToken,
+        abi: wrappedMainTokenAbi,
+        functionName: "unwrapTo",
+        args: [recipient, amount],
+        account: walletClient.account,
       });
-    },
-
-    async getAssetController(dacCell) {
-      return publicClient.readContract({
-        address: dacCell,
-        abi: dacCellAbi,
-        functionName: "getAssetController",
-      });
-    },
-
-    async getGovernanceSchema(dacCell) {
-      return publicClient.readContract({
-        address: dacCell,
-        abi: dacCellAbi,
-        functionName: "getGovernanceSchema",
-      });
-    },
-
-    async getTreasuryHolder(assetController) {
-      return publicClient.readContract({
-        address: assetController,
-        abi: assetControllerAbi,
-        functionName: "treasuryHolder",
-      });
-    },
-
-    async getGovernanceOracle(governanceSchema) {
-      return publicClient.readContract({
-        address: governanceSchema,
-        abi: governanceSchemaAbi,
-        functionName: "getGovernanceOracle",
-      });
-    },
-
-    async getDealCreationConfig(governanceSchema) {
-      const config = await publicClient.readContract({
-        address: governanceSchema,
-        abi: governanceSchemaAbi,
-        functionName: "getDealCreationConfig",
-      });
-
-      return {
-        minAgentBalance: config.minAgentBalance,
-        minInitialAgentStake: config.minInitialAgentStake,
-      };
-    },
-
-    async getGovernanceStrategyConfig(governanceSchema) {
-      const config = await publicClient.readContract({
-        address: governanceSchema,
-        abi: governanceSchemaAbi,
-        functionName: "getStrategyConfig",
-      });
-
-      return {
-        quorumPercent: config.quorumPercent,
-        highQuorumPercent: config.highQuorumPercent,
-        blockingPercent: config.blockingPercent,
-        duration: config.duration,
-        qualification: config.qualification,
-        executionValidityDuration: config.executionValidityDuration,
-        oraclePublishDeadline: config.oraclePublishDeadline,
-        fallbackWarmupDuration: config.fallbackWarmupDuration,
-        fallbackDuration: config.fallbackDuration,
-      };
-    },
-
-    async getDacCapabilities(assetController) {
-      const [supportsMint, supportsBurn, supportsCapitalCall, supportsWrap, supportsUnwrap, supportsReserveBackedClaims] = await Promise.all([
-        publicClient.readContract({address: assetController, abi: assetControllerAbi, functionName: "supportsCapability", args: [0]}),
-        publicClient.readContract({address: assetController, abi: assetControllerAbi, functionName: "supportsCapability", args: [1]}),
-        publicClient.readContract({address: assetController, abi: assetControllerAbi, functionName: "supportsCapability", args: [2]}),
-        publicClient.readContract({address: assetController, abi: assetControllerAbi, functionName: "supportsCapability", args: [3]}),
-        publicClient.readContract({address: assetController, abi: assetControllerAbi, functionName: "supportsCapability", args: [4]}),
-        publicClient.readContract({address: assetController, abi: assetControllerAbi, functionName: "supportsCapability", args: [5]}),
-      ]);
-
-      return {
-        supportsMint,
-        supportsBurn,
-        supportsCapitalCall,
-        supportsWrap,
-        supportsUnwrap,
-        supportsReserveBackedClaims,
-      };
-    },
-
-    async getDacAddresses(dacCell) {
-      const [mainToken, agentToken, dealManager, moduleRegistry, assetController, governanceSchema] = await Promise.all([
-        publicClient.readContract({address: dacCell, abi: dacCellAbi, functionName: "getMainToken"}),
-        publicClient.readContract({address: dacCell, abi: dacCellAbi, functionName: "getAgentToken"}),
-        publicClient.readContract({address: dacCell, abi: dacCellAbi, functionName: "getDealManager"}),
-        publicClient.readContract({address: dacCell, abi: dacCellAbi, functionName: "getModuleRegistry"}),
-        publicClient.readContract({address: dacCell, abi: dacCellAbi, functionName: "getAssetController"}),
-        publicClient.readContract({address: dacCell, abi: dacCellAbi, functionName: "getGovernanceSchema"}),
-      ]);
-
-      const [treasuryHolder, governanceOracle, capabilities] = await Promise.all([
-        publicClient.readContract({address: assetController, abi: assetControllerAbi, functionName: "treasuryHolder"}),
-        publicClient.readContract({address: governanceSchema, abi: governanceSchemaAbi, functionName: "getGovernanceOracle"}),
-        Promise.all([
-          publicClient.readContract({address: assetController, abi: assetControllerAbi, functionName: "supportsCapability", args: [3]}),
-          publicClient.readContract({address: assetController, abi: assetControllerAbi, functionName: "supportsCapability", args: [4]}),
-          publicClient.readContract({address: assetController, abi: assetControllerAbi, functionName: "supportsCapability", args: [5]}),
-        ]),
-      ]);
-
-      return {
-        dac: dacCell,
-        mainToken,
-        agentToken,
-        dealManager,
-        moduleRegistry,
-        assetController,
-        governanceSchema,
-        treasuryHolder,
-        governanceOracle: governanceOracle === ZERO_ADDRESS ? undefined : governanceOracle,
-        mode: capabilities.some(Boolean) ? "EXISTING_TOKEN" : "NATIVE",
-      };
     },
 
     async createDealProposal({dealManager, params}) {
@@ -523,32 +415,6 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       return {txHash, proposalId, proposalAddress};
     },
 
-    async getDacProposalVotingAddress({dacCell, proposalId}) {
-      return publicClient.readContract({
-        address: dacCell,
-        abi: dacCellAbi,
-        functionName: "getProposalVoting",
-        args: [proposalId],
-      });
-    },
-
-    async getDacVotingConfig({dacCell}) {
-      const config = await publicClient.readContract({
-        address: dacCell,
-        abi: dacCellAbi,
-        functionName: "getVotingConfig",
-      });
-
-      return {
-        quorumPercent: config.quorumPercent,
-        blockingPercent: config.blockingPercent,
-        highQuorumPercent: config.highQuorumPercent,
-        duration: config.duration,
-        qualification: config.qualification,
-        executionValidityDuration: config.executionValidityDuration,
-      };
-    },
-
     async voteProposal({proposalAddress, support}) {
       if (!walletClient || !walletClient.account) {
         throw new Error("Wallet client with account is required for voteProposal");
@@ -563,25 +429,6 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       });
     },
 
-    async checkProposalOutcome({proposalAddress}) {
-      const resolved = await publicClient.readContract({
-        address: proposalAddress,
-        abi: votingProposalAbi,
-        functionName: "isResolved",
-      });
-
-      let outcome = false;
-      if (resolved) {
-        outcome = await publicClient.readContract({
-          address: proposalAddress,
-          abi: votingProposalAbi,
-          functionName: "outcome",
-        });
-      }
-
-      return {resolved, outcome};
-    },
-
     async executeDacProposal({dacCell, proposalId}) {
       if (!walletClient || !walletClient.account) {
         throw new Error("Wallet client with account is required for executeDacProposal");
@@ -592,6 +439,113 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         abi: dacCellAbi,
         functionName: "executeDACProposal",
         args: [proposalId],
+        account: walletClient.account,
+      });
+    },
+
+    async setGovernanceOraclePublisher({governanceOracle, publisher, allowed}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for setGovernanceOraclePublisher");
+      }
+
+      return walletClient.writeContract({
+        address: governanceOracle,
+        abi: governanceOracleAbi,
+        functionName: "setPublisher",
+        args: [publisher, allowed],
+        account: walletClient.account,
+      });
+    },
+
+    async deactivateGovernanceOracle(governanceOracle) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for deactivateGovernanceOracle");
+      }
+
+      return walletClient.writeContract({
+        address: governanceOracle,
+        abi: governanceOracleAbi,
+        functionName: "deactivate",
+        account: walletClient.account,
+      });
+    },
+
+    async publishGovernanceOracleSnapshot({governanceOracle, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for publishGovernanceOracleSnapshot");
+      }
+
+      return walletClient.writeContract({
+        address: governanceOracle,
+        abi: governanceOracleAbi,
+        functionName: "publishSnapshot",
+        args: [proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower],
+        account: walletClient.account,
+      });
+    },
+
+    async activateHybridPrimaryVoting(proposalAddress) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for activateHybridPrimaryVoting");
+      }
+
+      return walletClient.writeContract({
+        address: proposalAddress,
+        abi: hybridDacManagementProposalAbi,
+        functionName: "activatePrimaryVoting",
+        account: walletClient.account,
+      });
+    },
+
+    async beginHybridFallbackWarmup(proposalAddress) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for beginHybridFallbackWarmup");
+      }
+
+      return walletClient.writeContract({
+        address: proposalAddress,
+        abi: hybridDacManagementProposalAbi,
+        functionName: "beginFallbackWarmup",
+        account: walletClient.account,
+      });
+    },
+
+    async triggerHybridEmergencyFallback(proposalAddress) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for triggerHybridEmergencyFallback");
+      }
+
+      return walletClient.writeContract({
+        address: proposalAddress,
+        abi: hybridDacManagementProposalAbi,
+        functionName: "triggerEmergencyFallback",
+        account: walletClient.account,
+      });
+    },
+
+    async activateHybridFallbackVoting(proposalAddress) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for activateHybridFallbackVoting");
+      }
+
+      return walletClient.writeContract({
+        address: proposalAddress,
+        abi: hybridDacManagementProposalAbi,
+        functionName: "activateFallbackVoting",
+        account: walletClient.account,
+      });
+    },
+
+    async voteMerkle({proposalAddress, support, index, amount, proof}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for voteMerkle");
+      }
+
+      return walletClient.writeContract({
+        address: proposalAddress,
+        abi: hybridDacManagementProposalAbi,
+        functionName: "voteMerkle",
+        args: [support, index, amount, proof],
         account: walletClient.account,
       });
     },
@@ -637,14 +591,6 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       });
     },
 
-    async getStakeToken({dealCell}) {
-      return publicClient.readContract({
-        address: dealCell,
-        abi: dealCellAbi,
-        functionName: "stakeToken",
-      });
-    },
-
     async createDealManagementProposal({dealAddress, params}) {
       if (!walletClient || !walletClient.account) {
         throw new Error("Wallet client with account is required for createDealManagementProposal");
@@ -680,15 +626,6 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       }
 
       return {txHash, proposalId, proposalAddress};
-    },
-
-    async getDealProposalVotingAddress({dealAddress, proposalId}) {
-      return publicClient.readContract({
-        address: dealAddress,
-        abi: dealAbi,
-        functionName: "getProposal",
-        args: [proposalId],
-      });
     },
 
     async executeDealProposal({dealAddress, proposalId}) {
@@ -898,15 +835,6 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         functionName: "delegate",
         args: [delegatee],
         account: walletClient.account,
-      });
-    },
-
-    async getVotes({token, account}) {
-      return publicClient.readContract({
-        address: token,
-        abi: erc20VotesAbi,
-        functionName: "getVotes",
-        args: [account],
       });
     },
 

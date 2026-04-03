@@ -1,6 +1,6 @@
 import {encodeAbiParameters, numberToHex, type Address, type Hex} from "viem";
-import {DAC_PROPOSAL_TYPE} from "./selectors";
-import type {ProposalParams} from "./types";
+import {DAC_PROPOSAL_TYPE, DEAL_PROPOSAL_TYPE} from "./selectors";
+import type {DealCreationConfig, GovernanceStrategyConfig, ProposalParams, VotingConfig} from "./types";
 import type {TreasurySpendAllowance} from "./modules/core/types";
 import {
   buildChildDacCreateProposalProposal as buildChildDacCreateProposalProposalModule,
@@ -83,6 +83,127 @@ export function buildCapitalCallProposal(
     data: encodeAbiParameters(
       [{name: "treasuryToken", type: "address"}, {name: "cashAmount", type: "uint256"}],
       [treasuryToken, cashAmount],
+    ),
+  };
+}
+
+export function buildUpdateDacVotingConfigProposal(config: VotingConfig): ProposalParams {
+  return {
+    typ: DAC_PROPOSAL_TYPE.UPDATE_VOTING_CONFIG,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [{
+        name: "config",
+        type: "tuple",
+        components: [
+          {name: "quorumPercent", type: "uint256"},
+          {name: "blockingPercent", type: "uint256"},
+          {name: "highQuorumPercent", type: "uint256"},
+          {name: "duration", type: "uint256"},
+          {name: "qualification", type: "uint256"},
+          {name: "executionValidityDuration", type: "uint256"},
+        ],
+      }],
+      [config],
+    ),
+  };
+}
+
+export function buildUpdateDealVotingConfigProposal(config: VotingConfig): ProposalParams {
+  return {
+    typ: DEAL_PROPOSAL_TYPE.UPDATE_VOTING_CONFIG,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [{
+        name: "config",
+        type: "tuple",
+        components: [
+          {name: "quorumPercent", type: "uint256"},
+          {name: "blockingPercent", type: "uint256"},
+          {name: "highQuorumPercent", type: "uint256"},
+          {name: "duration", type: "uint256"},
+          {name: "qualification", type: "uint256"},
+          {name: "executionValidityDuration", type: "uint256"},
+        ],
+      }],
+      [config],
+    ),
+  };
+}
+
+export function buildUpdateGovernanceStrategyProposal(config: GovernanceStrategyConfig): ProposalParams {
+  return {
+    typ: DAC_PROPOSAL_TYPE.UPDATE_GOVERNANCE_STRATEGY,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [{
+        name: "config",
+        type: "tuple",
+        components: [
+          {name: "quorumPercent", type: "uint256"},
+          {name: "highQuorumPercent", type: "uint256"},
+          {name: "blockingPercent", type: "uint256"},
+          {name: "duration", type: "uint256"},
+          {name: "qualification", type: "uint256"},
+          {name: "executionValidityDuration", type: "uint256"},
+          {name: "oraclePublishDeadline", type: "uint256"},
+          {name: "fallbackWarmupDuration", type: "uint256"},
+          {name: "fallbackDuration", type: "uint256"},
+        ],
+      }],
+      [config],
+    ),
+  };
+}
+
+export function buildUpdateDealCreationConfigProposal(config: DealCreationConfig): ProposalParams {
+  return {
+    typ: DAC_PROPOSAL_TYPE.UPDATE_DEAL_CREATION_CONFIG,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [{
+        name: "config",
+        type: "tuple",
+        components: [
+          {name: "minAgentBalance", type: "uint256"},
+          {name: "minInitialAgentStake", type: "uint256"},
+        ],
+      }],
+      [config],
+    ),
+  };
+}
+
+export function buildUpdateGovernanceOracleProposal(oracle: Address): ProposalParams {
+  return {
+    typ: DAC_PROPOSAL_TYPE.UPDATE_GOVERNANCE_ORACLE,
+    target: oracle,
+    i: toBytes32FromUint(0n),
+    data: "0x",
+  };
+}
+
+export function buildEnableDealChallengeRightProposal(): ProposalParams {
+  return {
+    typ: DEAL_PROPOSAL_TYPE.ENABLE_CHALLENGE_RIGHT,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: "0x",
+  };
+}
+
+export function buildChallengeDealProposal(dealId: bigint, dealProposalId: bigint): ProposalParams {
+  return {
+    typ: DAC_PROPOSAL_TYPE.CHALLENGE_DEAL,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [{name: "dealId", type: "uint256"}, {name: "dealProposalId", type: "uint256"}],
+      [dealId, dealProposalId],
     ),
   };
 }
