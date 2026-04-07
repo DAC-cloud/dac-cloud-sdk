@@ -2,11 +2,13 @@ import {resolve} from "node:path";
 import {
   accountFromPrivateKey,
   createDacCoreClient,
+  createDacTransactionBuilder,
   type DacCoreClient,
+  type DacTransactionBuilder,
 } from "@dac-cloud/core";
 import {createIndexerClient} from "@dac-cloud/indexer";
 import {loadProtocolManifest, type ProtocolManifest} from "@dac-cloud/manifests";
-import {defineChain, type Hex, type PrivateKeyAccount} from "viem";
+import {defineChain, type Address, type Hex, type PrivateKeyAccount} from "viem";
 import type {OptionResolver} from "./config";
 
 export const DEFAULT_ANVIL_PK_0 =
@@ -53,6 +55,39 @@ export async function makeCoreContext(resolver: OptionResolver): Promise<CoreCon
     protocol,
     core,
   };
+}
+
+export interface DryRunContext {
+  chainId: number;
+  contractsRoot: string;
+  fromAddress: Address;
+  protocol: ProtocolManifest;
+  txBuilder: DacTransactionBuilder;
+}
+
+export async function makeDryRunContext(resolver: OptionResolver): Promise<DryRunContext> {
+  const chainId = resolver.resolveNumber("chain-id", 31337) ?? 31337;
+  const contractsRoot = resolve(
+    resolver.resolveString("contracts-root", process.env.DAC_CONTRACTS_ROOT ?? "../dac-cloud-contracts")
+      ?? "../dac-cloud-contracts",
+  );
+
+  const fromRaw = resolver.resolveString("from");
+  const privateKeyRaw = resolver.resolveString("private-key");
+
+  let fromAddress: Address;
+  if (fromRaw) {
+    fromAddress = fromRaw as Address;
+  } else if (privateKeyRaw) {
+    fromAddress = accountFromPrivateKey(privateKeyRaw as Hex).address;
+  } else {
+    throw new Error("--dry-run requires --from <address> or --private-key to derive sender address");
+  }
+
+  const protocol = await loadProtocolManifest(chainId, {contractsRoot});
+  const txBuilder = createDacTransactionBuilder({chainId, fromAddress, protocol});
+
+  return {chainId, contractsRoot, fromAddress, protocol, txBuilder};
 }
 
 export function makeIndexer(resolver: OptionResolver) {

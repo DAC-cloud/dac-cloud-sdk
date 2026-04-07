@@ -38,8 +38,12 @@ import {
 } from "./shared";
 import {addCommandHelp, applyOptions, type OptionKey} from "../cli/options";
 import type {OptionResolver} from "../runtime/config";
-import {advanceTime, makeCoreContext, makeIndexer} from "../runtime/chain";
+import {advanceTime, makeCoreContext, makeDryRunContext, makeIndexer} from "../runtime/chain";
 import {printJson, readJsonFile} from "../runtime/io";
+
+function isDryRun(resolver: OptionResolver): boolean {
+  return resolver.resolveBoolean("dry-run", false);
+}
 
 const DAC_PROPOSAL_TYPES = [
   "update-voting-config",
@@ -105,8 +109,6 @@ function readBoolField(input: Record<string, unknown> | undefined, key: string, 
 }
 
 async function cmdCreate(resolver: OptionResolver): Promise<void> {
-  const {account, core} = await makeCoreContext(resolver);
-
   const name = resolver.requireString("name", "--name is required for dac create");
   const description = resolver.requireString("description", "--description is required for dac create");
   const symbol = resolver.resolveString("symbol", "DAC") ?? "DAC";
@@ -120,21 +122,28 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
   const mainTokenMaxSupply = resolver.resolveBigInt("max-supply", 1_000_000_000n * 10n ** 18n) ?? (1_000_000_000n * 10n ** 18n);
   const defaultQuorum = resolver.resolveBigInt("default-quorum", 5n * 10n ** 17n) ?? 5n * 10n ** 17n; // 0.5 * MANTISSA
   const dividendsEnabled = resolver.resolveBoolean("dividends-enabled", false);
+  const deferBirthRole = resolver.resolveString("defer-birth-role") as Address | undefined;
 
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const config: DACConfig = {
+      symbol: symbol.slice(0, 8), name, description, mainTokenMaxSupply, defaultQuorum,
+      founder: ctx.fromAddress, founderAllocation, treasuryToken, founderCommitment, dividendsEnabled,
+    };
+    const transaction = ctx.txBuilder.deployDac({config, salt: bytes32Random(), deferBirthRole});
+    printJson({
+      action: "dac.create", dryRun: true, transaction,
+      note: "After confirming, use the DACDeployed event to get mainToken address for delegation.",
+    });
+    return;
+  }
+
+  const {account, core} = await makeCoreContext(resolver);
   const config: DACConfig = {
-    symbol: symbol.slice(0, 8),
-    name,
-    description,
-    mainTokenMaxSupply,
-    defaultQuorum,
-    founder: account.address,
-    founderAllocation,
-    treasuryToken,
-    founderCommitment,
-    dividendsEnabled,
+    symbol: symbol.slice(0, 8), name, description, mainTokenMaxSupply, defaultQuorum,
+    founder: account.address, founderAllocation, treasuryToken, founderCommitment, dividendsEnabled,
   };
 
-  const deferBirthRole = resolver.resolveString("defer-birth-role") as Address | undefined;
   const result = await core.deployDac({config, salt: bytes32Random(), deferBirthRole});
 
   const autoDelegate = resolver.resolveBoolean("auto-delegate", false);
@@ -155,8 +164,6 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
 }
 
 async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
-  const {account, core} = await makeCoreContext(resolver);
-
   const name = resolver.requireString("name", "--name is required for dac create-existing-token");
   const description = resolver.requireString("description", "--description is required for dac create-existing-token");
   const symbol = resolver.resolveString("symbol", "DAC") ?? "DAC";
@@ -168,16 +175,7 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
     "treasury-seed-amount",
     "--treasury-seed-amount is required for dac create-existing-token",
   );
-  const oracleAdmin = asAddress(
-    resolver.resolveString("oracle-admin", account.address) ?? account.address,
-    "Oracle admin",
-  );
-  const initialOraclePublisher = asAddress(
-    resolver.resolveString("initial-oracle-publisher", account.address) ?? account.address,
-    "Initial oracle publisher",
-  );
   const dividendsEnabled = resolver.resolveBoolean("dividends-enabled", false);
-
   const governanceStrategy: GovernanceStrategyConfig = {
     quorumPercent: resolver.resolveBigInt("quorum-percent", 5n * 10n ** 17n) ?? 5n * 10n ** 17n,
     highQuorumPercent: resolver.resolveBigInt("high-quorum-percent", 75n * 10n ** 16n) ?? 75n * 10n ** 16n,
@@ -193,17 +191,28 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
     oraclePrimaryEnabled: resolver.resolveBoolean("oracle-primary-enabled", true) ?? true,
   };
 
-  const config: ExistingTokenDacConfig = {
-    symbol: symbol.slice(0, 8),
-    name,
-    description,
-    underlyingToken,
-    treasurySeedAmount,
-    oracleAdmin,
-    initialOraclePublisher,
-    dividendsEnabled,
-    governanceStrategy,
-  };
+  function buildConfig(senderAddress: Address): ExistingTokenDacConfig {
+    const oracleAdmin = asAddress(resolver.resolveString("oracle-admin", senderAddress) ?? senderAddress, "Oracle admin");
+    const initialOraclePublisher = asAddress(resolver.resolveString("initial-oracle-publisher", senderAddress) ?? senderAddress, "Initial oracle publisher");
+    return {
+      symbol: symbol.slice(0, 8), name, description, underlyingToken, treasurySeedAmount,
+      oracleAdmin, initialOraclePublisher, dividendsEnabled, governanceStrategy,
+    };
+  }
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const config = buildConfig(ctx.fromAddress);
+    const transaction = ctx.txBuilder.deployExistingTokenDac({config, salt: bytes32Random()});
+    printJson({
+      action: "dac.create.existing-token", dryRun: true, transaction, governanceStrategy,
+      note: "After confirming, use ExistingTokenDACDeployed event for deployed addresses.",
+    });
+    return;
+  }
+
+  const {account, core} = await makeCoreContext(resolver);
+  const config = buildConfig(account.address);
 
   const result = await core.deployExistingTokenDac({config, salt: bytes32Random()});
 
@@ -231,29 +240,30 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
 }
 
 async function cmdDelegate(resolver: OptionResolver): Promise<void> {
-  const {account, core} = await makeCoreContext(resolver);
   const dacRecord = await resolveDacRecordOrThrow(resolver);
   const dac = dacRecord.address;
-  const delegatee = asAddress(resolver.resolveString("delegatee", account.address) ?? account.address, "Delegatee");
 
   if (!dacRecord.mainTokenAddress) {
     throw new Error("DAC main token address is missing in indexer.");
   }
-
   const mainToken = dacRecord.mainTokenAddress;
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const delegatee = asAddress(resolver.resolveString("delegatee", ctx.fromAddress) ?? ctx.fromAddress, "Delegatee");
+    const transaction = ctx.txBuilder.delegateVotes({token: mainToken, delegatee});
+    printJson({action: "dac.delegate", dryRun: true, dac, mainToken, delegatee, transaction});
+    return;
+  }
+
+  const {account, core} = await makeCoreContext(resolver);
+  const delegatee = asAddress(resolver.resolveString("delegatee", account.address) ?? account.address, "Delegatee");
   const txHash = await core.delegateVotes({token: mainToken, delegatee});
 
-  printJson({
-    action: "dac.delegate",
-    dac,
-    mainToken,
-    delegatee,
-    txHash,
-  });
+  printJson({action: "dac.delegate", dac, mainToken, delegatee, txHash});
 }
 
 async function cmdWrap(resolver: OptionResolver): Promise<void> {
-  const {account, core} = await makeCoreContext(resolver);
   const dacRecord = await resolveDacRecordOrThrow(resolver);
   const dac = dacRecord.address;
   const amount = resolver.requireBigInt("amount", "--amount is required for dac wrap");
@@ -267,6 +277,25 @@ async function cmdWrap(resolver: OptionResolver): Promise<void> {
 
   const wrappedToken = dacRecord.mainTokenAddress;
   const underlyingToken = dacRecord.underlyingTokenAddress;
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const recipientText = resolver.resolveString("recipient");
+    const recipient = recipientText ? asAddress(recipientText, "Wrap recipient") : ctx.fromAddress;
+    const transactions = [];
+    if (resolver.resolveBoolean("auto-approve", true) && amount > 0n) {
+      transactions.push(ctx.txBuilder.approveErc20({token: underlyingToken, spender: wrappedToken, amount}));
+    }
+    transactions.push(
+      recipient.toLowerCase() === ctx.fromAddress.toLowerCase()
+        ? ctx.txBuilder.wrapMainToken({wrappedToken, amount})
+        : ctx.txBuilder.wrapMainTokenTo({wrappedToken, recipient, amount}),
+    );
+    printJson({action: "dac.wrap", dryRun: true, dac, wrappedToken, underlyingToken, recipient, amount, transactions});
+    return;
+  }
+
+  const {account, core} = await makeCoreContext(resolver);
   const recipientText = resolver.resolveString("recipient");
   const recipient = recipientText ? asAddress(recipientText, "Wrap recipient") : account.address;
 
@@ -283,21 +312,10 @@ async function cmdWrap(resolver: OptionResolver): Promise<void> {
     ? await core.wrapMainToken({wrappedToken, amount})
     : await core.wrapMainTokenTo({wrappedToken, recipient, amount});
 
-  printJson({
-    action: "dac.wrap",
-    caller: account.address,
-    dac,
-    wrappedToken,
-    underlyingToken,
-    recipient,
-    amount,
-    approveTx,
-    txHash,
-  });
+  printJson({action: "dac.wrap", caller: account.address, dac, wrappedToken, underlyingToken, recipient, amount, approveTx, txHash});
 }
 
 async function cmdUnwrap(resolver: OptionResolver): Promise<void> {
-  const {account, core} = await makeCoreContext(resolver);
   const dacRecord = await resolveDacRecordOrThrow(resolver);
   const dac = dacRecord.address;
   const amount = resolver.requireBigInt("amount", "--amount is required for dac unwrap");
@@ -311,6 +329,19 @@ async function cmdUnwrap(resolver: OptionResolver): Promise<void> {
 
   const wrappedToken = dacRecord.mainTokenAddress;
   const underlyingToken = dacRecord.underlyingTokenAddress;
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const recipientText = resolver.resolveString("recipient");
+    const recipient = recipientText ? asAddress(recipientText, "Unwrap recipient") : ctx.fromAddress;
+    const transaction = recipient.toLowerCase() === ctx.fromAddress.toLowerCase()
+      ? ctx.txBuilder.unwrapMainToken({wrappedToken, amount})
+      : ctx.txBuilder.unwrapMainTokenTo({wrappedToken, recipient, amount});
+    printJson({action: "dac.unwrap", dryRun: true, dac, wrappedToken, underlyingToken, recipient, amount, transaction});
+    return;
+  }
+
+  const {account, core} = await makeCoreContext(resolver);
   const recipientText = resolver.resolveString("recipient");
   const recipient = recipientText ? asAddress(recipientText, "Unwrap recipient") : account.address;
 
@@ -318,20 +349,10 @@ async function cmdUnwrap(resolver: OptionResolver): Promise<void> {
     ? await core.unwrapMainToken({wrappedToken, amount})
     : await core.unwrapMainTokenTo({wrappedToken, recipient, amount});
 
-  printJson({
-    action: "dac.unwrap",
-    caller: account.address,
-    dac,
-    wrappedToken,
-    underlyingToken,
-    recipient,
-    amount,
-    txHash,
-  });
+  printJson({action: "dac.unwrap", caller: account.address, dac, wrappedToken, underlyingToken, recipient, amount, txHash});
 }
 
 async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, args: string[]): Promise<void> {
-  const {core} = await makeCoreContext(resolver);
   const dac = resolveDacAddressOrThrow(resolver);
   const zero = "0x0000000000000000000000000000000000000000" as Address;
   const inputPath = resolver.resolveString("input");
@@ -560,7 +581,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
         [dealId, asBytes4(messageKind, "message kind"), z.string().regex(/^0x[0-9a-fA-F]*$/).parse(messageData) as Hex],
       ),
     };
-  } else if (proposalType === "cast-veto-deal" || proposalType === "challenge-deal") {
+  } else if (proposalType === "challenge-deal") {
     if (args.length !== 2 && !input) {
       throw new Error("dac propose challenge-deal requires positional args or --input json");
     }
@@ -568,15 +589,19 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     const dealProposalId = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "dealProposalId", "--input");
     params = buildChallengeDealProposal(dealId, dealProposalId);
   } else {
-    if (args.length !== 3 && !input) {
-      throw new Error("dac propose add-evaluator requires positional args or --input json");
+    if (args.length !== 4 && !input) {
+      throw new Error("dac propose add-evaluator requires <dealId> <evaluatorModuleFactory> <evaluatorSelector> <evaluatorConfig> or --input json");
     }
     const dealId = args[0] !== undefined ? BigInt(args[0]) : readBigIntField(input, "dealId", "--input");
-    const evaluatorSelector = args[1] ?? readStringField(input, "evaluatorSelector", "--input");
-    const evaluatorParams = args[2] ?? readStringField(input, "evaluatorParams", "--input");
-    const evaluatorHandle = encodeAbiParameters(
+    const evaluatorModuleFactory = asAddress(
+      args[1] ?? readStringField(input, "evaluatorModuleFactory", "--input"),
+      "evaluator module factory",
+    );
+    const evaluatorSelector = args[2] ?? readStringField(input, "evaluatorSelector", "--input");
+    const evaluatorConfigHex = args[3] ?? readStringField(input, "evaluatorConfig", "--input");
+    const evaluatorConfig = encodeAbiParameters(
       [{name: "selector", type: "bytes4"}, {name: "params", type: "bytes"}],
-      [asBytes4(evaluatorSelector, "evaluator selector"), z.string().regex(/^0x[0-9a-fA-F]*$/).parse(evaluatorParams) as Hex],
+      [asBytes4(evaluatorSelector, "evaluator selector"), z.string().regex(/^0x[0-9a-fA-F]*$/).parse(evaluatorConfigHex) as Hex],
     );
 
     params = {
@@ -584,12 +609,20 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
       target: zero,
       i: numberToHex(0n, {size: 32}),
       data: encodeAbiParameters(
-        [{name: "dealId", type: "uint256"}, {name: "evaluatorHandle", type: "bytes"}],
-        [dealId, evaluatorHandle],
+        [{name: "dealId", type: "uint256"}, {name: "evaluatorModuleFactory", type: "address"}, {name: "evaluatorConfig", type: "bytes"}],
+        [dealId, evaluatorModuleFactory, evaluatorConfig],
       ),
     };
   }
 
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.createDacManagementProposal({dacCell: dac, params});
+    printJson({action: "dac.propose", dryRun: true, dac, proposalType, transaction});
+    return;
+  }
+
+  const {core} = await makeCoreContext(resolver);
   const created = await core.createDacManagementProposal({dacCell: dac, params});
 
   printJson({
@@ -603,7 +636,6 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
 }
 
 async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string, supportText: string): Promise<void> {
-  const {core, rpcUrl} = await makeCoreContext(resolver);
   const proposal = await resolveDacProposalByNumericIdOrThrow(resolver, proposalIdText);
   const dac = resolveDacAddressOrThrow(resolver);
   const proposalId = BigInt(proposalIdText);
@@ -612,8 +644,16 @@ async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string,
   if (!proposal.proposalAddress) {
     throw new Error(`DAC proposal #${proposalIdText} is missing proposalAddress in indexer`);
   }
-
   const proposalAddress = asAddress(proposal.proposalAddress, "Proposal address");
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.voteProposal({proposalAddress, support});
+    printJson({action: "dac.vote.proposal", dryRun: true, dac, proposalId, proposalAddress, support, transaction});
+    return;
+  }
+
+  const {core, rpcUrl} = await makeCoreContext(resolver);
   const preVoteAdvanceSeconds = resolver.resolveNumber("pre-vote-advance-seconds", 1) ?? 1;
   await advanceTime(rpcUrl, preVoteAdvanceSeconds);
 
@@ -630,10 +670,18 @@ async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string,
 }
 
 async function cmdExecute(resolver: OptionResolver, proposalIdText: string): Promise<void> {
-  const {core, rpcUrl} = await makeCoreContext(resolver);
-  const proposal = await resolveDacProposalByNumericIdOrThrow(resolver, proposalIdText);
   const dac = resolveDacAddressOrThrow(resolver);
   const proposalId = BigInt(proposalIdText);
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.executeDacProposal({dacCell: dac, proposalId});
+    printJson({action: "dac.execute", dryRun: true, dac, proposalId, transaction});
+    return;
+  }
+
+  const {core, rpcUrl} = await makeCoreContext(resolver);
+  const proposal = await resolveDacProposalByNumericIdOrThrow(resolver, proposalIdText);
   const proposalAddress = proposal.proposalAddress ? asAddress(proposal.proposalAddress, "Proposal address") : undefined;
 
   const advanceSeconds = resolver.resolveNumber("advance-seconds", 0) ?? 0;
@@ -743,35 +791,40 @@ async function cmdJoin(resolver: OptionResolver): Promise<void> {
 }
 
 async function cmdRecoverTreasury(resolver: OptionResolver): Promise<void> {
-  const {account, core} = await makeCoreContext(resolver);
   const dac = resolveDacAddressOrThrow(resolver);
-  const token = asAddress(
-    resolver.requireString("token", "--token is required for dac recover-treasury"),
-    "Token",
-  );
+  const token = asAddress(resolver.requireString("token", "--token is required for dac recover-treasury"), "Token");
 
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.recoverTreasury({dacCell: dac, token});
+    printJson({action: "dac.recover-treasury", dryRun: true, dac, token, transaction});
+    return;
+  }
+
+  const {account, core} = await makeCoreContext(resolver);
   const txHash = await core.recoverTreasury({dacCell: dac, token});
-  printJson({
-    action: "dac.recover-treasury",
-    caller: account.address,
-    dac,
-    token,
-    txHash,
-  });
+  printJson({action: "dac.recover-treasury", caller: account.address, dac, token, txHash});
 }
 
 async function cmdDepositTreasury(resolver: OptionResolver): Promise<void> {
-  const {account, core} = await makeCoreContext(resolver);
   const dac = resolveDacAddressOrThrow(resolver);
-  const token = asAddress(
-    resolver.requireString("token", "--token is required for dac deposit-treasury"),
-    "Token",
-  );
+  const token = asAddress(resolver.requireString("token", "--token is required for dac deposit-treasury"), "Token");
   const amount = resolver.requireBigInt("amount", "--amount is required for dac deposit-treasury");
 
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transactions = [];
+    if (resolver.resolveBoolean("auto-approve", true) && amount > 0n) {
+      transactions.push(ctx.txBuilder.approveErc20({token, spender: dac, amount}));
+    }
+    transactions.push(ctx.txBuilder.depositTreasury({dacCell: dac, token, amount}));
+    printJson({action: "dac.deposit-treasury", dryRun: true, dac, token, amount, transactions});
+    return;
+  }
+
+  const {account, core} = await makeCoreContext(resolver);
   const autoApprove = resolver.resolveBoolean("auto-approve", true);
   let approveTx: Hex | undefined;
-
   if (autoApprove && amount > 0n) {
     const allowance = await core.getErc20Allowance({token, owner: account.address, spender: dac});
     if (allowance < amount) {
@@ -780,41 +833,25 @@ async function cmdDepositTreasury(resolver: OptionResolver): Promise<void> {
   }
 
   const txHash = await core.depositTreasury({dacCell: dac, token, amount});
-
-  printJson({
-    action: "dac.deposit-treasury",
-    caller: account.address,
-    dac,
-    token,
-    amount,
-    approveTx,
-    txHash,
-    note: "DACCell.depositTreasury can be restricted to registered deal callers in current contracts.",
-  });
+  printJson({action: "dac.deposit-treasury", caller: account.address, dac, token, amount, approveTx, txHash});
 }
 
 async function cmdLegalMessage(resolver: OptionResolver, messageFile: string): Promise<void> {
-  const {core, account} = await makeCoreContext(resolver);
   const dac = resolveDacAddressOrThrow(resolver);
   const payload = await readJsonFile<Record<string, unknown>>(resolvePath(messageFile));
-
   const kind = asBytes4(readStringField(payload, "kind", messageFile), "legal message kind");
   const message = z.string().regex(/^0x[0-9a-fA-F]*$/).parse(readStringField(payload, "message", messageFile)) as Hex;
 
-  const txHash = await core.sendDacLegalWrapperMessage({
-    dacCell: dac,
-    kind,
-    message,
-  });
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.sendDacLegalWrapperMessage({dacCell: dac, kind, message});
+    printJson({action: "dac.legal-message", dryRun: true, dac, kind, message, transaction});
+    return;
+  }
 
-  printJson({
-    action: "dac.legal-message",
-    caller: account.address,
-    dac,
-    kind,
-    message,
-    txHash,
-  });
+  const {core, account} = await makeCoreContext(resolver);
+  const txHash = await core.sendDacLegalWrapperMessage({dacCell: dac, kind, message});
+  printJson({action: "dac.legal-message", caller: account.address, dac, kind, message, txHash});
 }
 
 async function cmdClaimDividend(resolver: OptionResolver, proofFile: string): Promise<void> {

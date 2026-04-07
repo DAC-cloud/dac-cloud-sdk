@@ -185,4 +185,15 @@ export interface DealParams {
   dealConfig: Hex;
   evaluatorSelector: Hex;
   evaluatorConfig: Hex;
+  evaluatorModuleFactory: Address;
+  agentsLimit: bigint;
+  minimalStake: bigint;
+}
+
+export interface TransactionRequest {
+  to: Address;
+  from: Address;
+  data: Hex;
+  value: bigint;
+  chainId: number;
 }

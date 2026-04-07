@@ -71,6 +71,8 @@ const OPTION_SPECS = {
   "stake-token": {flags: "--stake-token <address>", description: "Deal stake token override"},
   input: {flags: "--input <path>", description: "JSON input file for complex proposal/message payloads"},
   "from-request": {flags: "--from-request", description: "For add-stake proposals: source amount from request allowance"},
+  "dry-run": {flags: "--dry-run", description: "Output unsigned transaction data instead of broadcasting"},
+  "from": {flags: "--from <address>", description: "Sender address for dry-run mode (alternative to --private-key)"},
 } satisfies Record<string, CliOptionSpec>;
 
 export type OptionKey = keyof typeof OPTION_SPECS;
@@ -82,6 +84,8 @@ export const GLOBAL_OPTION_KEYS: OptionKey[] = [
   "rpc-url",
   "contracts-root",
   "indexer-url",
+  "dry-run",
+  "from",
 ];
 
 export interface RequirementSpec {

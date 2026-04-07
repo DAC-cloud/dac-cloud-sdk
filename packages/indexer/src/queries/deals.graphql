@@ -26,6 +26,9 @@ fragment DealViewFields on Deal {
   description
   linkHash
   evaluatorSelector
+  evaluatorModuleFactoryAddress
+  agentsLimit
+  minimalStake
   stakeTokenAddress
   managedTreasuryAddress
   childDacAddress

@@ -31,8 +31,12 @@ import {
 } from "../modules/registry";
 import {addCommandHelp, applyOptions} from "../cli/options";
 import type {OptionResolver} from "../runtime/config";
-import {advanceTime, makeCoreContext, makeIndexer} from "../runtime/chain";
+import {advanceTime, makeCoreContext, makeDryRunContext, makeIndexer} from "../runtime/chain";
 import {printJson, readJsonFile} from "../runtime/io";
+
+function isDryRun(resolver: OptionResolver): boolean {
+  return resolver.resolveBoolean("dry-run", false);
+}
 
 function requireNArgs(args: string[], expected: number, hint: string): void {
   if (args.length !== expected) {
@@ -97,10 +101,13 @@ async function resolveDealCellAddressForStake(resolver: OptionResolver): Promise
 }
 
 async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<void> {
-  const {account, core, protocol} = await makeCoreContext(resolver);
-
   const dacRecord = await resolveDacRecordOrThrow(resolver);
   const dac = dacRecord.address;
+
+  if (!dacRecord.dealManagerAddress) {
+    throw new Error("DAC deal manager address is missing in indexer.");
+  }
+  const dealManager = dacRecord.dealManagerAddress;
 
   const content = await readJsonFile<Record<string, unknown>>(resolvePath(dealFile));
 
@@ -124,6 +131,9 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
     dealConfig: z.unknown(),
     evaluatorSelector: z.string(),
     evaluatorConfig: z.unknown(),
+    evaluatorModuleFactory: z.string().optional(),
+    agentsLimit: z.union([z.string(), z.number(), z.bigint()]).optional(),
+    minimalStake: z.union([z.string(), z.number(), z.bigint()]).optional(),
   });
 
   const parsed = schema.parse(content);
@@ -134,80 +144,59 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
   const dealConfig = dealKind.encodeConfig(parsed.dealConfig);
   const evaluatorConfig = evaluator.encodeConfig(parsed.evaluatorConfig);
 
-  const defaultCoreGovernanceFactory = typeof protocol.coreDealGovernanceFactory === "string"
-    ? protocol.coreDealGovernanceFactory
-    : undefined;
-  const moduleFactory = parsed.moduleFactory
-    ?? dealKind.defaultModuleFactory?.(protocol)
-    ?? String(protocol.coreModuleFactory);
-  const governanceFactory = parsed.governanceFactory
-    ?? dealKind.defaultGovernanceFactory?.(protocol)
-    ?? defaultCoreGovernanceFactory;
-
-  if (!governanceFactory) {
-    throw new Error(
-      "Missing governanceFactory. Provide 'governanceFactory' in deal JSON or configure it in module/protocol manifest.",
-    );
+  function buildDealParams(protocol: {coreModuleFactory: unknown; coreDealGovernanceFactory?: unknown}, proposerAddress: string): DealParams {
+    const defaultCoreGovernanceFactory = typeof protocol.coreDealGovernanceFactory === "string"
+      ? protocol.coreDealGovernanceFactory : undefined;
+    const moduleFactory = parsed.moduleFactory ?? dealKind.defaultModuleFactory?.(protocol as never) ?? String(protocol.coreModuleFactory);
+    const governanceFactory = parsed.governanceFactory ?? dealKind.defaultGovernanceFactory?.(protocol as never) ?? defaultCoreGovernanceFactory;
+    if (!governanceFactory) {
+      throw new Error("Missing governanceFactory. Provide 'governanceFactory' in deal JSON or configure it in module/protocol manifest.");
+    }
+    const resolvedDealDeadline = parsed.dealDeadline ? parseBigNumberish(parsed.dealDeadline, "dealDeadline") : now + 30n * 24n * 60n * 60n;
+    const resolvedEvaluationDeadline = parsed.evaluationDeadline ? parseBigNumberish(parsed.evaluationDeadline, "evaluationDeadline") : resolvedDealDeadline;
+    return {
+      dealKind: dealKind.selector, name: parsed.name, description: parsed.description, linkHash: parsed.linkHash,
+      moduleFactory: asAddress(moduleFactory, "moduleFactory"), governanceFactory: asAddress(governanceFactory, "governanceFactory"),
+      dealTarget: asAddress(parsed.dealTarget ?? "0x0000000000000000000000000000000000000000", "dealTarget"),
+      proposer: asAddress(parsed.proposer ?? proposerAddress, "proposer"),
+      vetoEnabled: parsed.vetoEnabled ?? false, fundingToken: asAddress(parsed.fundingToken, "fundingToken"),
+      fundingAmount: parseBigNumberish(parsed.fundingAmount, "fundingAmount"),
+      rewardsLimit: parsed.rewardsLimit ? parseBigNumberish(parsed.rewardsLimit, "rewardsLimit") : 500_000_000n,
+      dealRewardPoolPercent: parsed.dealRewardPoolPercent ? parseBigNumberish(parsed.dealRewardPoolPercent, "dealRewardPoolPercent") : 0n,
+      approveDeadline: parsed.approveDeadline ? parseBigNumberish(parsed.approveDeadline, "approveDeadline") : now + 7n * 24n * 60n * 60n,
+      evaluationDeadline: resolvedEvaluationDeadline, dealDeadline: resolvedDealDeadline,
+      dealConfig, evaluatorSelector: evaluator.selector, evaluatorConfig,
+      evaluatorModuleFactory: asAddress(parsed.evaluatorModuleFactory ?? "0x0000000000000000000000000000000000000000", "evaluatorModuleFactory"),
+      agentsLimit: parsed.agentsLimit ? parseBigNumberish(parsed.agentsLimit, "agentsLimit") : 0n,
+      minimalStake: parsed.minimalStake ? parseBigNumberish(parsed.minimalStake, "minimalStake") : 0n,
+    };
   }
 
-  const resolvedDealDeadline = parsed.dealDeadline
-    ? parseBigNumberish(parsed.dealDeadline, "dealDeadline")
-    : now + 30n * 24n * 60n * 60n;
-  const resolvedEvaluationDeadline = parsed.evaluationDeadline
-    ? parseBigNumberish(parsed.evaluationDeadline, "evaluationDeadline")
-    : resolvedDealDeadline;
-
-  const dealParams: DealParams = {
-    dealKind: dealKind.selector,
-    name: parsed.name,
-    description: parsed.description,
-    linkHash: parsed.linkHash,
-    moduleFactory: asAddress(moduleFactory, "moduleFactory"),
-    governanceFactory: asAddress(governanceFactory, "governanceFactory"),
-    dealTarget: asAddress(parsed.dealTarget ?? "0x0000000000000000000000000000000000000000", "dealTarget"),
-    proposer: asAddress(parsed.proposer ?? account.address, "proposer"),
-    vetoEnabled: parsed.vetoEnabled ?? false,
-    fundingToken: asAddress(parsed.fundingToken, "fundingToken"),
-    fundingAmount: parseBigNumberish(parsed.fundingAmount, "fundingAmount"),
-    rewardsLimit: parsed.rewardsLimit ? parseBigNumberish(parsed.rewardsLimit, "rewardsLimit") : 500_000_000n,
-    dealRewardPoolPercent: parsed.dealRewardPoolPercent ? parseBigNumberish(parsed.dealRewardPoolPercent, "dealRewardPoolPercent") : 0n,
-    approveDeadline: parsed.approveDeadline ? parseBigNumberish(parsed.approveDeadline, "approveDeadline") : now + 7n * 24n * 60n * 60n,
-    evaluationDeadline: resolvedEvaluationDeadline,
-    dealDeadline: resolvedDealDeadline,
-    dealConfig,
-    evaluatorSelector: evaluator.selector,
-    evaluatorConfig,
-  };
-
-  if (!dacRecord.dealManagerAddress) {
-    throw new Error("DAC deal manager address is missing in indexer.");
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const dealParams = buildDealParams(ctx.protocol, ctx.fromAddress);
+    const transaction = ctx.txBuilder.createDealProposal({dealManager, params: dealParams});
+    printJson({action: "deal.create", dryRun: true, dac, dealManager, transaction,
+      moduleId: dealKind.moduleId, evaluatorModuleId: evaluator.moduleId});
+    return;
   }
 
-  const dealManager = dacRecord.dealManagerAddress;
+  const {account, core, protocol} = await makeCoreContext(resolver);
+  const dealParams = buildDealParams(protocol, account.address);
+
   const created = await core.createDealProposalDetailed({dealManager, params: dealParams});
 
   printJson({
-    action: "deal.create",
-    dac,
-    dealManager,
-    proposer: account.address,
-    txHash: created.txHash,
-    dealId: created.dealId,
-    dacProposalId: created.proposalId,
-    dealCell: created.dealCell,
-    dealAddress: created.dealAddress,
-    evaluatorAddress: created.evaluatorAddress,
-    moduleId: dealKind.moduleId,
-    evaluatorModuleId: evaluator.moduleId,
-    approveDeadline: dealParams.approveDeadline,
-    evaluationDeadline: dealParams.evaluationDeadline,
-    dealDeadline: dealParams.dealDeadline,
-    rewardsLimit: dealParams.rewardsLimit,
+    action: "deal.create", dac, dealManager, proposer: account.address,
+    txHash: created.txHash, dealId: created.dealId, dacProposalId: created.proposalId,
+    dealCell: created.dealCell, dealAddress: created.dealAddress, evaluatorAddress: created.evaluatorAddress,
+    moduleId: dealKind.moduleId, evaluatorModuleId: evaluator.moduleId,
+    approveDeadline: dealParams.approveDeadline, evaluationDeadline: dealParams.evaluationDeadline,
+    dealDeadline: dealParams.dealDeadline, rewardsLimit: dealParams.rewardsLimit,
   });
 }
 
 async function cmdStake(resolver: OptionResolver, amountText: string): Promise<void> {
-  const {account, core} = await makeCoreContext(resolver);
   const amount = BigInt(amountText);
   const dealRecord = await resolveDealRecordOrThrow(resolver);
   const dealCell = dealRecord.cellAddress;
@@ -217,8 +206,20 @@ async function cmdStake(resolver: OptionResolver, amountText: string): Promise<v
   if (!dacRecord.agentTokenAddress) {
     throw new Error("DAC agent token address is missing in indexer.");
   }
-
   const agentToken = dacRecord.agentTokenAddress;
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transactions = [ctx.txBuilder.stakeAgentToDeal({agentToken, dealCell, amount})];
+    const stakeToken = dealRecord.stakeTokenAddress;
+    if (resolver.resolveBoolean("auto-delegate", false) && stakeToken) {
+      transactions.push(ctx.txBuilder.delegateVotes({token: stakeToken, delegatee: ctx.fromAddress}));
+    }
+    printJson({action: "deal.stake", dryRun: true, dac, dealCell, agentToken, amount, transactions});
+    return;
+  }
+
+  const {account, core} = await makeCoreContext(resolver);
   const txHash = await core.stakeAgentToDeal({agentToken, dealCell, amount});
   const stakeToken = resolver.resolveString("stake-token")
     ? asAddress(resolver.requireString("stake-token"), "stake token")
@@ -230,30 +231,22 @@ async function cmdStake(resolver: OptionResolver, amountText: string): Promise<v
     delegateTx = await core.delegateVotes({token: stakeToken, delegatee: account.address});
   }
 
-  printJson({
-    action: "deal.stake",
-    staker: account.address,
-    dac,
-    dealCell,
-    agentToken,
-    stakeToken,
-    amount,
-    txHash,
-    delegateTx,
-  });
+  printJson({action: "deal.stake", staker: account.address, dac, dealCell, agentToken, stakeToken, amount, txHash, delegateTx});
 }
 
 async function cmdUnstake(resolver: OptionResolver): Promise<void> {
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const dealCell = await resolveDealCellAddressForStake(resolver);
+    const transaction = ctx.txBuilder.unstakeFromDeal({dealCell});
+    printJson({action: "deal.unstake", dryRun: true, dealCell, transaction});
+    return;
+  }
+
   const {account, core} = await makeCoreContext(resolver);
   const dealCell = await resolveDealCellAddressForStake(resolver);
   const txHash = await core.unstakeFromDeal({dealCell});
-
-  printJson({
-    action: "deal.unstake",
-    staker: account.address,
-    dealCell,
-    txHash,
-  });
+  printJson({action: "deal.unstake", staker: account.address, dealCell, txHash});
 }
 
 async function cmdDelegate(resolver: OptionResolver): Promise<void> {
@@ -325,7 +318,6 @@ const BASE_DEAL_PROPOSAL_TYPE_LIST = [
 const BASE_DEAL_PROPOSAL_TYPES = new Set<string>(BASE_DEAL_PROPOSAL_TYPE_LIST);
 
 async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, args: string[]): Promise<void> {
-  const {core} = await makeCoreContext(resolver);
   const dealAddress = await resolveDealAddressForWrite(resolver);
   const resolved = await resolveDealRecordOrThrow(resolver);
   const indexer = makeIndexer(resolver);
@@ -338,10 +330,18 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     throw new Error(`'${proposalTypeRaw}' is a kernel deal proposal type. Remove module prefix.`);
   }
 
+  // Lazy core context — only created when hooks/modules need it
+  let _coreCtx: Awaited<ReturnType<typeof makeCoreContext>> | undefined;
+  async function getCoreContext() {
+    if (!_coreCtx) _coreCtx = await makeCoreContext(resolver);
+    return _coreCtx;
+  }
+
   let params: ProposalParams | undefined;
 
   const kernelHook = resolveKernelDealProposalHook(proposalType, resolved.kindSelector);
   if (kernelHook) {
+    const {core} = await getCoreContext();
     params = await kernelHook.build({
       args,
       input,
@@ -447,7 +447,8 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
           throw new Error("DAC agent token address is missing in indexer.");
         }
         const agentToken = dacRecord.agentTokenAddress;
-        amount = await core.getErc20Allowance({
+        const {core: allowanceCore} = await getCoreContext();
+        amount = await allowanceCore.getErc20Allowance({
           token: agentToken,
           owner: agent,
           spender: resolved.cellAddress,
@@ -480,11 +481,12 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
         + `Module types: ${supportedModule.join(", ")}.`,
       );
     }
+    const {core: moduleCore} = await getCoreContext();
     params = await moduleProposal.build({
       args,
       input,
       resolver,
-      core,
+      core: moduleCore,
       indexer,
       resolvedDeal: resolved,
     });
@@ -494,11 +496,19 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     throw new Error(`Unable to build proposal params for type '${proposalTypeRaw}'.`);
   }
 
-  const created = await core.createDealManagementProposal({dealAddress, params});
-
   const outputType = resolvedType.spec
     ? `${resolvedType.spec.moduleId}:${resolvedType.spec.key}`
     : proposalType;
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.createDealManagementProposal({dealAddress, params: params!});
+    printJson({action: "deal.propose", dryRun: true, deal: dealAddress, proposalType: outputType, transaction});
+    return;
+  }
+
+  const {core: submitCore} = await getCoreContext();
+  const created = await submitCore.createDealManagementProposal({dealAddress, params: params!});
 
   printJson({
     action: "deal.propose",
@@ -511,7 +521,6 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
 }
 
 async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string, supportText: string): Promise<void> {
-  const {core, rpcUrl} = await makeCoreContext(resolver);
   const proposal = await resolveDealProposalByNumericIdOrThrow(resolver, proposalIdText);
   const dealAddress = await resolveDealAddressForWrite(resolver);
   const proposalId = BigInt(proposalIdText);
@@ -520,28 +529,35 @@ async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string,
   if (!proposal.proposalAddress) {
     throw new Error(`Deal proposal #${proposalIdText} is missing proposalAddress in indexer`);
   }
-
   const proposalAddress = asAddress(proposal.proposalAddress, "Proposal address");
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.voteProposal({proposalAddress, support});
+    printJson({action: "deal.vote.proposal", dryRun: true, deal: dealAddress, proposalId, proposalAddress, support, transaction});
+    return;
+  }
+
+  const {core, rpcUrl} = await makeCoreContext(resolver);
   const preVoteAdvanceSeconds = resolver.resolveNumber("pre-vote-advance-seconds", 1) ?? 1;
   await advanceTime(rpcUrl, preVoteAdvanceSeconds);
-
   const voteTx = await core.voteProposal({proposalAddress, support});
-
-  printJson({
-    action: "deal.vote.proposal",
-    deal: dealAddress,
-    proposalId,
-    proposalAddress,
-    support,
-    voteTx,
-  });
+  printJson({action: "deal.vote.proposal", deal: dealAddress, proposalId, proposalAddress, support, voteTx});
 }
 
 async function cmdExecute(resolver: OptionResolver, proposalIdText: string): Promise<void> {
-  const {core, rpcUrl} = await makeCoreContext(resolver);
-  const proposal = await resolveDealProposalByNumericIdOrThrow(resolver, proposalIdText);
   const dealAddress = await resolveDealAddressForWrite(resolver);
   const proposalId = BigInt(proposalIdText);
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.executeDealProposal({dealAddress, proposalId});
+    printJson({action: "deal.execute", dryRun: true, deal: dealAddress, proposalId, transaction});
+    return;
+  }
+
+  const {core, rpcUrl} = await makeCoreContext(resolver);
+  const proposal = await resolveDealProposalByNumericIdOrThrow(resolver, proposalIdText);
   const proposalAddress = proposal.proposalAddress ? asAddress(proposal.proposalAddress, "Proposal address") : undefined;
 
   const advanceSeconds = resolver.resolveNumber("advance-seconds", 0) ?? 0;
@@ -550,22 +566,14 @@ async function cmdExecute(resolver: OptionResolver, proposalIdText: string): Pro
   }
 
   const details = await core.executeDealProposalDetailed({dealAddress, proposalId});
-
   printJson({
-    action: "deal.execute",
-    deal: dealAddress,
-    proposalId,
-    proposalAddress,
-    txHash: details.txHash,
-    dacProposalId: details.dacProposalId,
-    trancheId: details.trancheId,
-    childProposalId: details.childProposalId,
-    childVoteProposalId: details.childVoteProposalId,
+    action: "deal.execute", deal: dealAddress, proposalId, proposalAddress,
+    txHash: details.txHash, dacProposalId: details.dacProposalId, trancheId: details.trancheId,
+    childProposalId: details.childProposalId, childVoteProposalId: details.childVoteProposalId,
   });
 }
 
 async function cmdEvaluate(resolver: OptionResolver, evaluatorIdText?: string): Promise<void> {
-  const {core, account} = await makeCoreContext(resolver);
   const resolved = await resolveDealRecordOrThrow(resolver);
   const evaluatorId = evaluatorIdText ? BigInt(evaluatorIdText) : (resolver.resolveBigInt("evaluator-id", 0n) ?? 0n);
   const dacRecord = await resolveDacRecordOrThrow(resolver);
@@ -574,38 +582,36 @@ async function cmdEvaluate(resolver: OptionResolver, evaluatorIdText?: string): 
   }
   const dealManager = dacRecord.dealManagerAddress;
 
-  const txHash = await core.evaluateDeal({
-    dealManager,
-    dealId: resolved.dealNumericId,
-    evaluatorId,
-  });
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.evaluateDeal({dealManager, dealId: resolved.dealNumericId, evaluatorId});
+    printJson({action: "deal.evaluate", dryRun: true, dealId: resolved.id, dealManager, evaluatorId, transaction});
+    return;
+  }
 
+  const {core, account} = await makeCoreContext(resolver);
+  const txHash = await core.evaluateDeal({dealManager, dealId: resolved.dealNumericId, evaluatorId});
   printJson({
-    action: "deal.evaluate",
-    caller: account.address,
-    dealId: resolved.id,
-    dealNumericId: resolved.dealNumericId,
-    dealAddress: resolved.dealAddress,
-    dealCell: resolved.cellAddress,
-    dealManager,
-    evaluatorId,
-    txHash,
+    action: "deal.evaluate", caller: account.address, dealId: resolved.id,
+    dealNumericId: resolved.dealNumericId, dealAddress: resolved.dealAddress,
+    dealCell: resolved.cellAddress, dealManager, evaluatorId, txHash,
   });
 }
 
 async function cmdClaim(resolver: OptionResolver, evaluatorIdText?: string): Promise<void> {
-  const {core, account} = await makeCoreContext(resolver);
   const dealCell = await resolveDealCellAddressForStake(resolver);
   const evaluatorId = evaluatorIdText ? BigInt(evaluatorIdText) : (resolver.resolveBigInt("evaluator-id", 0n) ?? 0n);
-  const txHash = await core.claimMainToken({dealCell, evaluatorId});
 
-  printJson({
-    action: "deal.claim",
-    caller: account.address,
-    dealCell,
-    evaluatorId,
-    txHash,
-  });
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.claimMainToken({dealCell, evaluatorId});
+    printJson({action: "deal.claim", dryRun: true, dealCell, evaluatorId, transaction});
+    return;
+  }
+
+  const {core, account} = await makeCoreContext(resolver);
+  const txHash = await core.claimMainToken({dealCell, evaluatorId});
+  printJson({action: "deal.claim", caller: account.address, dealCell, evaluatorId, txHash});
 }
 
 async function cmdLegalMessage(resolver: OptionResolver, messageFile: string, dealNumericIdText?: string): Promise<void> {

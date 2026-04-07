@@ -1,7 +1,9 @@
 export * from "./abi";
 export * from "./client";
+export * from "./encoding";
 export * from "./errors";
 export * from "./proposals";
 export * from "./selectors";
+export * from "./tx-builder";
 export * from "./types";
 export * as coreModule from "./modules/core";

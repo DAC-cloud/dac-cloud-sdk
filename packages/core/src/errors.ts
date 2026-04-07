@@ -61,6 +61,9 @@ export const dacErrorSignatures = [
   "error EarlyReturnsNotAllowed()",
   "error CapitalWithdrawNotSupported()",
   "error InvalidToken()",
+  "error AgentsLimitReached()",
+  "error InsufficientStake()",
+  "error EvaluatorNotCompatible()",
 ] as const;
 
 export const commonOZErrorSignatures = [

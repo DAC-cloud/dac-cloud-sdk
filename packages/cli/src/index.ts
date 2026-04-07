@@ -31,6 +31,10 @@ Defaults:
   --indexer-url http://127.0.0.1:8080/v1/graphql
   --private-key anvil account #0
 
+Dry-run mode:
+  --dry-run --from <address>   Return unsigned tx data instead of broadcasting.
+  Useful for managed wallets, multisig, and agent harnesses.
+
 All command outputs are JSON. Bigint values are serialized as decimal strings.
 `);
 

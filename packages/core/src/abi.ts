@@ -71,7 +71,7 @@ export const dealManagerAbi = parseAbi([
   ...commonErrorSignatures,
   "event DealCreated(address indexed dac, uint256 indexed id, uint256 indexed proposalId, address creator, bytes4 kind, address cell, address deal)",
   "event TrancheCreated(address indexed dac, uint256 indexed id, uint256 indexed proposalId, uint256 trancheId)",
-  "function createDealProposal((bytes4 dealKind,string name,string description,string linkHash,address moduleFactory,address governanceFactory,address dealTarget,address proposer,bool vetoEnabled,address fundingToken,uint256 fundingAmount,uint256 rewardsLimit,uint256 dealRewardPoolPercent,uint256 approveDeadline,uint256 evaluationDeadline,uint256 dealDeadline,bytes dealConfig,bytes4 evaluatorSelector,bytes evaluatorConfig) params) returns (uint256 id, address dealCell, address dealAddr, address evaluatorAddr)",
+  "function createDealProposal((bytes4 dealKind,string name,string description,string linkHash,address moduleFactory,address governanceFactory,address dealTarget,address proposer,bool vetoEnabled,address fundingToken,uint256 fundingAmount,uint256 rewardsLimit,uint256 dealRewardPoolPercent,uint256 approveDeadline,uint256 evaluationDeadline,uint256 dealDeadline,bytes dealConfig,bytes4 evaluatorSelector,bytes evaluatorConfig,address evaluatorModuleFactory,uint256 agentsLimit,uint256 minimalStake) params) returns (uint256 id, address dealCell, address dealAddr, address evaluatorAddr)",
   "function deals(uint256 id) view returns (address)",
   "function isRecoverable(uint256 id) view returns (bool)",
   "function evaluateDeal(uint256 id, uint256 evaluatorId)",
