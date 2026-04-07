@@ -14,6 +14,8 @@ export const dacCellAbi = parseAbi([
   ...commonErrorSignatures,
   "event DACProposalCreated(uint256 indexed id, address indexed prop, bytes4 indexed typ, address target, bytes32 data1, bytes data2)",
   "event CapitalCallCreated(uint256 indexed id, address indexed recipient, bytes32 indexed callHash, address treasuryToken, uint256 tokenAmount, uint256 cashAmount, uint256 nonce)",
+  "event AgentDistributorApproved(address indexed dac, address indexed distributor, uint256 allowance)",
+  "event AgentDistributorRevoked(address indexed dac, address indexed distributor)",
   "function getMainToken() view returns (address)",
   "function getAgentToken() view returns (address)",
   "function getDealManager() view returns (address)",
@@ -50,7 +52,7 @@ export const governanceSchemaAbi = parseAbi([
   ...commonErrorSignatures,
   "function getVotingConfig() view returns ((uint256 quorumPercent, uint256 blockingPercent, uint256 highQuorumPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration))",
   "function getDealCreationConfig() view returns ((uint256 minAgentBalance, uint256 minInitialAgentStake))",
-  "function getStrategyConfig() view returns ((uint256 quorumPercent, uint256 highQuorumPercent, uint256 blockingPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration, uint256 oraclePublishDeadline, uint256 fallbackWarmupDuration, uint256 fallbackDuration))",
+  "function getStrategyConfig() view returns ((uint256 quorumPercent, uint256 highQuorumPercent, uint256 blockingPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration, uint256 oraclePublishDeadline, uint256 fallbackWarmupDuration, uint256 fallbackDuration, bool blockingOnAllProposals, bool blockingOnHighQuorum, bool oraclePrimaryEnabled))",
   "function getGovernanceOracle() view returns (address oracle)",
   "function getProposal(uint256 id) view returns (address proposal)"
 ]);
@@ -69,7 +71,7 @@ export const dealManagerAbi = parseAbi([
   ...commonErrorSignatures,
   "event DealCreated(address indexed dac, uint256 indexed id, uint256 indexed proposalId, address creator, bytes4 kind, address cell, address deal)",
   "event TrancheCreated(address indexed dac, uint256 indexed id, uint256 indexed proposalId, uint256 trancheId)",
-  "function createDealProposal((bytes4 dealKind,string name,string description,string linkHash,address moduleFactory,address governanceFactory,address dealTarget,address proposer,bool vetoEnabled,address fundingToken,uint256 fundingAmount,uint256 rewardsLimit,uint256 approveDeadline,uint256 evaluationDeadline,uint256 dealDeadline,bytes dealConfig,bytes4 evaluatorSelector,bytes evaluatorConfig) params) returns (uint256 id, address dealCell, address dealAddr, address evaluatorAddr)",
+  "function createDealProposal((bytes4 dealKind,string name,string description,string linkHash,address moduleFactory,address governanceFactory,address dealTarget,address proposer,bool vetoEnabled,address fundingToken,uint256 fundingAmount,uint256 rewardsLimit,uint256 dealRewardPoolPercent,uint256 approveDeadline,uint256 evaluationDeadline,uint256 dealDeadline,bytes dealConfig,bytes4 evaluatorSelector,bytes evaluatorConfig) params) returns (uint256 id, address dealCell, address dealAddr, address evaluatorAddr)",
   "function deals(uint256 id) view returns (address)",
   "function isRecoverable(uint256 id) view returns (bool)",
   "function evaluateDeal(uint256 id, uint256 evaluatorId)",
@@ -104,7 +106,7 @@ export const hybridDacManagementProposalAbi = parseAbi([
   "function resolutionTime() view returns (uint256)",
   "function oracleMerkleRoot() view returns (bytes32)",
   "function totalUnderlyingVotingPower() view returns (uint256)",
-  "function getStrategy() view returns ((uint256 quorumPercent, uint256 highQuorumPercent, uint256 blockingPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration, uint256 oraclePublishDeadline, uint256 fallbackWarmupDuration, uint256 fallbackDuration))",
+  "function getStrategy() view returns ((uint256 quorumPercent, uint256 highQuorumPercent, uint256 blockingPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration, uint256 oraclePublishDeadline, uint256 fallbackWarmupDuration, uint256 fallbackDuration, bool blockingOnAllProposals, bool blockingOnHighQuorum, bool oraclePrimaryEnabled))",
   "function activatePrimaryVoting()",
   "function beginFallbackWarmup()",
   "function triggerEmergencyFallback()",
@@ -133,14 +135,20 @@ export const erc20Abi = parseAbi([
 
 export const agentTokenAbi = parseAbi([
   ...commonErrorSignatures,
-  "function stakeToDeal(address dealCell, uint256 amount)"
+  "function stakeToDeal(address dealCell, uint256 amount)",
+  "function qualifiedBalanceOf(address account) view returns (uint256)",
+  "event AgentTokenDistributed(address indexed dac, address indexed distributor, address indexed recipient, uint256 amount)"
 ]);
 
 export const dealCellAbi = parseAbi([
   ...commonErrorSignatures,
   "function stakeToken() view returns (address)",
   "function unstake()",
-  "function claimMainToken(uint256 evaluatorId)"
+  "function claimMainToken(uint256 evaluatorId)",
+  "function dealRewardPoolPercent() view returns (uint256)",
+  "event AgentStruckOut(address indexed dac, uint256 indexed id, address indexed deal, address agent, uint256 amount)",
+  "event DealRewardPoolAllocated(address indexed dac, uint256 indexed id, address indexed deal, uint256 amount)",
+  "event DealRewardClaimed(address indexed dac, uint256 indexed id, address indexed deal, uint256 amount)"
 ]);
 
 export const dealAbi = parseAbi([

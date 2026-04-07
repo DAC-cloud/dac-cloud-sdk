@@ -33,6 +33,9 @@ const OPTION_SPECS = {
   "oracle-publish-deadline": {flags: "--oracle-publish-deadline <uint256>", description: "Hybrid oracle publish deadline in seconds"},
   "fallback-warmup-duration": {flags: "--fallback-warmup-duration <uint256>", description: "Hybrid fallback warmup duration in seconds"},
   "fallback-duration": {flags: "--fallback-duration <uint256>", description: "Hybrid fallback voting duration in seconds"},
+  "blocking-on-all-proposals": {flags: "--blocking-on-all-proposals", description: "Apply blocking logic on all proposal types (hybrid)"},
+  "blocking-on-high-quorum": {flags: "--blocking-on-high-quorum", description: "Apply blocking on high-quorum proposals (hybrid, default: true)"},
+  "oracle-primary-enabled": {flags: "--oracle-primary-enabled", description: "Enable oracle-primary voting path (hybrid, default: true)"},
   "dividends-enabled": {flags: "--dividends-enabled", description: "Enable dividends at DAC creation"},
   "defer-birth-role": {flags: "--defer-birth-role <address>", description: "Optional defer birth role address"},
 

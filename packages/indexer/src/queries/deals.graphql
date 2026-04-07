@@ -47,6 +47,10 @@ fragment DealViewFields on Deal {
   totalRewardClaimedAmount
   rewardsLimit
   rewardsAllocated
+  dealRewardPoolPercent
+  rewardPoolSupported
+  totalDealRewardPoolAllocatedAmount
+  totalDealRewardPoolClaimedAmount
   approveDeadline
   evaluationDeadline
   dealDeadline

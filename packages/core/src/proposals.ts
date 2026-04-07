@@ -1,5 +1,6 @@
 import {encodeAbiParameters, numberToHex, type Address, type Hex} from "viem";
 import {DAC_PROPOSAL_TYPE, DEAL_PROPOSAL_TYPE} from "./selectors";
+import {AGENT_TOKEN_MINT_ACTION, type AgentTokenMintAction} from "./types";
 import type {DealCreationConfig, GovernanceStrategyConfig, ProposalParams, VotingConfig} from "./types";
 import type {TreasurySpendAllowance} from "./modules/core/types";
 import {
@@ -28,6 +29,30 @@ export function buildMintAgentTokensProposal(agent: Address, amount: bigint): Pr
     target: agent,
     i: toBytes32FromUint(amount),
     data: "0x",
+  };
+}
+
+export function buildMintAgentTokensDistributorProposal(distributor: Address, amount: bigint): ProposalParams {
+  return {
+    typ: DAC_PROPOSAL_TYPE.MINT_AGENT_TOKENS,
+    target: distributor,
+    i: toBytes32FromUint(amount),
+    data: encodeAbiParameters(
+      [{name: "action", type: "uint8"}],
+      [AGENT_TOKEN_MINT_ACTION.DISTRIBUTOR_INVENTORY],
+    ),
+  };
+}
+
+export function buildDisableAgentDistributorProposal(distributor: Address): ProposalParams {
+  return {
+    typ: DAC_PROPOSAL_TYPE.MINT_AGENT_TOKENS,
+    target: distributor,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [{name: "action", type: "uint8"}],
+      [AGENT_TOKEN_MINT_ACTION.DISTRIBUTOR_DISABLE],
+    ),
   };
 }
 
@@ -152,6 +177,9 @@ export function buildUpdateGovernanceStrategyProposal(config: GovernanceStrategy
           {name: "oraclePublishDeadline", type: "uint256"},
           {name: "fallbackWarmupDuration", type: "uint256"},
           {name: "fallbackDuration", type: "uint256"},
+          {name: "blockingOnAllProposals", type: "bool"},
+          {name: "blockingOnHighQuorum", type: "bool"},
+          {name: "oraclePrimaryEnabled", type: "bool"},
         ],
       }],
       [config],
@@ -182,6 +210,15 @@ export function buildUpdateGovernanceOracleProposal(oracle: Address): ProposalPa
   return {
     typ: DAC_PROPOSAL_TYPE.UPDATE_GOVERNANCE_ORACLE,
     target: oracle,
+    i: toBytes32FromUint(0n),
+    data: "0x",
+  };
+}
+
+export function buildStrikeOutAgentProposal(agent: Address): ProposalParams {
+  return {
+    typ: DEAL_PROPOSAL_TYPE.STRIKE_OUT_AGENT,
+    target: agent,
     i: toBytes32FromUint(0n),
     data: "0x",
   };

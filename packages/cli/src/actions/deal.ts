@@ -2,6 +2,7 @@ import {resolve as resolvePath} from "node:path";
 import {
   DEAL_PROPOSAL_TYPE,
   buildEnableDealChallengeRightProposal,
+  buildStrikeOutAgentProposal,
   buildUpdateDealVotingConfigProposal,
   type DealParams,
   type ProposalParams,
@@ -116,6 +117,7 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
     fundingToken: z.string(),
     fundingAmount: z.union([z.string(), z.number(), z.bigint()]),
     rewardsLimit: z.union([z.string(), z.number(), z.bigint()]).optional(),
+    dealRewardPoolPercent: z.union([z.string(), z.number(), z.bigint()]).optional(),
     approveDeadline: z.union([z.string(), z.number(), z.bigint()]).optional(),
     evaluationDeadline: z.union([z.string(), z.number(), z.bigint()]).optional(),
     dealDeadline: z.union([z.string(), z.number(), z.bigint()]).optional(),
@@ -168,6 +170,7 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
     fundingToken: asAddress(parsed.fundingToken, "fundingToken"),
     fundingAmount: parseBigNumberish(parsed.fundingAmount, "fundingAmount"),
     rewardsLimit: parsed.rewardsLimit ? parseBigNumberish(parsed.rewardsLimit, "rewardsLimit") : 500_000_000n,
+    dealRewardPoolPercent: parsed.dealRewardPoolPercent ? parseBigNumberish(parsed.dealRewardPoolPercent, "dealRewardPoolPercent") : 0n,
     approveDeadline: parsed.approveDeadline ? parseBigNumberish(parsed.approveDeadline, "approveDeadline") : now + 7n * 24n * 60n * 60n,
     evaluationDeadline: resolvedEvaluationDeadline,
     dealDeadline: resolvedDealDeadline,
@@ -316,6 +319,7 @@ const BASE_DEAL_PROPOSAL_TYPE_LIST = [
   "enable-veto-right",
   "request-tranche",
   "add-stake",
+  "strike-out-agent",
 ] as const;
 
 const BASE_DEAL_PROPOSAL_TYPES = new Set<string>(BASE_DEAL_PROPOSAL_TYPE_LIST);
@@ -462,6 +466,9 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
       i: numberToHex(amount, {size: 32}),
       data: "0x",
     };
+  } else if (!params && proposalType === "strike-out-agent") {
+    requireNArgs(args, 1, "deal propose strike-out-agent requires <agent>");
+    params = buildStrikeOutAgentProposal(asAddress(args[0], "agent"));
   } else if (!params) {
     const moduleProposal = resolvedType.spec;
     if (!moduleProposal) {

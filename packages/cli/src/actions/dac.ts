@@ -7,6 +7,8 @@ import {
   buildChallengeDealProposal,
   buildDelegateVoteRightsProposal,
   buildMintAgentTokensProposal,
+  buildMintAgentTokensDistributorProposal,
+  buildDisableAgentDistributorProposal,
   buildMintMainTokensReserveProposal,
   buildRevokeAgentTokensProposal,
   buildUpdateDacVotingConfigProposal,
@@ -47,6 +49,8 @@ const DAC_PROPOSAL_TYPES = [
   "update-legal-wrapper",
   "approve-offchain-action",
   "mint-agent-tokens",
+  "mint-agent-tokens-distributor",
+  "disable-agent-distributor",
   "revoke-agent-tokens",
   "mint-main-tokens",
   "burn-main-tokens",
@@ -184,6 +188,9 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
     oraclePublishDeadline: resolver.resolveBigInt("oracle-publish-deadline", 24n * 60n * 60n) ?? 24n * 60n * 60n,
     fallbackWarmupDuration: resolver.resolveBigInt("fallback-warmup-duration", 24n * 60n * 60n) ?? 24n * 60n * 60n,
     fallbackDuration: resolver.resolveBigInt("fallback-duration", 7n * 24n * 60n * 60n) ?? 7n * 24n * 60n * 60n,
+    blockingOnAllProposals: resolver.resolveBoolean("blocking-on-all-proposals", false) ?? false,
+    blockingOnHighQuorum: resolver.resolveBoolean("blocking-on-high-quorum", true) ?? true,
+    oraclePrimaryEnabled: resolver.resolveBoolean("oracle-primary-enabled", true) ?? true,
   };
 
   const config: ExistingTokenDacConfig = {
@@ -356,7 +363,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
       executionValidityDuration,
     });
   } else if (proposalType === "update-governance-strategy") {
-    if (args.length !== 9 && !input) {
+    if (!input && args.length < 9) {
       throw new Error("dac propose update-governance-strategy requires positional args or --input json");
     }
     const quorumPercent = args[0] !== undefined ? BigInt(args[0]) : readBigIntField(input, "quorumPercent", "--input");
@@ -368,6 +375,9 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     const oraclePublishDeadline = args[6] !== undefined ? BigInt(args[6]) : readBigIntField(input, "oraclePublishDeadline", "--input");
     const fallbackWarmupDuration = args[7] !== undefined ? BigInt(args[7]) : readBigIntField(input, "fallbackWarmupDuration", "--input");
     const fallbackDuration = args[8] !== undefined ? BigInt(args[8]) : readBigIntField(input, "fallbackDuration", "--input");
+    const blockingOnAllProposals = args[9] !== undefined ? parseBoolText(args[9]) : (input?.blockingOnAllProposals !== undefined ? readBoolField(input, "blockingOnAllProposals", "--input") : false);
+    const blockingOnHighQuorum = args[10] !== undefined ? parseBoolText(args[10]) : (input?.blockingOnHighQuorum !== undefined ? readBoolField(input, "blockingOnHighQuorum", "--input") : true);
+    const oraclePrimaryEnabled = args[11] !== undefined ? parseBoolText(args[11]) : (input?.oraclePrimaryEnabled !== undefined ? readBoolField(input, "oraclePrimaryEnabled", "--input") : true);
     params = buildUpdateGovernanceStrategyProposal({
       quorumPercent,
       highQuorumPercent,
@@ -378,6 +388,9 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
       oraclePublishDeadline,
       fallbackWarmupDuration,
       fallbackDuration,
+      blockingOnAllProposals,
+      blockingOnHighQuorum,
+      oraclePrimaryEnabled,
     });
   } else if (proposalType === "update-deal-creation-config") {
     if (args.length !== 2 && !input) {
@@ -441,6 +454,12 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
   } else if (proposalType === "mint-agent-tokens") {
     requireNArgs(args, 2, "dac propose mint-agent-tokens requires <amount> <agent>");
     params = buildMintAgentTokensProposal(asAddress(args[1], "agent"), BigInt(args[0]));
+  } else if (proposalType === "mint-agent-tokens-distributor") {
+    requireNArgs(args, 2, "dac propose mint-agent-tokens-distributor requires <amount> <distributor>");
+    params = buildMintAgentTokensDistributorProposal(asAddress(args[1], "distributor"), BigInt(args[0]));
+  } else if (proposalType === "disable-agent-distributor") {
+    requireNArgs(args, 1, "dac propose disable-agent-distributor requires <distributor>");
+    params = buildDisableAgentDistributorProposal(asAddress(args[0], "distributor"));
   } else if (proposalType === "revoke-agent-tokens") {
     requireNArgs(args, 2, "dac propose revoke-agent-tokens requires <amount> <agent>");
     params = buildRevokeAgentTokensProposal(asAddress(args[1], "agent"), BigInt(args[0]));
@@ -1027,6 +1046,9 @@ export function registerDacCommands(program: Command, resolverFactory: (options:
     "oracle-publish-deadline",
     "fallback-warmup-duration",
     "fallback-duration",
+    "blocking-on-all-proposals",
+    "blocking-on-high-quorum",
+    "oracle-primary-enabled",
     "auto-delegate",
   ]);
   addCommandHelp(createExistingToken, {

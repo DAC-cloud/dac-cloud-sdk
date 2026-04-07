@@ -2,6 +2,14 @@ import type {Address, Hex} from "viem";
 
 export type DacMode = "NATIVE" | "EXISTING_TOKEN";
 
+export const AGENT_TOKEN_MINT_ACTION = {
+  DIRECT_AGENT: 0,
+  DISTRIBUTOR_INVENTORY: 1,
+  DISTRIBUTOR_DISABLE: 2,
+} as const;
+
+export type AgentTokenMintAction = typeof AGENT_TOKEN_MINT_ACTION[keyof typeof AGENT_TOKEN_MINT_ACTION];
+
 export const PROPOSAL_PHASE = {
   AWAITING_ORACLE_SNAPSHOT: 0,
   PRIMARY_VOTING: 1,
@@ -48,6 +56,9 @@ export interface GovernanceStrategyConfig {
   oraclePublishDeadline: bigint;
   fallbackWarmupDuration: bigint;
   fallbackDuration: bigint;
+  blockingOnAllProposals: boolean;
+  blockingOnHighQuorum: boolean;
+  oraclePrimaryEnabled: boolean;
 }
 
 export interface ExistingTokenDacConfig {
@@ -167,6 +178,7 @@ export interface DealParams {
   fundingToken: Address;
   fundingAmount: bigint;
   rewardsLimit: bigint;
+  dealRewardPoolPercent: bigint;
   approveDeadline: bigint;
   evaluationDeadline: bigint;
   dealDeadline: bigint;

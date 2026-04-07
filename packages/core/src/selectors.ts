@@ -20,6 +20,7 @@ export const DEAL_PROPOSAL_TYPE = {
   TOGGLE_WHITELIST: toFunctionSelector("toggleWhitelist()"),
   TOGGLE_EARLY_RETURNS: toFunctionSelector("toggleEarlyReturns()"),
   PERMIT_EVALUATOR_ADD: toFunctionSelector("permitEvaluatorAdd()"),
+  STRIKE_OUT_AGENT: toFunctionSelector("strikeOutAgent()"),
 } as const;
 
 export const CORE_DEAL_PROPOSAL_TYPE = CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE;

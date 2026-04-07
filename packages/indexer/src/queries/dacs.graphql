@@ -34,6 +34,9 @@ fragment DacViewFields on Dac {
   oraclePublishDeadline
   fallbackWarmupDuration
   fallbackDuration
+  blockingOnAllProposals
+  blockingOnHighQuorum
+  oraclePrimaryEnabled
   supportsMint
   supportsBurn
   supportsCapitalCall
