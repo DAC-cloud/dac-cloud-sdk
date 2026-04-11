@@ -210,16 +210,29 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
     const config = buildConfig(ctx.fromAddress);
-    const transaction = ctx.txBuilder.deployExistingTokenDac({config, salt: bytes32Random()});
+    const transactions = [];
+    if (resolver.resolveBoolean("auto-approve", true) && treasurySeedAmount > 0n) {
+      transactions.push(ctx.txBuilder.approveErc20({token: underlyingToken, spender: ctx.protocol.dacFactory, amount: treasurySeedAmount}));
+    }
+    transactions.push(ctx.txBuilder.deployExistingTokenDac({config, salt: bytes32Random()}));
     printJson({
-      action: "dac.create.existing-token", dryRun: true, transaction, governanceStrategy,
+      action: "dac.create.existing-token", dryRun: true, transactions, governanceStrategy,
       note: "After confirming, use ExistingTokenDACDeployed event for deployed addresses.",
     });
     return;
   }
 
-  const {account, core} = await makeCoreContext(resolver);
+  const {account, core, protocol} = await makeCoreContext(resolver);
   const config = buildConfig(account.address);
+
+  const autoApprove = resolver.resolveBoolean("auto-approve", true);
+  let approveTx: Hex | undefined;
+  if (autoApprove && treasurySeedAmount > 0n) {
+    const allowance = await core.getErc20Allowance({token: underlyingToken, owner: account.address, spender: protocol.dacFactory});
+    if (allowance < treasurySeedAmount) {
+      approveTx = await core.approveErc20({token: underlyingToken, spender: protocol.dacFactory, amount: treasurySeedAmount});
+    }
+  }
 
   const result = await core.deployExistingTokenDac({config, salt: bytes32Random()});
 
@@ -232,6 +245,7 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
   printJson({
     action: "dac.create.existing-token",
     creator: account.address,
+    approveTx,
     txHash: result.txHash,
     dac: result.dac,
     mainToken: result.mainToken,
@@ -1093,6 +1107,7 @@ export function registerDacCommands(program: Command, resolverFactory: (options:
     "blocking-on-all-proposals",
     "blocking-on-high-quorum",
     "oracle-primary-enabled",
+    "auto-approve",
     "auto-delegate",
   ]);
   addCommandHelp(createExistingToken, {
