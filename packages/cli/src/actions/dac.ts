@@ -15,6 +15,7 @@ import {
   buildUpdateDealCreationConfigProposal,
   buildUpdateGovernanceOracleProposal,
   buildUpdateGovernanceStrategyProposal,
+  normalizePercentInput,
   type CapitalCall,
   type DACConfig,
   type ExistingTokenDacConfig,
@@ -43,6 +44,12 @@ import {printJson, readJsonFile} from "../runtime/io";
 
 function isDryRun(resolver: OptionResolver): boolean {
   return resolver.resolveBoolean("dry-run", false);
+}
+
+function resolvePercent(resolver: OptionResolver, key: string, defaultPercent: number): bigint {
+  const raw = resolver.resolveString(key);
+  if (raw !== undefined && raw !== null) return normalizePercentInput(raw);
+  return normalizePercentInput(defaultPercent.toString());
 }
 
 const DAC_PROPOSAL_TYPES = [
@@ -120,7 +127,7 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
   const founderCommitment = resolver.requireBigInt("commitment", "--commitment is required for dac create");
   const founderAllocation = resolver.requireBigInt("allocation", "--allocation is required for dac create");
   const mainTokenMaxSupply = resolver.resolveBigInt("max-supply", 1_000_000_000n * 10n ** 18n) ?? (1_000_000_000n * 10n ** 18n);
-  const defaultQuorum = resolver.resolveBigInt("default-quorum", 5n * 10n ** 17n) ?? 5n * 10n ** 17n; // 0.5 * MANTISSA
+  const defaultQuorum = resolvePercent(resolver, "default-quorum", 50);
   const dividendsEnabled = resolver.resolveBoolean("dividends-enabled", false);
   const deferBirthRole = resolver.resolveString("defer-birth-role") as Address | undefined;
 
@@ -177,11 +184,11 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
   );
   const dividendsEnabled = resolver.resolveBoolean("dividends-enabled", false);
   const governanceStrategy: GovernanceStrategyConfig = {
-    quorumPercent: resolver.resolveBigInt("quorum-percent", 5n * 10n ** 17n) ?? 5n * 10n ** 17n,
-    highQuorumPercent: resolver.resolveBigInt("high-quorum-percent", 75n * 10n ** 16n) ?? 75n * 10n ** 16n,
-    blockingPercent: resolver.resolveBigInt("blocking-percent", 25n * 10n ** 16n) ?? 25n * 10n ** 16n,
+    quorumPercent: resolvePercent(resolver, "quorum-percent", 50),
+    highQuorumPercent: resolvePercent(resolver, "high-quorum-percent", 75),
+    blockingPercent: resolvePercent(resolver, "blocking-percent", 25),
     duration: resolver.resolveBigInt("voting-duration", 7n * 24n * 60n * 60n) ?? 7n * 24n * 60n * 60n,
-    qualification: resolver.resolveBigInt("qualification", 0n) ?? 0n,
+    qualification: resolvePercent(resolver, "qualification", 0),
     executionValidityDuration: resolver.resolveBigInt("execution-validity-duration", 7n * 24n * 60n * 60n) ?? 7n * 24n * 60n * 60n,
     oraclePublishDeadline: resolver.resolveBigInt("oracle-publish-deadline", 24n * 60n * 60n) ?? 24n * 60n * 60n,
     fallbackWarmupDuration: resolver.resolveBigInt("fallback-warmup-duration", 24n * 60n * 60n) ?? 24n * 60n * 60n,
@@ -365,11 +372,11 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     if (args.length !== 5 && args.length !== 6 && !input) {
       throw new Error("dac propose update-voting-config requires positional args or --input json");
     }
-    const quorumPercent = args[0] !== undefined ? BigInt(args[0]) : readBigIntField(input, "quorumPercent", "--input");
-    const blockingPercent = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "blockingPercent", "--input");
-    const highQuorumPercent = args[2] !== undefined ? BigInt(args[2]) : readBigIntField(input, "highQuorumPercent", "--input");
+    const quorumPercent = normalizePercentInput(args[0] ?? readStringField(input, "quorumPercent", "--input"));
+    const blockingPercent = normalizePercentInput(args[1] ?? readStringField(input, "blockingPercent", "--input"));
+    const highQuorumPercent = normalizePercentInput(args[2] ?? readStringField(input, "highQuorumPercent", "--input"));
     const duration = args[3] !== undefined ? BigInt(args[3]) : readBigIntField(input, "duration", "--input");
-    const qualification = args[4] !== undefined ? BigInt(args[4]) : readBigIntField(input, "qualification", "--input");
+    const qualification = normalizePercentInput(args[4] ?? (input?.qualification !== undefined ? String(readBigIntField(input, "qualification", "--input")) : "0"));
     const executionValidityDuration = args[5] !== undefined
       ? BigInt(args[5])
       : input?.executionValidityDuration !== undefined
@@ -387,11 +394,11 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     if (!input && args.length < 9) {
       throw new Error("dac propose update-governance-strategy requires positional args or --input json");
     }
-    const quorumPercent = args[0] !== undefined ? BigInt(args[0]) : readBigIntField(input, "quorumPercent", "--input");
-    const highQuorumPercent = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "highQuorumPercent", "--input");
-    const blockingPercent = args[2] !== undefined ? BigInt(args[2]) : readBigIntField(input, "blockingPercent", "--input");
+    const quorumPercent = normalizePercentInput(args[0] ?? readStringField(input, "quorumPercent", "--input"));
+    const highQuorumPercent = normalizePercentInput(args[1] ?? readStringField(input, "highQuorumPercent", "--input"));
+    const blockingPercent = normalizePercentInput(args[2] ?? readStringField(input, "blockingPercent", "--input"));
     const duration = args[3] !== undefined ? BigInt(args[3]) : readBigIntField(input, "duration", "--input");
-    const qualification = args[4] !== undefined ? BigInt(args[4]) : readBigIntField(input, "qualification", "--input");
+    const qualification = normalizePercentInput(args[4] ?? (input?.qualification !== undefined ? String(readBigIntField(input, "qualification", "--input")) : "0"));
     const executionValidityDuration = args[5] !== undefined ? BigInt(args[5]) : readBigIntField(input, "executionValidityDuration", "--input");
     const oraclePublishDeadline = args[6] !== undefined ? BigInt(args[6]) : readBigIntField(input, "oraclePublishDeadline", "--input");
     const fallbackWarmupDuration = args[7] !== undefined ? BigInt(args[7]) : readBigIntField(input, "fallbackWarmupDuration", "--input");

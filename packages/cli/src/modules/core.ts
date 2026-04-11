@@ -16,6 +16,12 @@ import {
   CORE_EVALUATOR_KIND,
   type ProposalParams,
 } from "@dac-cloud/core";
+const {
+  encodeDacDealConfigFromJson,
+  encodePermit2TreasuryDealConfigFromJson,
+  encodeMilestoneEvaluatorConfigFromJson,
+  encodeRevenueEvaluatorConfigFromJson,
+} = coreModule;
 import type {ProtocolManifest} from "@dac-cloud/manifests";
 import {encodeAbiParameters, numberToHex, type Address, type Hex} from "viem";
 import {z} from "zod";
@@ -78,11 +84,6 @@ function parseBigNumberish(value: unknown, label: string): bigint {
     return BigInt(value);
   }
   throw new Error(`${label} must be bigint-compatible`);
-}
-
-function parseBigintArray(value: unknown, label: string): bigint[] {
-  const list = z.array(z.union([z.string(), z.number(), z.bigint()])).parse(value);
-  return list.map((entry, index) => parseBigNumberish(entry, `${label}[${index}]`));
 }
 
 function toBytes32FromNumberish(value: string): Hex {
@@ -188,128 +189,9 @@ async function buildDacDealRequestTrancheKernelHook(context: ModuleDealProposalB
   };
 }
 
-function encodePermit2TreasuryDealConfig(config: unknown): Hex {
-  if (typeof config === "string" && config.startsWith("0x")) {
-    return config as Hex;
-  }
-
-  const parsed = z.object({label: z.string().optional(), value: z.string().optional()}).catch({}).parse(config);
-  const value = parsed.value ?? parsed.label ?? "dac-cli treasury config";
-  return encodeAbiParameters([{name: "value", type: "string"}], [value]);
-}
-
-function encodeDacDealConfig(config: unknown): Hex {
-  if (typeof config === "string" && config.startsWith("0x")) {
-    return config as Hex;
-  }
-
-  const parsed = z.object({
-    managedEquity: z.union([z.string(), z.number(), z.bigint()]),
-    capitalCallId: z.union([z.string(), z.number(), z.bigint()]),
-    config: z.string().regex(/^0x[0-9a-fA-F]*$/),
-  }).parse(config);
-
-  return encodeAbiParameters(
-    [{
-      name: "value",
-      type: "tuple",
-      components: [
-        {name: "managedEquity", type: "uint256"},
-        {name: "capitalCallId", type: "uint256"},
-        {name: "config", type: "bytes"},
-      ],
-    }],
-    [{
-      managedEquity: parseBigNumberish(parsed.managedEquity, "managedEquity"),
-      capitalCallId: parseBigNumberish(parsed.capitalCallId, "capitalCallId"),
-      config: parsed.config as Hex,
-    }],
-  );
-}
-
-function encodeMilestonesEvaluatorConfig(config: unknown): Hex {
-  if (typeof config === "string" && config.startsWith("0x")) {
-    return config as Hex;
-  }
-
-  const parsed = z.object({
-    rewardShare: z.union([z.string(), z.number(), z.bigint()]),
-    milestones: z.array(z.object({
-      milestoneType: z.number().int(),
-      token: z.string(),
-      oracle: z.string(),
-      valuationMode: z.number().int(),
-      fundingToken: z.string(),
-      expectedReturn: z.union([z.string(), z.number(), z.bigint()]),
-      timestamp: z.union([z.string(), z.number(), z.bigint()]),
-      rewardPercentage: z.union([z.string(), z.number(), z.bigint()]),
-      rewardCurve: z.array(z.union([z.string(), z.number(), z.bigint()])),
-      penaltyCurve: z.array(z.union([z.string(), z.number(), z.bigint()])),
-      minPercentGrace: z.union([z.string(), z.number(), z.bigint()]),
-      extension: z.union([z.string(), z.number(), z.bigint()]),
-    })),
-  }).parse(config);
-
-  return coreModule.buildMilestoneEvaluatorConfig({
-    rewardShare: parseBigNumberish(parsed.rewardShare, "rewardShare"),
-    milestones: parsed.milestones.map((item) => ({
-      milestoneType: item.milestoneType,
-      token: asAddress(item.token, "milestone token"),
-      oracle: asAddress(item.oracle, "milestone oracle"),
-      valuationMode: item.valuationMode,
-      fundingToken: asAddress(item.fundingToken, "milestone fundingToken"),
-      expectedReturn: parseBigNumberish(item.expectedReturn, "expectedReturn"),
-      timestamp: parseBigNumberish(item.timestamp, "timestamp"),
-      rewardPercentage: parseBigNumberish(item.rewardPercentage, "rewardPercentage"),
-      rewardCurve: parseBigintArray(item.rewardCurve, "rewardCurve"),
-      penaltyCurve: parseBigintArray(item.penaltyCurve, "penaltyCurve"),
-      minPercentGrace: parseBigNumberish(item.minPercentGrace, "minPercentGrace"),
-      extension: parseBigNumberish(item.extension, "extension"),
-    })),
-  });
-}
-
-function encodeRevenueEvaluatorConfig(config: unknown): Hex {
-  if (typeof config === "string" && config.startsWith("0x")) {
-    return config as Hex;
-  }
-
-  const parsed = z.object({
-    rewardShare: z.union([z.string(), z.number(), z.bigint()]),
-    schedule: z.object({
-      token: z.string(),
-      duration: z.union([z.string(), z.number(), z.bigint()]),
-      revenueProjectionMode: z.number().int(),
-      revenueProjection: z.union([z.string(), z.number(), z.bigint()]),
-      curveCoeffs: z.array(z.union([z.string(), z.number(), z.bigint()])),
-      requirementCurveCoeffs: z.array(z.union([z.string(), z.number(), z.bigint()])),
-      maxCycleUnlockPercent: z.union([z.string(), z.number(), z.bigint()]),
-      minCycleRevenuePercent: z.union([z.string(), z.number(), z.bigint()]),
-      graceCycles: z.union([z.string(), z.number(), z.bigint()]),
-      penaltyPerMiss: z.union([z.string(), z.number(), z.bigint()]),
-      evaluationStart: z.union([z.string(), z.number(), z.bigint()]),
-      autoClose: z.boolean(),
-    }),
-  }).parse(config);
-
-  return coreModule.buildRevenueEvaluatorConfig({
-    rewardShare: parseBigNumberish(parsed.rewardShare, "rewardShare"),
-    schedule: {
-      token: asAddress(parsed.schedule.token, "schedule token"),
-      duration: parseBigNumberish(parsed.schedule.duration, "duration"),
-      revenueProjectionMode: parsed.schedule.revenueProjectionMode,
-      revenueProjection: parseBigNumberish(parsed.schedule.revenueProjection, "revenueProjection"),
-      curveCoeffs: parseBigintArray(parsed.schedule.curveCoeffs, "curveCoeffs"),
-      requirementCurveCoeffs: parseBigintArray(parsed.schedule.requirementCurveCoeffs, "requirementCurveCoeffs"),
-      maxCycleUnlockPercent: parseBigNumberish(parsed.schedule.maxCycleUnlockPercent, "maxCycleUnlockPercent"),
-      minCycleRevenuePercent: parseBigNumberish(parsed.schedule.minCycleRevenuePercent, "minCycleRevenuePercent"),
-      graceCycles: parseBigNumberish(parsed.schedule.graceCycles, "graceCycles"),
-      penaltyPerMiss: parseBigNumberish(parsed.schedule.penaltyPerMiss, "penaltyPerMiss"),
-      evaluationStart: parseBigNumberish(parsed.schedule.evaluationStart, "evaluationStart"),
-      autoClose: parsed.schedule.autoClose,
-    },
-  });
-}
+// Config encoders now delegate to @dac-cloud/core parsers.
+// They handle JSON validation, type conversion, and ABI encoding in one step.
+// Pre-encoded hex strings (0x...) are passed through.
 
 function buildDirectSpendProposal(context: ModuleDealProposalBuildContext): ProposalParams {
   const {args, input} = context;
@@ -454,7 +336,7 @@ export const coreCliModule: CliModuleSpec = {
       key: "permit2-treasury",
       selector: CORE_DEAL_KIND.PERMIT2_TREASURY,
       aliases: ["permit2-treasury", "permit2_treasury", "treasury-deal"],
-      encodeConfig: encodePermit2TreasuryDealConfig,
+      encodeConfig: encodePermit2TreasuryDealConfigFromJson,
       defaultModuleFactory: (protocol) => readAddressFromManifest(protocol, "coreModuleFactory", "coreModuleFactory"),
       defaultGovernanceFactory: (protocol) => readAddressFromManifest(protocol, "coreDealGovernanceFactory", "coreDealGovernanceFactory"),
     },
@@ -463,7 +345,7 @@ export const coreCliModule: CliModuleSpec = {
       key: "dac-deal",
       selector: CORE_DEAL_KIND.DAC_DEAL,
       aliases: ["dac-deal", "dac_deal"],
-      encodeConfig: encodeDacDealConfig,
+      encodeConfig: encodeDacDealConfigFromJson,
       defaultModuleFactory: (protocol) => readAddressFromManifest(protocol, "coreModuleFactory", "coreModuleFactory"),
       defaultGovernanceFactory: (protocol) => readAddressFromManifest(protocol, "coreDealGovernanceFactory", "coreDealGovernanceFactory"),
     },
@@ -474,14 +356,14 @@ export const coreCliModule: CliModuleSpec = {
       key: "milestones-evaluator",
       selector: CORE_EVALUATOR_KIND.MILESTONES_EVALUATOR,
       aliases: ["milestones-evaluator", "milestones_evaluator"],
-      encodeConfig: encodeMilestonesEvaluatorConfig,
+      encodeConfig: encodeMilestoneEvaluatorConfigFromJson,
     },
     {
       moduleId: "core",
       key: "revenue-evaluator",
       selector: CORE_EVALUATOR_KIND.REVENUE_EVALUATOR,
       aliases: ["revenue-evaluator", "revenue_evaluator"],
-      encodeConfig: encodeRevenueEvaluatorConfig,
+      encodeConfig: encodeRevenueEvaluatorConfigFromJson,
     },
   ],
   dealProposalTypes: [

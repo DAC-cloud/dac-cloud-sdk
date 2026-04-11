@@ -4,6 +4,7 @@ import {
   buildEnableDealChallengeRightProposal,
   buildStrikeOutAgentProposal,
   buildUpdateDealVotingConfigProposal,
+  normalizePercentInput,
   type DealParams,
   type ProposalParams,
 } from "@dac-cloud/core";
@@ -356,11 +357,11 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     if (args.length !== 5 && args.length !== 6 && !input) {
       throw new Error("deal propose update-voting-config requires positional args or --input json");
     }
-    const quorumPercent = args[0] !== undefined ? BigInt(args[0]) : readBigIntField(input, "quorumPercent", "--input");
-    const blockingPercent = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "blockingPercent", "--input");
-    const highQuorumPercent = args[2] !== undefined ? BigInt(args[2]) : readBigIntField(input, "highQuorumPercent", "--input");
+    const quorumPercent = normalizePercentInput(args[0] ?? readStringField(input, "quorumPercent", "--input"));
+    const blockingPercent = normalizePercentInput(args[1] ?? readStringField(input, "blockingPercent", "--input"));
+    const highQuorumPercent = normalizePercentInput(args[2] ?? readStringField(input, "highQuorumPercent", "--input"));
     const duration = args[3] !== undefined ? BigInt(args[3]) : readBigIntField(input, "duration", "--input");
-    const qualification = args[4] !== undefined ? BigInt(args[4]) : readBigIntField(input, "qualification", "--input");
+    const qualification = normalizePercentInput(args[4] ?? (input?.qualification !== undefined ? String(readBigIntField(input, "qualification", "--input")) : "0"));
     const executionValidityDuration = args[5] !== undefined
       ? BigInt(args[5])
       : input?.executionValidityDuration !== undefined
