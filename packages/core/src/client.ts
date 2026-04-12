@@ -67,6 +67,7 @@ export interface DacCoreClient {
   protocol: ProtocolManifest;
   deployDac(args: {config: DACConfig; salt: Hex; deferBirthRole?: Address}): Promise<DeployDacResult>;
   deployExistingTokenDac(args: {config: ExistingTokenDacConfig; salt: Hex}): Promise<DeployExistingTokenDacResult>;
+  deployGovernanceOracle(args: {admin: Address; initialPublisher: Address}): Promise<{txHash: Hex; oracleAddress?: Address}>;
   wrapMainToken(args: {wrappedToken: Address; amount: bigint}): Promise<Hex>;
   wrapMainTokenTo(args: {wrappedToken: Address; recipient: Address; amount: bigint}): Promise<Hex>;
   unwrapMainToken(args: {wrappedToken: Address; amount: bigint}): Promise<Hex>;
@@ -230,6 +231,30 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         assetController,
         treasurySeedAmount,
       };
+    },
+
+    async deployGovernanceOracle({admin, initialPublisher}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for deployGovernanceOracle");
+      }
+
+      const {result: oracleAddress} = await publicClient.simulateContract({
+        address: options.protocol.dacFactory,
+        abi: dacFactoryAbi,
+        functionName: "deployGovernanceOracle",
+        args: [admin, initialPublisher],
+        account: walletClient.account,
+      });
+
+      const txHash = await walletClient.writeContract({
+        address: options.protocol.dacFactory,
+        abi: dacFactoryAbi,
+        functionName: "deployGovernanceOracle",
+        args: [admin, initialPublisher],
+        account: walletClient.account,
+      });
+
+      return {txHash, oracleAddress: oracleAddress as Address | undefined};
     },
 
     async wrapMainToken({wrappedToken, amount}) {

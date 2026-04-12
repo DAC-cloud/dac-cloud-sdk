@@ -223,7 +223,7 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
     const ctx = await makeDryRunContext(resolver);
     const config = buildConfig(ctx.fromAddress);
     const transactions = [];
-    if (resolver.resolveBoolean("auto-approve", true) && treasurySeedAmount > 0n) {
+    if (resolver.resolveBoolean("auto-approve", false) && treasurySeedAmount > 0n) {
       transactions.push(ctx.txBuilder.approveErc20({token: underlyingToken, spender: ctx.protocol.dacFactory, amount: treasurySeedAmount}));
     }
     transactions.push(ctx.txBuilder.deployExistingTokenDac({config, salt: bytes32Random()}));
@@ -316,7 +316,7 @@ async function cmdWrap(resolver: OptionResolver): Promise<void> {
     const recipientText = resolver.resolveString("recipient");
     const recipient = recipientText ? asAddress(recipientText, "Wrap recipient") : ctx.fromAddress;
     const transactions = [];
-    if (resolver.resolveBoolean("auto-approve", true) && amount > 0n) {
+    if (resolver.resolveBoolean("auto-approve", false) && amount > 0n) {
       transactions.push(ctx.txBuilder.approveErc20({token: underlyingToken, spender: wrappedToken, amount}));
     }
     transactions.push(
@@ -884,6 +884,125 @@ async function cmdProposalState(resolver: OptionResolver, proposalIdText: string
   });
 }
 
+// ---- Oracle management commands ----
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
+
+async function resolveOracleAddress(resolver: OptionResolver): Promise<Address> {
+  const explicit = resolver.resolveString("governance-oracle");
+  if (explicit) return asAddress(explicit, "governance oracle");
+
+  const dacRecord = await resolveDacRecordOrThrow(resolver);
+  if (dacRecord.governanceOracleAddress) {
+    return asAddress(dacRecord.governanceOracleAddress, "governance oracle from DAC");
+  }
+  throw new Error("Cannot resolve oracle address. Pass --governance-oracle explicitly or use --dac with a DAC that has an oracle.");
+}
+
+async function cmdOracleDeploy(resolver: OptionResolver, adminText: string, publisherText?: string): Promise<void> {
+  const admin = asAddress(adminText, "admin");
+  const initialPublisher = publisherText ? asAddress(publisherText, "initial publisher") : ZERO_ADDRESS;
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.deployGovernanceOracle({admin, initialPublisher});
+    printJson({action: "dac.oracle.deploy", dryRun: true, admin, initialPublisher, transaction});
+    return;
+  }
+
+  const {core} = await makeCoreContext(resolver);
+  const result = await core.deployGovernanceOracle({admin, initialPublisher});
+  printJson({action: "dac.oracle.deploy", txHash: result.txHash, oracleAddress: result.oracleAddress, admin, initialPublisher});
+}
+
+async function cmdOracleSetPublisher(resolver: OptionResolver, publisherText: string, allowedText: string): Promise<void> {
+  const publisher = asAddress(publisherText, "publisher");
+  const allowed = parseBoolText(allowedText);
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const governanceOracle = await resolveOracleAddress(resolver);
+    const transaction = ctx.txBuilder.setGovernanceOraclePublisher({governanceOracle, publisher, allowed});
+    printJson({action: "dac.oracle.set-publisher", dryRun: true, governanceOracle, publisher, allowed, transaction});
+    return;
+  }
+
+  const {core} = await makeCoreContext(resolver);
+  const governanceOracle = await resolveOracleAddress(resolver);
+  const txHash = await core.setGovernanceOraclePublisher({governanceOracle, publisher, allowed});
+  printJson({action: "dac.oracle.set-publisher", governanceOracle, publisher, allowed, txHash});
+}
+
+async function cmdOraclePublish(
+  resolver: OptionResolver,
+  proposalIdText: string,
+  snapshotBlockText: string,
+  merkleRootText: string,
+  totalVotingPowerText: string,
+): Promise<void> {
+  const proposalId = BigInt(proposalIdText);
+  const snapshotBlock = BigInt(snapshotBlockText);
+  const merkleRoot = asBytes32(merkleRootText, "merkle root");
+  const totalUnderlyingVotingPower = BigInt(totalVotingPowerText);
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const governanceOracle = await resolveOracleAddress(resolver);
+    const transaction = ctx.txBuilder.publishGovernanceOracleSnapshot({governanceOracle, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower});
+    printJson({action: "dac.oracle.publish", dryRun: true, governanceOracle, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower, transaction});
+    return;
+  }
+
+  const {core} = await makeCoreContext(resolver);
+  const governanceOracle = await resolveOracleAddress(resolver);
+  const txHash = await core.publishGovernanceOracleSnapshot({governanceOracle, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower});
+  printJson({action: "dac.oracle.publish", governanceOracle, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower, txHash});
+}
+
+async function cmdOracleDeactivate(resolver: OptionResolver): Promise<void> {
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const governanceOracle = await resolveOracleAddress(resolver);
+    const transaction = ctx.txBuilder.deactivateGovernanceOracle(governanceOracle);
+    printJson({action: "dac.oracle.deactivate", dryRun: true, governanceOracle, transaction});
+    return;
+  }
+
+  const {core} = await makeCoreContext(resolver);
+  const governanceOracle = await resolveOracleAddress(resolver);
+  const txHash = await core.deactivateGovernanceOracle(governanceOracle);
+  printJson({action: "dac.oracle.deactivate", governanceOracle, txHash});
+}
+
+async function cmdOracleStatus(resolver: OptionResolver): Promise<void> {
+  const indexer = makeIndexer(resolver);
+  const dacId = await resolveDacIdOrThrow(resolver);
+  const oracles = await indexer.oracle.listByDac(dacId, {limit: 50, offset: 0});
+
+  const explicitOracle = resolver.resolveString("governance-oracle")?.toLowerCase();
+  const matched = explicitOracle
+    ? oracles.filter((o) => o.address.toLowerCase() === explicitOracle)
+    : oracles;
+
+  if (matched.length === 0) {
+    throw new Error(explicitOracle
+      ? `Oracle ${explicitOracle} not found for this DAC in indexer.`
+      : "No governance oracles found for this DAC in indexer.");
+  }
+
+  const result = matched.map((o) => ({
+    address: o.address,
+    active: o.active,
+    publishers: (o as unknown as {publishers: Array<{publisherAddress: string; allowed: boolean}>}).publishers?.map((p) => ({
+      address: p.publisherAddress,
+      allowed: p.allowed,
+    })) ?? [],
+    createdBlockNumber: o.createdBlockNumber,
+  }));
+
+  printJson({action: "dac.oracle.status", dacId, oracles: result.length === 1 ? result[0] : result});
+}
+
 async function cmdJoin(resolver: OptionResolver): Promise<void> {
   const {account, core} = await makeCoreContext(resolver);
   const dac = resolveDacAddressOrThrow(resolver);
@@ -945,7 +1064,7 @@ async function cmdJoin(resolver: OptionResolver): Promise<void> {
   const treasuryToken = asAddress(treasuryTokenText, "Treasury token");
   const recipient = asAddress(recipientText, "Capital call recipient");
 
-  const autoApprove = resolver.resolveBoolean("auto-approve", true);
+  const autoApprove = resolver.resolveBoolean("auto-approve", false);
   let approveTx: Hex | undefined;
   if (autoApprove && cashAmount > 0n) {
     const allowance = await core.getErc20Allowance({token: treasuryToken, owner: account.address, spender: dac});
@@ -998,7 +1117,7 @@ async function cmdDepositTreasury(resolver: OptionResolver): Promise<void> {
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
     const transactions = [];
-    if (resolver.resolveBoolean("auto-approve", true) && amount > 0n) {
+    if (resolver.resolveBoolean("auto-approve", false) && amount > 0n) {
       transactions.push(ctx.txBuilder.approveErc20({token, spender: dac, amount}));
     }
     transactions.push(ctx.txBuilder.depositTreasury({dacCell: dac, token, amount}));
@@ -1438,6 +1557,76 @@ Examples:
   proposalState.action(async function handleProposalState(proposalId: string) {
     const resolver = await resolverFactory(this.optsWithGlobals());
     await cmdProposalState(resolver, proposalId);
+  });
+
+  // Oracle management subcommand group
+  const oracle = program.command("oracle").description("Manage governance oracles (deploy, publishers, snapshots)");
+  const oracleSelectorOpts: OptionKey[] = ["governance-oracle", "cell-address", "dac-address", "dac"];
+  const oracleSelectorRequirement = {mode: "oneOf" as const, options: ["governance-oracle", "cell-address", "dac-address", "dac"] as OptionKey[], label: "Oracle or DAC selector"};
+
+  const oracleDeploy = oracle.command("deploy <admin> [publisher]")
+    .description("Deploy a new governance oracle via DACFactory");
+  oracleDeploy.action(async function handleOracleDeploy(admin: string, publisher?: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdOracleDeploy(resolver, admin, publisher);
+  });
+  addCommandHelp(oracleDeploy, {
+    notes: [
+      "Deploys a reference GovernanceOracle via DACFactory. The admin can manage publishers.",
+      "[publisher] is optional — pass address(0) or omit to skip initial publisher assignment.",
+    ],
+    examples: [
+      "dac oracle deploy 0xAdminAddr 0xPublisherAddr",
+      "dac oracle deploy 0xAdminAddr",
+    ],
+  });
+
+  const oracleSetPublisher = oracle.command("set-publisher <publisher> <allowed>")
+    .description("Grant or revoke publisher role on the governance oracle");
+  applyOptions(oracleSetPublisher, oracleSelectorOpts);
+  addCommandHelp(oracleSetPublisher, {
+    requirements: [oracleSelectorRequirement],
+    examples: ["dac oracle set-publisher 0xPublisher true --governance-oracle 0x..."],
+  });
+  oracleSetPublisher.action(async function handleSetPublisher(publisher: string, allowed: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdOracleSetPublisher(resolver, publisher, allowed);
+  });
+
+  const oraclePublish = oracle.command("publish <proposalId> <snapshotBlock> <merkleRoot> <totalVotingPower>")
+    .description("Publish an oracle snapshot for a proposal (requires publisher role)");
+  applyOptions(oraclePublish, oracleSelectorOpts);
+  addCommandHelp(oraclePublish, {
+    requirements: [oracleSelectorRequirement],
+    notes: ["Requires the caller to have the PUBLISHER_ROLE on the oracle."],
+    examples: ["dac oracle publish 5 12345678 0xabc...def 1000000000000000000 --governance-oracle 0x..."],
+  });
+  oraclePublish.action(async function handleOraclePublish(proposalId: string, snapshotBlock: string, merkleRoot: string, totalVotingPower: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdOraclePublish(resolver, proposalId, snapshotBlock, merkleRoot, totalVotingPower);
+  });
+
+  const oracleDeactivate = oracle.command("deactivate")
+    .description("Deactivate the governance oracle (admin or publisher)");
+  applyOptions(oracleDeactivate, oracleSelectorOpts);
+  addCommandHelp(oracleDeactivate, {
+    requirements: [oracleSelectorRequirement],
+    notes: ["Once deactivated, no new snapshots can be published. Active proposals will fall back to wrapped-only voting."],
+  });
+  oracleDeactivate.action(async function handleOracleDeactivate() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdOracleDeactivate(resolver);
+  });
+
+  const oracleStatus = oracle.command("status")
+    .description("Show governance oracle state (active, publishers) from indexer");
+  applyOptions(oracleStatus, oracleSelectorOpts);
+  addCommandHelp(oracleStatus, {
+    requirements: [oracleSelectorRequirement],
+  });
+  oracleStatus.action(async function handleOracleStatus() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdOracleStatus(resolver);
   });
 
   const joinOptionKeys: OptionKey[] = [

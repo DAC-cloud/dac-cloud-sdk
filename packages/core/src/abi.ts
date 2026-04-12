@@ -7,6 +7,7 @@ export const dacFactoryAbi = parseAbi([
   "event ExistingTokenDACDeployed(address indexed dac, address indexed underlyingToken, address indexed wrappedToken, address governanceOracle, address agentToken, address assetController, address creator, uint256 treasurySeedAmount)",
   "function deployDAC((string symbol,string name,string description,uint256 mainTokenMaxSupply,uint256 defaultQuorum,address founder,uint256 founderAllocation,address treasuryToken,uint256 founderCommitment,bool dividendsEnabled) config, bytes32 salt, address deferBirthRole) returns (address dacAddr, address mainTokenAddr, address agentTokenAddr)",
   "function deployExistingTokenDAC(bytes encodedConfig, bytes32 salt) returns (address dacAddr, address wrappedMainTokenAddr, address agentTokenAddr)",
+  "function deployGovernanceOracle(address admin, address initialPublisher) returns (address oracle)",
   "function startDAC(address dacCell, (string symbol,string name,string description,uint256 mainTokenMaxSupply,uint256 defaultQuorum,address founder,uint256 founderAllocation,address treasuryToken,uint256 founderCommitment,bool dividendsEnabled) config, address mainTokenAddr, address agentTokenAddr)"
 ]);
 

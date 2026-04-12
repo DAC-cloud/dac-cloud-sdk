@@ -35,6 +35,7 @@ export interface DacTxBuilderOptions {
 export interface DacTransactionBuilder {
   deployDac(args: {config: DACConfig; salt: Hex; deferBirthRole?: Address}): TransactionRequest;
   deployExistingTokenDac(args: {config: ExistingTokenDacConfig; salt: Hex}): TransactionRequest;
+  deployGovernanceOracle(args: {admin: Address; initialPublisher: Address}): TransactionRequest;
   wrapMainToken(args: {wrappedToken: Address; amount: bigint}): TransactionRequest;
   wrapMainTokenTo(args: {wrappedToken: Address; recipient: Address; amount: bigint}): TransactionRequest;
   unwrapMainToken(args: {wrappedToken: Address; amount: bigint}): TransactionRequest;
@@ -89,6 +90,10 @@ export function createDacTransactionBuilder(options: DacTxBuilderOptions): DacTr
 
     deployExistingTokenDac({config, salt}) {
       return tx(protocol.dacFactory, dacFactoryAbi, "deployExistingTokenDAC", [encodeExistingTokenConfig(config), salt]);
+    },
+
+    deployGovernanceOracle({admin, initialPublisher}) {
+      return tx(protocol.dacFactory, dacFactoryAbi, "deployGovernanceOracle", [admin, initialPublisher]);
     },
 
     wrapMainToken({wrappedToken, amount}) {
