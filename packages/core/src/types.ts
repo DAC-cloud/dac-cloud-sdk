@@ -67,8 +67,12 @@ export interface ExistingTokenDacConfig {
   description: string;
   underlyingToken: Address;
   treasurySeedAmount: bigint;
-  oracleAdmin: Address;
-  initialOraclePublisher: Address;
+  /**
+   * Optional governance oracle address.
+   * Pass `0x0000...0000` when `governanceStrategy.oraclePrimaryEnabled` is `false`
+   * (wrapped-only bootstrap). Required (non-zero) when oracle-primary mode is enabled.
+   */
+  governanceOracle: Address;
   dividendsEnabled: boolean;
   governanceStrategy: GovernanceStrategyConfig;
 }

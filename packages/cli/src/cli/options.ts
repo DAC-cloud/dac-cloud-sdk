@@ -18,8 +18,7 @@ const OPTION_SPECS = {
   symbol: {flags: "--symbol <string>", description: "Symbol of the DAC tokens"},
   "underlying-token": {flags: "--underlying-token <address>", description: "Existing-token DAC underlying ERC-20"},
   "treasury-seed-amount": {flags: "--treasury-seed-amount <uint256>", description: "Initial wrapped treasury seed amount"},
-  "oracle-admin": {flags: "--oracle-admin <address>", description: "Governance oracle admin address"},
-  "initial-oracle-publisher": {flags: "--initial-oracle-publisher <address>", description: "Initial governance oracle publisher"},
+  "governance-oracle": {flags: "--governance-oracle <address>", description: "Existing governance oracle address (required when oracle-primary mode is enabled). Use 0x0 for wrapped-only bootstrap."},
   commitment: {flags: "--commitment <uint256>", description: "Founder commitment (in treasury token)"},
   allocation: {flags: "--allocation <uint256>", description: "Founder allocation of main tokens"},
   "max-supply": {flags: "--max-supply <uint256>", description: "Max DAC main token supply"},
@@ -33,9 +32,9 @@ const OPTION_SPECS = {
   "oracle-publish-deadline": {flags: "--oracle-publish-deadline <uint256>", description: "Hybrid oracle publish deadline in seconds"},
   "fallback-warmup-duration": {flags: "--fallback-warmup-duration <uint256>", description: "Hybrid fallback warmup duration in seconds"},
   "fallback-duration": {flags: "--fallback-duration <uint256>", description: "Hybrid fallback voting duration in seconds"},
-  "blocking-on-all-proposals": {flags: "--blocking-on-all-proposals", description: "Apply blocking logic on all proposal types (hybrid)"},
-  "blocking-on-high-quorum": {flags: "--blocking-on-high-quorum", description: "Apply blocking on high-quorum proposals (hybrid, default: true)"},
-  "oracle-primary-enabled": {flags: "--oracle-primary-enabled", description: "Enable oracle-primary voting path (hybrid, default: true)"},
+  "blocking-on-all-proposals": {flags: "--blocking-on-all-proposals", description: "Apply blocking logic on all proposal types (hybrid, default: off)"},
+  "blocking-on-high-quorum": {flags: "--blocking-on-high-quorum", description: "Apply blocking on high-quorum proposals (hybrid, default: off)"},
+  "oracle-primary-enabled": {flags: "--oracle-primary-enabled", description: "Enable oracle-primary voting path (requires --governance-oracle, default: off)"},
   "dividends-enabled": {flags: "--dividends-enabled", description: "Enable dividends at DAC creation"},
   "defer-birth-role": {flags: "--defer-birth-role <address>", description: "Optional defer birth role address"},
 
@@ -73,6 +72,7 @@ const OPTION_SPECS = {
   "from-request": {flags: "--from-request", description: "For add-stake proposals: source amount from request allowance"},
   "dry-run": {flags: "--dry-run", description: "Output unsigned transaction data instead of broadcasting"},
   "from": {flags: "--from <address>", description: "Sender address for dry-run mode (alternative to --private-key)"},
+  "pretty-print": {flags: "--pretty-print", description: "Pretty-print JSON output (human-friendly, indented)"},
 } satisfies Record<string, CliOptionSpec>;
 
 export type OptionKey = keyof typeof OPTION_SPECS;
@@ -86,6 +86,7 @@ export const GLOBAL_OPTION_KEYS: OptionKey[] = [
   "indexer-url",
   "dry-run",
   "from",
+  "pretty-print",
 ];
 
 export interface RequirementSpec {

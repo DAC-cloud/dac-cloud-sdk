@@ -1,12 +1,19 @@
 import {readFile} from "node:fs/promises";
 
+let prettyPrint = false;
+
+export function setPrettyPrint(enabled: boolean): void {
+  prettyPrint = enabled;
+}
+
 export function printJson(payload: unknown): void {
-  const text = JSON.stringify(payload, (_key, value) => {
-    if (typeof value === "bigint") {
-      return value.toString();
-    }
+  const replacer = (_key: string, value: unknown): unknown => {
+    if (typeof value === "bigint") return value.toString();
     return value;
-  });
+  };
+  const text = prettyPrint
+    ? JSON.stringify(payload, replacer, 2)
+    : JSON.stringify(payload, replacer);
   process.stdout.write(`${text}\n`);
 }
 

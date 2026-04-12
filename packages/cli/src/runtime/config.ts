@@ -1,6 +1,7 @@
 import {existsSync, readFileSync} from "node:fs";
 import {resolve} from "node:path";
 import {parse as parseDotEnv} from "dotenv";
+import {setPrettyPrint} from "./io";
 
 export type StringMap = Record<string, string>;
 
@@ -188,9 +189,13 @@ export async function loadOptionResolver(cliOptions: Record<string, unknown>): P
   const providedConfig = configPath ? readEnvFile(configPath, true) : {};
   const defaultConfig = configPath === defaultConfigPath ? providedConfig : readEnvFile(defaultConfigPath, false);
 
-  return new OptionResolver({
+  const resolver = new OptionResolver({
     cliOptions,
     providedConfig,
     defaultConfig,
   });
+
+  setPrettyPrint(resolver.resolveBoolean("pretty-print", false));
+
+  return resolver;
 }

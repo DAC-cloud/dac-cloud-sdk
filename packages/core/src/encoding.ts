@@ -12,8 +12,7 @@ export function encodeExistingTokenConfig(config: ExistingTokenDacConfig): Hex {
         {name: "description", type: "string"},
         {name: "underlyingToken", type: "address"},
         {name: "treasurySeedAmount", type: "uint256"},
-        {name: "oracleAdmin", type: "address"},
-        {name: "initialOraclePublisher", type: "address"},
+        {name: "governanceOracle", type: "address"},
         {name: "dividendsEnabled", type: "bool"},
         {
           name: "governanceStrategy",

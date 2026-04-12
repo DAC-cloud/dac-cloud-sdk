@@ -193,17 +193,29 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
     oraclePublishDeadline: resolver.resolveBigInt("oracle-publish-deadline", 24n * 60n * 60n) ?? 24n * 60n * 60n,
     fallbackWarmupDuration: resolver.resolveBigInt("fallback-warmup-duration", 24n * 60n * 60n) ?? 24n * 60n * 60n,
     fallbackDuration: resolver.resolveBigInt("fallback-duration", 7n * 24n * 60n * 60n) ?? 7n * 24n * 60n * 60n,
-    blockingOnAllProposals: resolver.resolveBoolean("blocking-on-all-proposals", false) ?? false,
-    blockingOnHighQuorum: resolver.resolveBoolean("blocking-on-high-quorum", true) ?? true,
-    oraclePrimaryEnabled: resolver.resolveBoolean("oracle-primary-enabled", true) ?? true,
+    blockingOnAllProposals: resolver.resolveBoolean("blocking-on-all-proposals", false),
+    blockingOnHighQuorum: resolver.resolveBoolean("blocking-on-high-quorum", false),
+    oraclePrimaryEnabled: resolver.resolveBoolean("oracle-primary-enabled", false),
   };
 
-  function buildConfig(senderAddress: Address): ExistingTokenDacConfig {
-    const oracleAdmin = asAddress(resolver.resolveString("oracle-admin", senderAddress) ?? senderAddress, "Oracle admin");
-    const initialOraclePublisher = asAddress(resolver.resolveString("initial-oracle-publisher", senderAddress) ?? senderAddress, "Initial oracle publisher");
+  const ZERO = "0x0000000000000000000000000000000000000000" as const;
+  const governanceOracleRaw = resolver.resolveString("governance-oracle");
+  const governanceOracle: Address = governanceOracleRaw
+    ? asAddress(governanceOracleRaw, "governance oracle")
+    : ZERO;
+
+  if (governanceStrategy.oraclePrimaryEnabled && governanceOracle === ZERO) {
+    throw new Error(
+      "--governance-oracle is required when --oracle-primary-enabled is set.\n"
+      + "Provide an existing oracle address (--governance-oracle 0x...), "
+      + "or omit --oracle-primary-enabled to deploy in wrapped-only bootstrap mode.",
+    );
+  }
+
+  function buildConfig(_senderAddress: Address): ExistingTokenDacConfig {
     return {
       symbol: symbol.slice(0, 8), name, description, underlyingToken, treasurySeedAmount,
-      oracleAdmin, initialOraclePublisher, dividendsEnabled, governanceStrategy,
+      governanceOracle, dividendsEnabled, governanceStrategy,
     };
   }
 
@@ -721,6 +733,157 @@ async function cmdExecute(resolver: OptionResolver, proposalIdText: string): Pro
   });
 }
 
+// ---- Hybrid proposal phase management ----
+
+type PhaseTransitionKind =
+  | "activate-primary"
+  | "begin-warmup"
+  | "trigger-fallback"
+  | "activate-fallback";
+
+async function resolveProposalAddressForPhase(resolver: OptionResolver, proposalIdText: string): Promise<{dac: Address; proposalId: bigint; proposalAddress: Address}> {
+  const dac = resolveDacAddressOrThrow(resolver);
+  const proposalId = BigInt(proposalIdText);
+  const proposal = await resolveDacProposalByNumericIdOrThrow(resolver, proposalIdText);
+  if (!proposal.proposalAddress) {
+    throw new Error(`DAC proposal #${proposalIdText} is missing proposalAddress in indexer`);
+  }
+  return {dac, proposalId, proposalAddress: asAddress(proposal.proposalAddress, "Proposal address")};
+}
+
+async function cmdProposalPhaseTransition(
+  resolver: OptionResolver,
+  proposalIdText: string,
+  kind: PhaseTransitionKind,
+): Promise<void> {
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const dac = resolveDacAddressOrThrow(resolver);
+    const proposalId = BigInt(proposalIdText);
+    const proposal = await resolveDacProposalByNumericIdOrThrow(resolver, proposalIdText);
+    if (!proposal.proposalAddress) {
+      throw new Error(`DAC proposal #${proposalIdText} is missing proposalAddress in indexer`);
+    }
+    const proposalAddress = asAddress(proposal.proposalAddress, "Proposal address");
+    let transaction;
+    switch (kind) {
+      case "activate-primary":
+        transaction = ctx.txBuilder.activateHybridPrimaryVoting(proposalAddress);
+        break;
+      case "begin-warmup":
+        transaction = ctx.txBuilder.beginHybridFallbackWarmup(proposalAddress);
+        break;
+      case "trigger-fallback":
+        transaction = ctx.txBuilder.triggerHybridEmergencyFallback(proposalAddress);
+        break;
+      case "activate-fallback":
+        transaction = ctx.txBuilder.activateHybridFallbackVoting(proposalAddress);
+        break;
+    }
+    printJson({action: `dac.proposal.${kind}`, dryRun: true, dac, proposalId, proposalAddress, transaction});
+    return;
+  }
+
+  const {core, rpcUrl} = await makeCoreContext(resolver);
+  const advanceSeconds = resolver.resolveNumber("advance-seconds", 0) ?? 0;
+  if (advanceSeconds > 0) {
+    await advanceTime(rpcUrl, advanceSeconds);
+  }
+
+  const {dac, proposalId, proposalAddress} = await resolveProposalAddressForPhase(resolver, proposalIdText);
+
+  let txHash: Hex;
+  switch (kind) {
+    case "activate-primary":
+      txHash = await core.activateHybridPrimaryVoting(proposalAddress);
+      break;
+    case "begin-warmup":
+      txHash = await core.beginHybridFallbackWarmup(proposalAddress);
+      break;
+    case "trigger-fallback":
+      txHash = await core.triggerHybridEmergencyFallback(proposalAddress);
+      break;
+    case "activate-fallback":
+      txHash = await core.activateHybridFallbackVoting(proposalAddress);
+      break;
+  }
+
+  printJson({action: `dac.proposal.${kind}`, dac, proposalId, proposalAddress, txHash});
+}
+
+async function cmdProposalVoteMerkle(
+  resolver: OptionResolver,
+  proposalIdText: string,
+  supportText: string,
+  indexText: string,
+  amountText: string,
+  proofText: string,
+): Promise<void> {
+  const support = parseBoolText(supportText);
+  const index = BigInt(indexText);
+  const amount = BigInt(amountText);
+  // proof: comma-separated bytes32 hex values, or @path/to/file.json with array
+  let proof: Hex[];
+  if (proofText.startsWith("@")) {
+    const data = await readJsonFile<unknown>(resolvePath(proofText.slice(1)));
+    if (!Array.isArray(data)) {
+      throw new Error("Merkle proof file must contain a JSON array of bytes32 hex strings");
+    }
+    proof = data.map((entry, i) => asBytes32(String(entry), `proof[${i}]`));
+  } else {
+    proof = proofText.split(",").map((entry, i) => asBytes32(entry.trim(), `proof[${i}]`));
+  }
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const {dac, proposalId, proposalAddress} = await resolveProposalAddressForPhase(resolver, proposalIdText);
+    const transaction = ctx.txBuilder.voteMerkle({proposalAddress, support, index, amount, proof});
+    printJson({action: "dac.proposal.vote-merkle", dryRun: true, dac, proposalId, proposalAddress, support, index, amount, transaction});
+    return;
+  }
+
+  const {core, rpcUrl} = await makeCoreContext(resolver);
+  const preVoteAdvanceSeconds = resolver.resolveNumber("pre-vote-advance-seconds", 1) ?? 1;
+  await advanceTime(rpcUrl, preVoteAdvanceSeconds);
+
+  const {dac, proposalId, proposalAddress} = await resolveProposalAddressForPhase(resolver, proposalIdText);
+  const txHash = await core.voteMerkle({proposalAddress, support, index, amount, proof});
+
+  printJson({action: "dac.proposal.vote-merkle", dac, proposalId, proposalAddress, support, index, amount, txHash});
+}
+
+async function cmdProposalState(resolver: OptionResolver, proposalIdText: string): Promise<void> {
+  const dac = resolveDacAddressOrThrow(resolver);
+  const proposalId = BigInt(proposalIdText);
+  const proposal = await resolveDacProposalByNumericIdOrThrow(resolver, proposalIdText);
+
+  printJson({
+    action: "dac.proposal.state",
+    dac,
+    proposalId,
+    proposalAddress: proposal.proposalAddress,
+    kind: proposal.kindName ?? proposal.kindSelector,
+    proposalVariant: proposal.proposalVariant,
+    currentPhase: proposal.currentPhase,
+    phaseStartTime: proposal.phaseStartTime,
+    phaseEndTime: proposal.phaseEndTime,
+    snapshotBlock: proposal.currentPhaseSnapshotBlock,
+    totalVotingPower: proposal.totalVotingPower,
+    quorum: proposal.quorum,
+    blockingQuorum: proposal.blockingQuorum,
+    yesVotes: proposal.yesVotes,
+    noVotes: proposal.noVotes,
+    voteCount: proposal.voteCount,
+    merkleVoteCount: proposal.merkleVoteCount,
+    resolved: proposal.resolved,
+    passed: proposal.passed,
+    executed: proposal.executed,
+    executionExpired: proposal.executionExpired,
+    resolutionTime: proposal.resolutionTime,
+    executionDeadline: proposal.executionDeadline,
+  });
+}
+
 async function cmdJoin(resolver: OptionResolver): Promise<void> {
   const {account, core} = await makeCoreContext(resolver);
   const dac = resolveDacAddressOrThrow(resolver);
@@ -1092,8 +1255,7 @@ export function registerDacCommands(program: Command, resolverFactory: (options:
     "symbol",
     "underlying-token",
     "treasury-seed-amount",
-    "oracle-admin",
-    "initial-oracle-publisher",
+    "governance-oracle",
     "dividends-enabled",
     "quorum-percent",
     "blocking-percent",
@@ -1116,9 +1278,12 @@ export function registerDacCommands(program: Command, resolverFactory: (options:
     ],
     notes: [
       "Governance strategy flags are optional; CLI applies protocol-aligned defaults for quorum, timing, and hybrid oracle fallback windows.",
+      "Default mode is wrapped-only bootstrap (no oracle). Pass --oracle-primary-enabled --governance-oracle 0x... to enable oracle-primary voting.",
+      "Oracle deployment is managed separately from this CLI. Provide an existing governance oracle address.",
     ],
     examples: [
-      "dac create-existing-token --name \"USDC DAC\" --description \"Treasury wrapper\" --underlying-token 0x... --treasury-seed-amount 1000000",
+      "dac create-existing-token --name \"Bootstrap\" --underlying-token 0x... --treasury-seed-amount 1000000",
+      "dac create-existing-token --name \"With Oracle\" --underlying-token 0x... --treasury-seed-amount 1000000 --oracle-primary-enabled --governance-oracle 0x...",
     ],
   });
   createExistingToken.action(async function handleCreateExistingToken() {
@@ -1186,6 +1351,93 @@ Examples:
   execute.action(async function handleExecute(proposalId: string) {
     const resolver = await resolverFactory(this.optsWithGlobals());
     await cmdExecute(resolver, proposalId);
+  });
+
+  // Proposal lifecycle subcommand group (hybrid governance phase management)
+  const proposal = program.command("proposal").description("Manage DAC proposal lifecycle (hybrid mode phase transitions)");
+  const proposalSelectorOpts: OptionKey[] = ["cell-address", "dac-address", "dac"];
+  const proposalSelectorRequirement = {mode: "oneOf" as const, options: ["cell-address", "dac-address", "dac"] as OptionKey[], label: "DAC selector"};
+
+  const proposalActivatePrimary = proposal.command("activate-primary <proposalId>")
+    .description("Activate primary voting after the oracle snapshot has been published");
+  applyOptions(proposalActivatePrimary, [...proposalSelectorOpts, "advance-seconds"]);
+  addCommandHelp(proposalActivatePrimary, {
+    requirements: [proposalSelectorRequirement],
+    notes: ["Hybrid mode only. The contract also auto-activates this phase when vote() is called, so explicit activation is optional."],
+  });
+  proposalActivatePrimary.action(async function handleActivatePrimary(proposalId: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdProposalPhaseTransition(resolver, proposalId, "activate-primary");
+  });
+
+  const proposalBeginWarmup = proposal.command("begin-warmup <proposalId>")
+    .description("Begin fallback warmup after oracle missed the snapshot deadline");
+  applyOptions(proposalBeginWarmup, [...proposalSelectorOpts, "advance-seconds"]);
+  addCommandHelp(proposalBeginWarmup, {
+    requirements: [proposalSelectorRequirement],
+    notes: ["Required when oracle did not publish a snapshot before the deadline, or oracle is inactive."],
+  });
+  proposalBeginWarmup.action(async function handleBeginWarmup(proposalId: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdProposalPhaseTransition(resolver, proposalId, "begin-warmup");
+  });
+
+  const proposalTriggerFallback = proposal.command("trigger-fallback <proposalId>")
+    .description("Emergency fallback transition when the oracle was deactivated mid-flight");
+  applyOptions(proposalTriggerFallback, [...proposalSelectorOpts, "advance-seconds"]);
+  addCommandHelp(proposalTriggerFallback, {
+    requirements: [proposalSelectorRequirement],
+    notes: [
+      "Use when the governance oracle has been deactivated while a proposal is in AwaitingOracleSnapshot or PrimaryVoting.",
+      "Resets vote tallies and transitions the proposal into FallbackWarmup.",
+    ],
+  });
+  proposalTriggerFallback.action(async function handleTriggerFallback(proposalId: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdProposalPhaseTransition(resolver, proposalId, "trigger-fallback");
+  });
+
+  const proposalActivateFallback = proposal.command("activate-fallback <proposalId>")
+    .description("Activate fallback voting after the warmup period has elapsed");
+  applyOptions(proposalActivateFallback, [...proposalSelectorOpts, "advance-seconds"]);
+  addCommandHelp(proposalActivateFallback, {
+    requirements: [proposalSelectorRequirement],
+    notes: ["The contract also auto-activates this phase when vote() is called after warmup, so explicit activation is optional."],
+  });
+  proposalActivateFallback.action(async function handleActivateFallback(proposalId: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdProposalPhaseTransition(resolver, proposalId, "activate-fallback");
+  });
+
+  const proposalVoteMerkle = proposal.command("vote-merkle <proposalId> <support> <index> <amount> <proof>")
+    .description("Vote on a hybrid proposal using a Merkle proof (unwrapped holders during PrimaryVoting)");
+  applyOptions(proposalVoteMerkle, [...proposalSelectorOpts, "pre-vote-advance-seconds"]);
+  addCommandHelp(proposalVoteMerkle, {
+    requirements: [proposalSelectorRequirement],
+    notes: [
+      "<proof> is either a comma-separated list of bytes32 hex values, or @path/to/proof.json containing a JSON array.",
+      "Only valid during PrimaryVoting phase against the published oracle snapshot.",
+    ],
+    examples: [
+      "dac proposal vote-merkle 5 true 12 1000000000000000000 0xabc...,0xdef...",
+      "dac proposal vote-merkle 5 true 12 1000000000000000000 @./proof.json",
+    ],
+  });
+  proposalVoteMerkle.action(async function handleVoteMerkle(proposalId: string, support: string, index: string, amount: string, proofText: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdProposalVoteMerkle(resolver, proposalId, support, index, amount, proofText);
+  });
+
+  const proposalState = proposal.command("state <proposalId>")
+    .description("Show current phase, deadlines, and voting state for a DAC proposal (read-only)");
+  applyOptions(proposalState, proposalSelectorOpts);
+  addCommandHelp(proposalState, {
+    requirements: [proposalSelectorRequirement],
+    notes: ["Reads from the indexer. Includes currentPhase, phase deadlines, vote tallies, and execution status."],
+  });
+  proposalState.action(async function handleProposalState(proposalId: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdProposalState(resolver, proposalId);
   });
 
   const joinOptionKeys: OptionKey[] = [
