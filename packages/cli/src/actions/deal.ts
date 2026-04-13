@@ -542,8 +542,8 @@ async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string,
   const {core, rpcUrl} = await makeCoreContext(resolver);
   const preVoteAdvanceSeconds = resolver.resolveNumber("pre-vote-advance-seconds", 1) ?? 1;
   await advanceTime(rpcUrl, preVoteAdvanceSeconds);
-  const voteTx = await core.voteProposal({proposalAddress, support});
-  printJson({action: "deal.vote.proposal", deal: dealAddress, proposalId, proposalAddress, support, voteTx});
+  const txHash = await core.voteProposal({proposalAddress, support});
+  printJson({action: "deal.vote.proposal", deal: dealAddress, proposalId, proposalAddress, support, txHash});
 }
 
 async function cmdExecute(resolver: OptionResolver, proposalIdText: string): Promise<void> {
@@ -739,10 +739,10 @@ export function registerDealCommands(program: Command, resolverFactory: (options
   const deal = program.command("deal").description("Deal-level operations");
 
   const create = deal.command("create <dealFile>").description("Create a deal from JSON file");
-  applyOptions(create, ["cell-address", "dac-address"]);
+  applyOptions(create, ["cell-address", "dac-address", "dac"]);
   addCommandHelp(create, {
     requirements: [
-      {mode: "oneOf", options: ["cell-address", "dac-address"], label: "DAC selector"},
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
     ],
     notes: [
       "dealFile must contain dealKind/evaluatorSelector and module-specific config payloads.",
@@ -757,7 +757,7 @@ export function registerDealCommands(program: Command, resolverFactory: (options
   });
 
   const stake = deal.command("stake <amount>").description("Stake AgentToken into a deal");
-  applyOptions(stake, ["cell-address", "dac-address", "deal-cell", "deal-id", "id", "deal-address", "address", "deal", "auto-delegate"]);
+  applyOptions(stake, ["cell-address", "dac-address", "dac", "deal-cell", "deal-id", "id", "deal-address", "address", "deal", "auto-delegate"]);
   addCommandHelp(stake, {
     requirements: [
       {mode: "oneOf", options: ["cell-address", "dac-address"], label: "DAC selector"},
@@ -794,7 +794,7 @@ export function registerDealCommands(program: Command, resolverFactory: (options
   });
 
   const request = deal.command("request <amount>").description("Request stake in active deal (AgentToken approve -> StakeRequested)");
-  applyOptions(request, ["cell-address", "dac-address", "deal-id", "id", "deal-address", "address", "deal"]);
+  applyOptions(request, ["cell-address", "dac-address", "dac", "deal-id", "id", "deal-address", "address", "deal"]);
   addCommandHelp(request, {
     requirements: [
       {mode: "oneOf", options: ["deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
@@ -821,6 +821,7 @@ export function registerDealCommands(program: Command, resolverFactory: (options
     "from-request",
     "cell-address",
     "dac-address",
+    "dac",
     "capital-call-hash",
     "capital-call-nonce",
   ]);
@@ -881,7 +882,7 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
   });
 
   const evaluate = deal.command("evaluate [evaluatorId]").description("Evaluate a deal via DealManager.evaluateDeal");
-  applyOptions(evaluate, ["evaluator-id", "deal-id", "id", "deal-address", "address", "deal", "cell-address", "dac-address"]);
+  applyOptions(evaluate, ["evaluator-id", "deal-id", "id", "deal-address", "address", "deal", "cell-address", "dac-address", "dac"]);
   addCommandHelp(evaluate, {
     requirements: [
       {mode: "oneOf", options: ["deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
@@ -906,7 +907,7 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
 
   const legalMessage = deal.command("legal-message [dealNumericId] <messageFile>")
     .description("Send legal wrapper message via DealManager.legalWrapperMessage");
-  applyOptions(legalMessage, ["deal-id", "id", "deal-address", "address", "deal", "cell-address", "dac-address"]);
+  applyOptions(legalMessage, ["deal-id", "id", "deal-address", "address", "deal", "cell-address", "dac-address", "dac"]);
   addCommandHelp(legalMessage, {
     notes: [
       "If dealNumericId is not provided, CLI resolves deal id from deal selector options.",
@@ -920,7 +921,7 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
 
   const withdraw = deal.command("withdraw <dealNumericId>")
     .description("Force return capital after deadline via DealManager.forceReturnCapital");
-  applyOptions(withdraw, ["cell-address", "dac-address"]);
+  applyOptions(withdraw, ["cell-address", "dac-address", "dac"]);
   addCommandHelp(withdraw, {
     requirements: [
       {mode: "oneOf", options: ["cell-address", "dac-address"], label: "DAC selector"},

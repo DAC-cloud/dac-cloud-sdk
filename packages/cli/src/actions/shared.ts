@@ -31,9 +31,9 @@ export function resolveDacAddressOrThrow(resolver: OptionResolver): Address {
 }
 
 export function resolveDealAddressOrThrow(resolver: OptionResolver): Address {
-  const value = resolver.resolveString(["deal-address", "deal"]);
+  const value = resolver.resolveString(["deal-address", "deal", "deal-cell"]);
   if (!value) {
-    throw new Error("Missing deal address. Provide --deal-address.");
+    throw new Error("Missing deal address. Provide --deal-address or --deal-cell.");
   }
   return asAddress(value, "Deal address");
 }
@@ -125,10 +125,18 @@ export async function resolveDacRecordOrThrow(resolver: OptionResolver): Promise
 export async function resolveDealIdOrThrow(resolver: OptionResolver): Promise<string> {
   const direct = resolver.resolveString(["deal-id", "id"]);
   if (direct) {
-    return direct;
+    const client = makeIndexer(resolver);
+    // Try as composite indexer ID first, then as on-chain numeric ID with DAC context
+    const byComposite = await client.deals.getById(direct);
+    if (byComposite) return byComposite.id;
+
+    const found = await resolveDealByNumericId(client, resolver, direct);
+    if (found) return found.id;
+
+    throw new Error(`Deal not found for id "${direct}". If using a numeric deal ID, also provide --dac.`);
   }
 
-  const address = resolver.resolveString(["deal-address", "address", "deal"]);
+  const address = resolver.resolveString(["deal-address", "address", "deal", "deal-cell"]);
   if (!address) {
     throw new Error("Provide --deal-id or --deal-address");
   }
@@ -141,19 +149,52 @@ export async function resolveDealIdOrThrow(resolver: OptionResolver): Promise<st
   return found.id;
 }
 
+/**
+ * Try to resolve a deal by on-chain numeric ID within a DAC context.
+ * Requires --dac / --dac-address / --cell-address to identify the DAC.
+ */
+async function resolveDealByNumericId(
+  client: ReturnType<typeof makeIndexer>,
+  resolver: OptionResolver,
+  numericIdText: string,
+) {
+  // Only attempt if it looks like a simple numeric ID (not a composite key with underscores/hyphens)
+  if (/[_\-]/.test(numericIdText)) return null;
+
+  const dacAddress = resolver.resolveString(["cell-address", "dac-address", "dac"]);
+  if (!dacAddress) return null;
+
+  const dacRecord = await client.dacs.getByAddress(dacAddress);
+  if (!dacRecord) return null;
+
+  const deals = await client.deals.listByDac(dacRecord.id, {limit: 100, offset: 0});
+  const target = numericIdText;
+  return deals.find((d) => String(d.dealNumericId) === target) ?? null;
+}
+
 export async function resolveDealRecordOrThrow(resolver: OptionResolver): Promise<ResolvedDealRecord> {
   const client = makeIndexer(resolver);
   const directId = resolver.resolveString(["deal-id", "id"]);
-  const byAddress = resolver.resolveString(["deal-address", "address", "deal"]);
+  const byAddress = resolver.resolveString(["deal-address", "address", "deal", "deal-cell"]);
 
-  const found = directId
-    ? await client.deals.getById(directId)
-    : byAddress
-      ? await client.deals.getByAddress(byAddress)
-      : null;
+  let found = null;
+
+  if (directId) {
+    // Try as composite indexer ID first
+    found = await client.deals.getById(directId);
+
+    // Then try as on-chain numeric ID with DAC context
+    if (!found) {
+      found = await resolveDealByNumericId(client, resolver, directId);
+    }
+  }
+
+  if (!found && byAddress) {
+    found = await client.deals.getByAddress(byAddress);
+  }
 
   if (!found) {
-    throw new Error("Deal not found in indexer. Provide --deal-id or --deal-address.");
+    throw new Error("Deal not found in indexer. Provide --deal-id (with --dac for numeric IDs) or --deal-address.");
   }
 
   if (!found.dealAddress || !found.cellAddress || !found.dealNumericId || !found.dacId) {

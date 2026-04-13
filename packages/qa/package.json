@@ -1,0 +1,23 @@
+{
+  "name": "@dac-cloud/qa",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "dac-qa": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "qa": "node --no-warnings dist/index.js"
+  },
+  "dependencies": {
+    "@dac-cloud/indexer": "0.1.0",
+    "viem": "^2.39.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0"
+  }
+}

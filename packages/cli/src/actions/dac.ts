@@ -690,7 +690,7 @@ async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string,
   const preVoteAdvanceSeconds = resolver.resolveNumber("pre-vote-advance-seconds", 1) ?? 1;
   await advanceTime(rpcUrl, preVoteAdvanceSeconds);
 
-  const voteTx = await core.voteProposal({proposalAddress, support});
+  const txHash = await core.voteProposal({proposalAddress, support});
 
   printJson({
     action: "dac.vote.proposal",
@@ -698,7 +698,7 @@ async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string,
     proposalId,
     proposalAddress,
     support,
-    voteTx,
+    txHash,
   });
 }
 
@@ -722,14 +722,14 @@ async function cmdExecute(resolver: OptionResolver, proposalIdText: string): Pro
     await advanceTime(rpcUrl, advanceSeconds);
   }
 
-  const executeTx = await core.executeDacProposal({dacCell: dac, proposalId});
+  const txHash = await core.executeDacProposal({dacCell: dac, proposalId});
 
   printJson({
     action: "dac.execute",
     dac,
     proposalId,
     proposalAddress,
-    executeTx,
+    txHash,
   });
 }
 
@@ -1081,14 +1081,14 @@ async function cmdJoin(resolver: OptionResolver): Promise<void> {
     cashAmount,
   };
 
-  const fulfillTx = await core.fulfillCapitalCall({dacCell: dac, call});
+  const txHash = await core.fulfillCapitalCall({dacCell: dac, call});
 
   printJson({
     action: "dac.join",
     fulfiller: account.address,
     dac,
     approveTx,
-    fulfillTx,
+    txHash,
     call,
   });
 }
@@ -1566,6 +1566,7 @@ Examples:
 
   const oracleDeploy = oracle.command("deploy <admin> [publisher]")
     .description("Deploy a new governance oracle via DACFactory");
+  applyOptions(oracleDeploy, []);
   oracleDeploy.action(async function handleOracleDeploy(admin: string, publisher?: string) {
     const resolver = await resolverFactory(this.optsWithGlobals());
     await cmdOracleDeploy(resolver, admin, publisher);
