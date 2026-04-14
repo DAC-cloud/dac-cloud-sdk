@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {setupNativeDacWithDeal} from "./fixtures/index.js";
+import {getChainTimestamp, setupNativeDacWithDeal} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Force Return Capital
@@ -40,7 +40,11 @@ export const dealForceReturnScenario: Scenario = {
     // ── Advance past deal deadline ───────────────────────────────
 
     h.log("Advancing past deal deadline...");
-    await h.advanceTime(86400 * 11); // past 10-day deadline
+    // Advance past deal deadline — exact calculation
+    const dealDeadlineTs = ctx.chainTimestamp + 86400 * 10;
+    const currentTs = await getChainTimestamp(h);
+    const neededAdvance = dealDeadlineTs - currentTs + 3600;
+    await h.advanceTime(Math.max(neededAdvance, 3600));
 
     // ── Force return capital ─────────────────────────────────────
 

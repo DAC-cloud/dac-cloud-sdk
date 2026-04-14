@@ -16,7 +16,16 @@ export async function syncIndexer(config: QaConfig, opts?: {timeoutMs?: number})
   const poll = config.indexerPollIntervalMs;
   const deadline = Date.now() + timeout;
 
-  // Get current chain block
+  // Mine an empty block to create a boundary. The indexer must process this
+  // block (which contains no events) AFTER the preceding blocks with events.
+  // This ensures that when we see this block as "processed", all prior block
+  // data is fully committed to the indexer's data tables.
+  if (config.isLocalChain) {
+    const {mineBlock} = await import("./chain.js");
+    await mineBlock(config);
+  }
+
+  // Get current chain block (includes the freshly mined boundary block)
   const chainBlock = await getBlockNumber(config.rpcUrl);
 
   // Try to poll indexer block height via its internal query

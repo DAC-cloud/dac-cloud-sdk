@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {setupNativeDacWithDeal} from "./fixtures/index.js";
+import {getChainTimestamp, setupNativeDacWithDeal} from "./fixtures/index.js";
 
 /**
  * Scenario: Single-Agent Deal — Full Slash
@@ -33,8 +33,12 @@ export const dealSingleAgentScenario: Scenario = {
 
     // ── Evaluate deal ────────────────────────────────────────────
 
-    // Advance past milestone timestamp (7 days)
-    await h.advanceTime(86400 * 8);
+    // Advance past milestone timestamp — use exact calculation to avoid timing flakiness
+    const milestoneTs = ctx.chainTimestamp + 86400 * 7;
+    const currentTs = await getChainTimestamp(h);
+    const neededAdvance = milestoneTs - currentTs + 3600; // 1 hour past milestone
+    h.log(`Chain time: ${currentTs}, milestone: ${milestoneTs}, advancing ${neededAdvance}s`);
+    await h.advanceTime(Math.max(neededAdvance, 3600));
 
     await step(h, "evaluate-deal", async () => {
       const args = [

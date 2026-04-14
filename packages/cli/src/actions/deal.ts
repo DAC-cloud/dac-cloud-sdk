@@ -197,6 +197,25 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
   });
 }
 
+async function cmdInvite(resolver: OptionResolver, inviteeText: string): Promise<void> {
+  const invitee = asAddress(inviteeText, "Invitee address");
+  const grantInviteRight = resolver.resolveBoolean("grant-invite-right", false);
+  const dealRecord = await resolveDealRecordOrThrow(resolver);
+  const dealCell = dealRecord.cellAddress;
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.inviteAgentToDeal({dealCell, invitee, grantInviteRight});
+    printJson({action: "deal.invite", dryRun: true, dealCell, invitee, grantInviteRight, transaction});
+    return;
+  }
+
+  const {account, core} = await makeCoreContext(resolver);
+  const txHash = await core.inviteAgentToDeal({dealCell, invitee, grantInviteRight});
+
+  printJson({action: "deal.invite", inviter: account.address, dealCell, invitee, grantInviteRight, txHash});
+}
+
 async function cmdStake(resolver: OptionResolver, amountText: string): Promise<void> {
   const amount = BigInt(amountText);
   const dealRecord = await resolveDealRecordOrThrow(resolver);
@@ -767,6 +786,19 @@ export function registerDealCommands(program: Command, resolverFactory: (options
   stake.action(async function handleStake(amount: string) {
     const resolver = await resolverFactory(this.optsWithGlobals());
     await cmdStake(resolver, amount);
+  });
+
+  const invite = deal.command("invite <invitee>").description("Invite an agent to a deal's whitelist");
+  applyOptions(invite, ["deal-cell", "deal-id", "id", "deal-address", "address", "deal", "grant-invite-right"]);
+  addCommandHelp(invite, {
+    requirements: [
+      {mode: "oneOf", options: ["deal-cell", "deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
+    ],
+    notes: ["Caller must have invite rights (the deal proposer has this by default)."],
+  });
+  invite.action(async function handleInvite(invitee: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdInvite(resolver, invitee);
   });
 
   const unstake = deal.command("unstake").description("Unstake from a deal after permit/close rules are satisfied");

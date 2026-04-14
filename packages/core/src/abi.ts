@@ -144,6 +144,7 @@ export const agentTokenAbi = parseAbi([
 export const dealCellAbi = parseAbi([
   ...commonErrorSignatures,
   "function stakeToken() view returns (address)",
+  "function invite(address invitee, bool grantInviteRight)",
   "function unstake()",
   "function claimMainToken(uint256 evaluatorId)",
   "function dealRewardPoolPercent() view returns (uint256)",

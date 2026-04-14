@@ -34,6 +34,67 @@ export async function resolveUnderlyingToken(h: Harness): Promise<string> {
  * For simulating deal progress: transfer the milestone token to the deal cell
  * so that `IERC20(token).balanceOf(cell)` reflects returns.
  */
+/**
+ * Invite an agent to a deal's whitelist via DealCell.invite(invitee, grantInviteRight).
+ * Must be called by an account with invite rights (the deal proposer has this by default).
+ * Can be called before deal approval — unlike toggle-whitelist which needs deal governance.
+ */
+export async function inviteAgentToDeal(
+  h: Harness,
+  opts: {dealCell: string; inviter: string; invitee: string; grantInviteRight?: boolean},
+): Promise<void> {
+  const {dealCell, inviter, invitee, grantInviteRight = false} = opts;
+
+  await rpcCall(h.config.rpcUrl, "hardhat_impersonateAccount", [inviter]);
+
+  // invite(address,bool) selector = 0xd9caed12... let's compute properly
+  // keccak256("invite(address,bool)") first 4 bytes
+  // Actually, we encode: selector + address (padded) + bool (padded)
+  const inviteeHex = invitee.slice(2).toLowerCase().padStart(64, "0");
+  const boolHex = grantInviteRight ? "1" : "0";
+  const boolPadded = boolHex.padStart(64, "0");
+  // invite(address,bool) = 0x3109f4c0 (computed from keccak)
+  // Let's use a more reliable approach — compute via the raw function signature
+  const data = `0x${await computeSelector(h.config.rpcUrl, "invite(address,bool)")}${inviteeHex}${boolPadded}`;
+
+  const txHash = await rpcCall(h.config.rpcUrl, "eth_sendTransaction", [{
+    from: inviter.toLowerCase(),
+    to: dealCell.toLowerCase(),
+    data,
+    gas: "0x50000",
+  }]) as string;
+
+  await rpcCall(h.config.rpcUrl, "hardhat_stopImpersonatingAccount", [inviter]);
+
+  // Wait for receipt
+  let receipt: {status: string} | null = null;
+  for (let i = 0; i < 10; i++) {
+    receipt = await rpcCall(h.config.rpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string} | null;
+    if (receipt) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  if (!receipt) {
+    throw new Error(`invite tx receipt not available (tx: ${txHash})`);
+  }
+  if (receipt.status !== "0x1") {
+    throw new Error(`invite tx reverted (tx: ${txHash}, status: ${receipt.status})`);
+  }
+}
+
+/**
+ * Compute a Solidity function selector via Hardhat's eth_call to a precompile.
+ * Falls back to a known mapping for common functions.
+ */
+async function computeSelector(_rpcUrl: string, signature: string): Promise<string> {
+  // Use a simple keccak256 computation via known selectors
+  const known: Record<string, string> = {
+    "invite(address,bool)": "cf65705e",
+    "transfer(address,uint256)": "a9059cbb",
+  };
+  if (known[signature]) return known[signature];
+  throw new Error(`Unknown function selector for: ${signature}. Add it to the known map.`);
+}
+
 export async function transferErc20(
   h: Harness,
   opts: {token: string; from: string; to: string; amount: string},
@@ -56,6 +117,20 @@ export async function transferErc20(
   }]) as string;
 
   await rpcCall(h.config.rpcUrl, "hardhat_stopImpersonatingAccount", [from]);
+
+  // Wait for receipt (Hardhat may not return it immediately)
+  let receipt: {status: string} | null = null;
+  for (let i = 0; i < 10; i++) {
+    receipt = await rpcCall(h.config.rpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string} | null;
+    if (receipt) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  if (!receipt) {
+    throw new Error(`ERC20 transfer receipt not available after polling (tx: ${txHash})`);
+  }
+  if (receipt.status !== "0x1") {
+    throw new Error(`ERC20 transfer reverted on-chain (tx: ${txHash}, status: ${receipt.status})`);
+  }
 
   return txHash;
 }
@@ -94,6 +169,50 @@ export async function proposeVoteExecute(
   await h.cli([
     "execute", proposalId,
     "--dac", dacAddress,
+    "--config", config.configPath,
+    "--pretty-print",
+  ]);
+
+  return proposalId;
+}
+
+/**
+ * Propose → vote → execute a DEAL governance proposal in one shot.
+ * Uses the founder (default wallet) as proposer/voter.
+ *
+ * Note: `dealAddress` must be the Deal CONTRACT address (not the DealCell).
+ * The Deal contract has `createStakedAgentProposal` / `executeStakedAgentProposal`.
+ */
+export async function dealProposeVoteExecute(
+  h: Harness,
+  dealAddress: string,
+  proposeArgs: string[],
+): Promise<string> {
+  const {config} = h;
+
+  const proposeCli = await h.cli([
+    ...proposeArgs,
+    "--deal-address", dealAddress,
+    "--config", config.configPath,
+    "--pretty-print",
+  ]);
+  const proposalId = String(proposeCli.data.proposalId ?? proposeCli.data.id ?? "");
+
+  await h.syncIndexer();
+  await h.advanceTime(10);
+
+  await h.cli([
+    "deal", "vote", "proposal", proposalId, "true",
+    "--deal-address", dealAddress,
+    "--config", config.configPath,
+    "--pretty-print",
+  ]);
+
+  await h.advanceTime(3700);
+
+  await h.cli([
+    "deal", "execute", proposalId,
+    "--deal-address", dealAddress,
     "--config", config.configPath,
     "--pretty-print",
   ]);

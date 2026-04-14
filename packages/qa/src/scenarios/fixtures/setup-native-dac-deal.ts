@@ -13,11 +13,21 @@ export interface MilestoneConfig {
   fundingToken?: string;
   expectedReturn: string;
   timestamp?: number;    // absolute; defaults to chainTimestamp + 7 days
+  timestampDelta?: number; // relative to chainTimestamp (overrides timestamp default if set)
   rewardPercentage?: string;
   rewardCurve?: string[];
   penaltyCurve?: string[];
   minPercentGrace?: string;
   extension?: string;
+}
+
+export interface AgentStakeConfig {
+  /** Wallet role name (e.g. "agent1") — must exist in config.wallets */
+  role: string;
+  /** Mint amount for this agent (default: same as agentMintAmount) */
+  mintAmount?: string;
+  /** Stake amount for this agent (default: same as stakeAmount) */
+  stakeAmount?: string;
 }
 
 export interface DealSetupOptions {
@@ -47,6 +57,10 @@ export interface DealSetupOptions {
   dealDeadlineDelta?: number;
   /** Enable veto (default: false) */
   vetoEnabled?: boolean;
+  /** Additional agents to join DAC, mint tokens, and stake into the deal */
+  extraAgents?: AgentStakeConfig[];
+  /** Skip deal approval — leave the deal in pending state (default: false) */
+  skipApproval?: boolean;
 }
 
 export interface DealContext {
@@ -149,7 +163,7 @@ export async function setupNativeDacWithDeal(h: Harness, opts: DealSetupOptions 
     valuationMode: m.valuationMode ?? 0,
     fundingToken: m.fundingToken ?? ZERO_ADDR,
     expectedReturn: m.expectedReturn,
-    timestamp: String(m.timestamp ?? chainTimestamp + 86400 * 7),
+    timestamp: String(m.timestamp ?? chainTimestamp + (m.timestampDelta ?? 86400 * 7)),
     rewardPercentage: m.rewardPercentage ?? "1000000000000000000",
     rewardCurve: m.rewardCurve ?? ["0"],
     penaltyCurve: m.penaltyCurve ?? ["1000000000000000000"],
@@ -208,7 +222,61 @@ export async function setupNativeDacWithDeal(h: Harness, opts: DealSetupOptions 
     "--config", config.configPath, "--pretty-print",
   ]);
 
+  // ── Extra agents: invite + mint + stake (before approval) ───────
+  // Staking requires !isApproved(), so agents must stake BEFORE deal approval.
+  // The proposer (founder) has invite rights — use DealCell.invite() to whitelist
+  // each agent, then mint their agent tokens via DAC governance, then they stake.
+
+  for (const agent of opts.extraAgents ?? []) {
+    const wallet = config.wallets[agent.role];
+    if (!wallet) throw new Error(`Wallet role "${agent.role}" not found in config`);
+
+    h.log(`Agent ${agent.role} (${wallet.address}) inviting, minting, and staking...`);
+
+    // Invite agent to deal whitelist (founder has invite rights as proposer)
+    await h.cli([
+      "deal", "invite", wallet.address,
+      "--deal-address", dealCell,
+      "--config", config.configPath,
+      "--pretty-print",
+    ]);
+
+    // Mint agent tokens for this agent (requires DAC governance)
+    const agentMint = agent.mintAmount ?? mintAmount;
+    await proposeVoteExecute(h, dacAddress, [
+      "propose", "mint-agent-tokens", agentMint, wallet.address,
+    ]);
+
+    await h.syncIndexer();
+
+    // Stake into the deal
+    const agentStake = agent.stakeAmount ?? stakeAmount;
+    await h.cliAs(agent.role, [
+      "deal", "stake", agentStake,
+      "--deal-address", dealCell, "--dac", dacAddress, "--auto-delegate",
+      "--config", config.configPath, "--pretty-print",
+    ]);
+  }
+
   // ── Approve deal ───────────────────────────────────────────────
+
+  if (opts.skipApproval) {
+    h.log("Skipping deal approval (skipApproval=true)");
+
+    return {
+      dacAddress,
+      agentTokenAddress,
+      mainTokenAddress,
+      dealManagerAddress,
+      dealAddress,
+      dealCell,
+      dealNumericId,
+      dealProposalId,
+      treasuryToken,
+      chainTimestamp,
+      founderAddress: founderWallet.address,
+    };
+  }
 
   h.log("Approving deal...");
 

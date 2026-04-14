@@ -85,6 +85,7 @@ export interface DacCoreClient {
   triggerHybridEmergencyFallback(proposalAddress: Address): Promise<Hex>;
   activateHybridFallbackVoting(proposalAddress: Address): Promise<Hex>;
   voteMerkle(args: {proposalAddress: Address; support: boolean; index: bigint; amount: bigint; proof: Hex[]}): Promise<Hex>;
+  inviteAgentToDeal(args: {dealCell: Address; invitee: Address; grantInviteRight: boolean}): Promise<Hex>;
   stakeAgentToDeal(args: {agentToken: Address; dealCell: Address; amount: bigint}): Promise<Hex>;
   unstakeFromDeal(args: {dealCell: Address}): Promise<Hex>;
   claimMainToken(args: {dealCell: Address; evaluatorId: bigint}): Promise<Hex>;
@@ -536,6 +537,20 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         abi: hybridDacManagementProposalAbi,
         functionName: "voteMerkle",
         args: [support, index, amount, proof],
+        account: walletClient.account,
+      });
+    },
+
+    async inviteAgentToDeal({dealCell, invitee, grantInviteRight}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for inviteAgentToDeal");
+      }
+
+      return walletClient.writeContract({
+        address: dealCell,
+        abi: dealCellAbi,
+        functionName: "invite",
+        args: [invitee, grantInviteRight],
         account: walletClient.account,
       });
     },

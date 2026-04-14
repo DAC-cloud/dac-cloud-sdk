@@ -56,6 +56,7 @@ const OPTION_SPECS = {
   "advance-seconds": {flags: "--advance-seconds <number>", description: "Optional EVM time advance before execute"},
   "auto-delegate": {flags: "--auto-delegate", description: "Auto-delegate after create/stake"},
   "auto-approve": {flags: "--auto-approve", description: "Auto-approve ERC20 allowance for join/deposit"},
+  "grant-invite-right": {flags: "--grant-invite-right", description: "Grant the invitee rights to invite other agents"},
   delegatee: {flags: "--delegatee <address>", description: "Vote delegate target"},
   token: {flags: "--token <address>", description: "Token address"},
   amount: {flags: "--amount <uint256>", description: "Amount"},

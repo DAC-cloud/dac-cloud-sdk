@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {setupNativeDacWithDeal, transferErc20} from "./fixtures/index.js";
+import {getChainTimestamp, setupNativeDacWithDeal, transferErc20} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Evaluation — Partial Reward
@@ -63,7 +63,11 @@ export const dealEvalPartialRewardScenario: Scenario = {
 
     // ── Evaluate deal ────────────────────────────────────────────
 
-    await h.advanceTime(86400 * 8); // past milestone timestamp
+    // Advance past milestone — exact calculation avoids timing flakiness
+    const milestoneTs = ctx.chainTimestamp + 86400 * 7;
+    const currentTs = await getChainTimestamp(h);
+    const neededAdvance = milestoneTs - currentTs + 3600;
+    await h.advanceTime(Math.max(neededAdvance, 3600));
 
     await step(h, "evaluate-deal", async () => {
       const args = [

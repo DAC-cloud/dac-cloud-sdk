@@ -53,6 +53,7 @@ export interface DacTransactionBuilder {
   activateHybridFallbackVoting(proposalAddress: Address): TransactionRequest;
   voteWrapped(args: {proposalAddress: Address; support: boolean}): TransactionRequest;
   voteMerkle(args: {proposalAddress: Address; support: boolean; index: bigint; amount: bigint; proof: Hex[]}): TransactionRequest;
+  inviteAgentToDeal(args: {dealCell: Address; invitee: Address; grantInviteRight: boolean}): TransactionRequest;
   stakeAgentToDeal(args: {agentToken: Address; dealCell: Address; amount: bigint}): TransactionRequest;
   unstakeFromDeal(args: {dealCell: Address}): TransactionRequest;
   claimMainToken(args: {dealCell: Address; evaluatorId: bigint}): TransactionRequest;
@@ -162,6 +163,10 @@ export function createDacTransactionBuilder(options: DacTxBuilderOptions): DacTr
 
     voteMerkle({proposalAddress, support, index, amount, proof}) {
       return tx(proposalAddress, hybridDacManagementProposalAbi, "voteMerkle", [support, index, amount, proof]);
+    },
+
+    inviteAgentToDeal({dealCell, invitee, grantInviteRight}) {
+      return tx(dealCell, dealCellAbi, "invite", [invitee, grantInviteRight]);
     },
 
     stakeAgentToDeal({agentToken, dealCell, amount}) {
