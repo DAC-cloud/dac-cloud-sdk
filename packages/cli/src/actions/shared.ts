@@ -194,7 +194,15 @@ export async function resolveDealRecordOrThrow(resolver: OptionResolver): Promis
   }
 
   if (!found) {
-    throw new Error("Deal not found in indexer. Provide --deal-id (with --dac for numeric IDs) or --deal-address.");
+    const searchedBy = directId
+      ? `deal-id "${directId}"`
+      : byAddress
+        ? `address "${byAddress}"`
+        : "no identifier provided";
+    throw new Error(
+      `Deal not found in indexer (searched by ${searchedBy}). `
+      + `Provide --deal-id (with --dac for numeric IDs), --deal-address, or --deal-cell.`,
+    );
   }
 
   if (!found.dealAddress || !found.cellAddress || !found.dealNumericId || !found.dacId) {

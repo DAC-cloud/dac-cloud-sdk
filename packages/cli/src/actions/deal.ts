@@ -84,22 +84,10 @@ function readBoolField(input: Record<string, unknown> | undefined, key: string, 
   throw new Error(`Missing bool field '${key}' in ${label}`);
 }
 
-async function resolveDealAddressForWrite(resolver: OptionResolver): Promise<Address> {
-  const direct = resolver.resolveString(["deal-address", "deal"]);
-  if (direct) {
-    return asAddress(direct, "Deal address");
-  }
-
-  return (await resolveDealRecordOrThrow(resolver)).dealAddress;
-}
-
-async function resolveDealCellAddressForStake(resolver: OptionResolver): Promise<Address> {
-  const direct = resolver.resolveString("deal-cell");
-  if (direct) {
-    return asAddress(direct, "Deal cell");
-  }
-  return (await resolveDealRecordOrThrow(resolver)).cellAddress;
-}
+/** Standard deal selector options — use in every deal subcommand's applyOptions. */
+const DEAL_SELECTOR_OPTIONS = [
+  "deal-id", "deal-address", "deal", "deal-cell",
+] as const;
 
 async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<void> {
   const dacRecord = await resolveDacRecordOrThrow(resolver);
@@ -206,18 +194,22 @@ async function cmdInvite(resolver: OptionResolver, inviteeText: string): Promise
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
     const transaction = ctx.txBuilder.inviteAgentToDeal({dealCell, invitee, grantInviteRight});
-    printJson({action: "deal.invite", dryRun: true, dealCell, invitee, grantInviteRight, transaction});
+    printJson({action: "deal.invite", dryRun: true, deal: dealRecord.dealAddress, dealCell, invitee, grantInviteRight, transaction});
     return;
   }
 
   const {account, core} = await makeCoreContext(resolver);
   const txHash = await core.inviteAgentToDeal({dealCell, invitee, grantInviteRight});
 
-  printJson({action: "deal.invite", inviter: account.address, dealCell, invitee, grantInviteRight, txHash});
+  printJson({action: "deal.invite", inviter: account.address, deal: dealRecord.dealAddress, dealCell, invitee, grantInviteRight, txHash,
+    nextStep: "Invited agent can now stake into the deal with `dac deal stake`."});
 }
 
 async function cmdStake(resolver: OptionResolver, amountText: string): Promise<void> {
-  const amount = BigInt(amountText);
+  let amount: bigint;
+  try { amount = BigInt(amountText); } catch {
+    throw new Error(`Invalid stake amount "${amountText}". Provide a numeric value (e.g. 10000000000000000000000).`);
+  }
   const dealRecord = await resolveDealRecordOrThrow(resolver);
   const dealCell = dealRecord.cellAddress;
   const dacRecord = await resolveDacRecordOrThrow(resolver);
@@ -255,18 +247,19 @@ async function cmdStake(resolver: OptionResolver, amountText: string): Promise<v
 }
 
 async function cmdUnstake(resolver: OptionResolver): Promise<void> {
+  const resolved = await resolveDealRecordOrThrow(resolver);
+  const dealCell = resolved.cellAddress;
+
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
-    const dealCell = await resolveDealCellAddressForStake(resolver);
     const transaction = ctx.txBuilder.unstakeFromDeal({dealCell});
-    printJson({action: "deal.unstake", dryRun: true, dealCell, transaction});
+    printJson({action: "deal.unstake", dryRun: true, deal: resolved.dealAddress, dealCell, transaction});
     return;
   }
 
   const {account, core} = await makeCoreContext(resolver);
-  const dealCell = await resolveDealCellAddressForStake(resolver);
   const txHash = await core.unstakeFromDeal({dealCell});
-  printJson({action: "deal.unstake", staker: account.address, dealCell, txHash});
+  printJson({action: "deal.unstake", staker: account.address, deal: resolved.dealAddress, dealCell, txHash});
 }
 
 async function cmdDelegate(resolver: OptionResolver): Promise<void> {
@@ -279,7 +272,10 @@ async function cmdDelegate(resolver: OptionResolver): Promise<void> {
     : dealRecord.stakeTokenAddress;
 
   if (!stakeToken) {
-    throw new Error("Deal stake token address is missing in indexer. Pass --stake-token explicitly.");
+    throw new Error(
+      `Deal stake token address is missing in indexer for deal ${dealRecord.dealAddress}. `
+      + `Pass --stake-token explicitly.`,
+    );
   }
 
   const delegatee = asAddress(resolver.resolveString("delegatee", account.address) ?? account.address, "delegatee");
@@ -287,6 +283,9 @@ async function cmdDelegate(resolver: OptionResolver): Promise<void> {
 
   printJson({
     action: "deal.delegate",
+    delegator: account.address,
+    deal: dealRecord.dealAddress,
+    dealCell: dealRecord.cellAddress,
     stakeToken,
     delegatee,
     txHash,
@@ -294,7 +293,10 @@ async function cmdDelegate(resolver: OptionResolver): Promise<void> {
 }
 
 async function cmdRequest(resolver: OptionResolver, amountText: string): Promise<void> {
-  const amount = BigInt(amountText);
+  let amount: bigint;
+  try { amount = BigInt(amountText); } catch {
+    throw new Error(`Invalid request amount "${amountText}". Provide a numeric value.`);
+  }
   const {core, account} = await makeCoreContext(resolver);
   const resolved = await resolveDealRecordOrThrow(resolver);
   const dacRecord = await resolveDacRecordOrThrow(resolver);
@@ -338,8 +340,8 @@ const BASE_DEAL_PROPOSAL_TYPE_LIST = [
 const BASE_DEAL_PROPOSAL_TYPES = new Set<string>(BASE_DEAL_PROPOSAL_TYPE_LIST);
 
 async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, args: string[]): Promise<void> {
-  const dealAddress = await resolveDealAddressForWrite(resolver);
   const resolved = await resolveDealRecordOrThrow(resolver);
+  const dealAddress = resolved.dealAddress;
   const indexer = makeIndexer(resolver);
   const inputPath = resolver.resolveString("input");
   const input = inputPath ? await readJsonFile<Record<string, unknown>>(resolvePath(inputPath)) : undefined;
@@ -542,7 +544,8 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
 
 async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string, supportText: string): Promise<void> {
   const proposal = await resolveDealProposalByNumericIdOrThrow(resolver, proposalIdText);
-  const dealAddress = await resolveDealAddressForWrite(resolver);
+  const resolved = await resolveDealRecordOrThrow(resolver);
+  const dealAddress = resolved.dealAddress;
   const proposalId = BigInt(proposalIdText);
   const support = parseBoolText(supportText);
 
@@ -566,7 +569,8 @@ async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string,
 }
 
 async function cmdExecute(resolver: OptionResolver, proposalIdText: string): Promise<void> {
-  const dealAddress = await resolveDealAddressForWrite(resolver);
+  const resolved = await resolveDealRecordOrThrow(resolver);
+  const dealAddress = resolved.dealAddress;
   const proposalId = BigInt(proposalIdText);
 
   if (isDryRun(resolver)) {
@@ -619,19 +623,20 @@ async function cmdEvaluate(resolver: OptionResolver, evaluatorIdText?: string): 
 }
 
 async function cmdClaim(resolver: OptionResolver, evaluatorIdText?: string): Promise<void> {
-  const dealCell = await resolveDealCellAddressForStake(resolver);
+  const resolved = await resolveDealRecordOrThrow(resolver);
+  const dealCell = resolved.cellAddress;
   const evaluatorId = evaluatorIdText ? BigInt(evaluatorIdText) : (resolver.resolveBigInt("evaluator-id", 0n) ?? 0n);
 
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
     const transaction = ctx.txBuilder.claimMainToken({dealCell, evaluatorId});
-    printJson({action: "deal.claim", dryRun: true, dealCell, evaluatorId, transaction});
+    printJson({action: "deal.claim", dryRun: true, deal: resolved.dealAddress, dealCell, evaluatorId, transaction});
     return;
   }
 
   const {core, account} = await makeCoreContext(resolver);
   const txHash = await core.claimMainToken({dealCell, evaluatorId});
-  printJson({action: "deal.claim", caller: account.address, dealCell, evaluatorId, txHash});
+  printJson({action: "deal.claim", caller: account.address, deal: resolved.dealAddress, dealCell, evaluatorId, txHash});
 }
 
 async function cmdLegalMessage(resolver: OptionResolver, messageFile: string, dealNumericIdText?: string): Promise<void> {
@@ -690,7 +695,10 @@ async function cmdLegalMessage(resolver: OptionResolver, messageFile: string, de
 
 async function cmdWithdraw(resolver: OptionResolver, dealNumericIdText: string): Promise<void> {
   const {core, account} = await makeCoreContext(resolver);
-  const dealId = BigInt(dealNumericIdText);
+  let dealId: bigint;
+  try { dealId = BigInt(dealNumericIdText); } catch {
+    throw new Error(`Invalid deal numeric ID "${dealNumericIdText}". Provide a numeric value.`);
+  }
   const dacRecord = await resolveDacRecordOrThrow(resolver);
   const dac = dacRecord.address;
   if (!dacRecord.dealManagerAddress) {
@@ -776,11 +784,11 @@ export function registerDealCommands(program: Command, resolverFactory: (options
   });
 
   const stake = deal.command("stake <amount>").description("Stake AgentToken into a deal");
-  applyOptions(stake, ["cell-address", "dac-address", "dac", "deal-cell", "deal-id", "id", "deal-address", "address", "deal", "auto-delegate"]);
+  applyOptions(stake, ["cell-address", "dac-address", "dac", ...DEAL_SELECTOR_OPTIONS, "auto-delegate"]);
   addCommandHelp(stake, {
     requirements: [
-      {mode: "oneOf", options: ["cell-address", "dac-address"], label: "DAC selector"},
-      {mode: "oneOf", options: ["deal-cell", "deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
     ],
   });
   stake.action(async function handleStake(amount: string) {
@@ -789,10 +797,10 @@ export function registerDealCommands(program: Command, resolverFactory: (options
   });
 
   const invite = deal.command("invite <invitee>").description("Invite an agent to a deal's whitelist");
-  applyOptions(invite, ["deal-cell", "deal-id", "id", "deal-address", "address", "deal", "grant-invite-right"]);
+  applyOptions(invite, [...DEAL_SELECTOR_OPTIONS, "grant-invite-right"]);
   addCommandHelp(invite, {
     requirements: [
-      {mode: "oneOf", options: ["deal-cell", "deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
     ],
     notes: ["Caller must have invite rights (the deal proposer has this by default)."],
   });
@@ -802,10 +810,10 @@ export function registerDealCommands(program: Command, resolverFactory: (options
   });
 
   const unstake = deal.command("unstake").description("Unstake from a deal after permit/close rules are satisfied");
-  applyOptions(unstake, ["deal-cell", "deal-id", "id", "deal-address", "address", "deal"]);
+  applyOptions(unstake, [...DEAL_SELECTOR_OPTIONS]);
   addCommandHelp(unstake, {
     requirements: [
-      {mode: "oneOf", options: ["deal-cell", "deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
     ],
   });
   unstake.action(async function handleUnstake() {
@@ -814,10 +822,10 @@ export function registerDealCommands(program: Command, resolverFactory: (options
   });
 
   const delegate = deal.command("delegate").description("Delegate StakedAgent voting power");
-  applyOptions(delegate, ["stake-token", "deal-cell", "deal-id", "id", "deal-address", "address", "deal", "delegatee"]);
+  applyOptions(delegate, ["stake-token", ...DEAL_SELECTOR_OPTIONS, "delegatee"]);
   addCommandHelp(delegate, {
     requirements: [
-      {mode: "oneOf", options: ["stake-token", "deal-cell", "deal-id", "id", "deal-address", "address", "deal"], label: "Stake token or deal selector"},
+      {mode: "oneOf", options: ["stake-token", ...DEAL_SELECTOR_OPTIONS], label: "Stake token or deal selector"},
     ],
   });
   delegate.action(async function handleDelegate() {
@@ -826,10 +834,10 @@ export function registerDealCommands(program: Command, resolverFactory: (options
   });
 
   const request = deal.command("request <amount>").description("Request stake in active deal (AgentToken approve -> StakeRequested)");
-  applyOptions(request, ["cell-address", "dac-address", "dac", "deal-id", "id", "deal-address", "address", "deal"]);
+  applyOptions(request, ["cell-address", "dac-address", "dac", ...DEAL_SELECTOR_OPTIONS]);
   addCommandHelp(request, {
     requirements: [
-      {mode: "oneOf", options: ["deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
     ],
     notes: [
       "If DAC is omitted, CLI derives it from indexer deal metadata.",
@@ -844,11 +852,7 @@ export function registerDealCommands(program: Command, resolverFactory: (options
     .command("propose <proposalType> [args...]")
     .description("Create a deal governance proposal");
   applyOptions(propose, [
-    "deal-address",
-    "deal",
-    "deal-id",
-    "id",
-    "address",
+    ...DEAL_SELECTOR_OPTIONS,
     "input",
     "from-request",
     "cell-address",
@@ -859,7 +863,7 @@ export function registerDealCommands(program: Command, resolverFactory: (options
   ]);
   addCommandHelp(propose, {
     requirements: [
-      {mode: "oneOf", options: ["deal-address", "deal", "deal-id", "id", "address"], label: "Deal selector"},
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
     ],
     notes: [
       "`--input` can replace positional args for complex payloads.",
@@ -890,10 +894,10 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
 
   const vote = deal.command("vote").description("Vote deal proposals");
   const voteProposal = vote.command("proposal <proposalId> <support>").description("Vote for a deal proposal");
-  applyOptions(voteProposal, ["deal-address", "deal", "deal-id", "id", "address", "pre-vote-advance-seconds"]);
+  applyOptions(voteProposal, [...DEAL_SELECTOR_OPTIONS, "pre-vote-advance-seconds"]);
   addCommandHelp(voteProposal, {
     requirements: [
-      {mode: "oneOf", options: ["deal-address", "deal", "deal-id", "id", "address"], label: "Deal selector"},
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
     ],
   });
   voteProposal.action(async function handleVote(proposalId: string, support: string) {
@@ -902,10 +906,10 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
   });
 
   const execute = deal.command("execute <proposalId>").description("Execute a passed deal proposal");
-  applyOptions(execute, ["deal-address", "deal", "deal-id", "id", "address", "advance-seconds"]);
+  applyOptions(execute, [...DEAL_SELECTOR_OPTIONS, "advance-seconds"]);
   addCommandHelp(execute, {
     requirements: [
-      {mode: "oneOf", options: ["deal-address", "deal", "deal-id", "id", "address"], label: "Deal selector"},
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
     ],
   });
   execute.action(async function handleExecute(proposalId: string) {
@@ -914,10 +918,10 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
   });
 
   const evaluate = deal.command("evaluate [evaluatorId]").description("Evaluate a deal via DealManager.evaluateDeal");
-  applyOptions(evaluate, ["evaluator-id", "deal-id", "id", "deal-address", "address", "deal", "cell-address", "dac-address", "dac"]);
+  applyOptions(evaluate, ["evaluator-id", ...DEAL_SELECTOR_OPTIONS, "cell-address", "dac-address", "dac"]);
   addCommandHelp(evaluate, {
     requirements: [
-      {mode: "oneOf", options: ["deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
     ],
   });
   evaluate.action(async function handleEvaluate(evaluatorId: string | undefined) {
@@ -926,10 +930,10 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
   });
 
   const claim = deal.command("claim [evaluatorId]").description("Claim unlocked MainToken rewards from deal cell");
-  applyOptions(claim, ["evaluator-id", "deal-cell", "deal-id", "id", "deal-address", "address", "deal"]);
+  applyOptions(claim, ["evaluator-id", ...DEAL_SELECTOR_OPTIONS]);
   addCommandHelp(claim, {
     requirements: [
-      {mode: "oneOf", options: ["deal-cell", "deal-id", "id", "deal-address", "address", "deal"], label: "Deal selector"},
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
     ],
   });
   claim.action(async function handleClaim(evaluatorId: string | undefined) {
@@ -939,7 +943,7 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
 
   const legalMessage = deal.command("legal-message [dealNumericId] <messageFile>")
     .description("Send legal wrapper message via DealManager.legalWrapperMessage");
-  applyOptions(legalMessage, ["deal-id", "id", "deal-address", "address", "deal", "cell-address", "dac-address", "dac"]);
+  applyOptions(legalMessage, [...DEAL_SELECTOR_OPTIONS, "cell-address", "dac-address", "dac"]);
   addCommandHelp(legalMessage, {
     notes: [
       "If dealNumericId is not provided, CLI resolves deal id from deal selector options.",
