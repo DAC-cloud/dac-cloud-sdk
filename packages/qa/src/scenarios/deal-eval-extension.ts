@@ -161,5 +161,36 @@ export const dealEvalExtensionScenario: Scenario = {
 
       return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
     });
+
+    // ── Claim rewards after close ────────────────────────────────
+
+    await step(h, "claim-rewards", async () => {
+      const cli = await h.cli([
+        "deal", "claim",
+        "--deal", ctx.dealAddress,
+        "--config", h.config.configPath,
+        "--pretty-print",
+      ]);
+      assert.defined(cli.data.txHash, "claim tx hash");
+      return {cli, command: ["deal", "claim"]};
+    });
+
+    await h.syncIndexer();
+
+    // ── Verify claimed amount > 0 ────────────────────────────────
+
+    await step(h, "verify-claim", async () => {
+      const cli = await h.dealView("deal", ["--deal-address", ctx.dealAddress]);
+      const deal = cli.data.deal as Record<string, unknown> | undefined;
+      assert.defined(deal, "deal after claim");
+
+      if (deal) {
+        h.log(`After claim: allocated=${deal.totalRewardAllocatedAmount}, claimed=${deal.totalRewardClaimedAmount}`);
+        assert.equal(BigInt(deal.totalRewardAllocatedAmount as string) > 0n, true, "rewards allocated > 0");
+        assert.equal(BigInt(deal.totalRewardClaimedAmount as string) > 0n, true, "rewards claimed > 0");
+      }
+
+      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+    });
   },
 };

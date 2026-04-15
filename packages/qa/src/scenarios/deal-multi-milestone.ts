@@ -192,31 +192,73 @@ export const dealMultiMilestoneScenario: Scenario = {
       return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
     });
 
-    // ── Agent1 claims rewards ────────────────────────────────────
+    // ── All agents claim rewards independently ─────────────────────
 
-    await step(h, "agent1-claim-rewards", async () => {
-      const args = [
-        "deal", "claim",
-        "--deal-address", ctx.dealAddress,
-        "--config", h.config.configPath,
-        "--pretty-print",
-      ];
-      const cli = await h.cliAs("agent1", args);
+    const claimArgs = ["deal", "claim", "--deal-address", ctx.dealAddress, "--config", h.config.configPath, "--pretty-print"];
+
+    await step(h, "founder-claim", async () => {
+      const cli = await h.cli(claimArgs);
+      assert.defined(cli.data.txHash, "founder claim tx hash");
+      return {cli, command: ["deal", "claim"]};
+    });
+
+    await step(h, "agent1-claim", async () => {
+      const cli = await h.cliAs("agent1", claimArgs);
       assert.defined(cli.data.txHash, "agent1 claim tx hash");
-      return {cli, command: ["dac [as agent1]", ...args]};
+      return {cli, command: ["deal", "claim (agent1)"]};
+    });
+
+    await step(h, "agent2-claim", async () => {
+      const cli = await h.cliAs("agent2", claimArgs);
+      assert.defined(cli.data.txHash, "agent2 claim tx hash");
+      return {cli, command: ["deal", "claim (agent2)"]};
     });
 
     await h.syncIndexer();
 
-    // ── Verify rewards distributed ───────────────────────────────
+    // ── Verify proportional rewards via agent positions ───────────
+    // Stake ratio: founder=10k/21k≈47.6%, agent1=8k/21k≈38.1%, agent2=3k/21k≈14.3%
 
-    await step(h, "verify-rewards", async () => {
+    await step(h, "verify-proportional-rewards", async () => {
+      const cli = await h.dealView("positions", ["--deal-address", ctx.dealAddress]);
+      const positions = cli.data.positions as Array<Record<string, unknown>> | undefined;
+      assert.defined(positions, "agent positions");
+      assert.equal(positions?.length ?? 0, 3, "three agent positions");
+
+      if (positions) {
+        const claims = positions.map((p) => ({
+          account: p.accountId,
+          staked: BigInt(p.totalStakedAmount as string),
+          claimed: BigInt(p.totalClaimedMainTokenAmount as string),
+        }));
+
+        for (const c of claims) {
+          h.log(`Position ${c.account}: staked=${c.staked}, claimed=${c.claimed}`);
+          assert.equal(c.claimed > 0n, true, `agent ${c.account} claimed > 0`);
+        }
+
+        // Verify ordering: largest staker gets most rewards
+        claims.sort((a, b) => (b.claimed > a.claimed ? 1 : b.claimed < a.claimed ? -1 : 0));
+        assert.equal(claims[0].staked > claims[1].staked, true, "top claimer had highest stake");
+      }
+
+      return {cli, command: ["deal", "view", "positions"], indexerSnapshot: {positions} as Record<string, unknown>};
+    });
+
+    // ── Verify total deal reward state ────────────────────────────
+
+    await step(h, "verify-total-rewards", async () => {
       const cli = await h.dealView("deal", ["--deal-address", ctx.dealAddress]);
       const deal = cli.data.deal as Record<string, unknown> | undefined;
-      assert.defined(deal, "deal after claims");
+      assert.defined(deal, "deal after all claims");
 
       if (deal) {
-        h.log(`Rewards: allocated=${deal.totalRewardAllocatedAmount}, claimed=${deal.totalRewardClaimedAmount}`);
+        const allocated = BigInt(deal.totalRewardAllocatedAmount as string);
+        const claimed = BigInt(deal.totalRewardClaimedAmount as string);
+        h.log(`Total rewards: allocated=${allocated}, claimed=${claimed}`);
+        assert.equal(allocated > 0n, true, "rewards allocated > 0");
+        assert.equal(claimed > 0n, true, "rewards claimed > 0");
+        assert.equal(claimed <= allocated, true, "claimed <= allocated");
       }
 
       return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};

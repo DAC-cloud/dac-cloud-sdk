@@ -124,10 +124,28 @@ export const dealEvalFullRewardScenario: Scenario = {
       assert.defined(deal, "deal in indexer after claim");
 
       if (deal) {
-        h.log(`After claim: rewardsAllocated=${deal.rewardsAllocated}`);
+        h.log(`After claim: allocated=${deal.totalRewardAllocatedAmount}, claimed=${deal.totalRewardClaimedAmount}`);
+        assert.equal(BigInt(deal.totalRewardAllocatedAmount as string) > 0n, true, "rewards allocated > 0");
+        assert.equal(BigInt(deal.totalRewardClaimedAmount as string) > 0n, true, "rewards claimed > 0");
       }
 
       return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+    });
+
+    // ── Verify agent position shows claimed rewards ──────────────
+
+    await step(h, "verify-agent-position-after-claim", async () => {
+      const cli = await h.dealView("positions", ["--deal-address", ctx.dealAddress]);
+      const positions = cli.data.positions as Array<Record<string, unknown>> | undefined;
+      assert.defined(positions, "agent positions");
+
+      if (positions && positions.length > 0) {
+        const pos = positions[0];
+        h.log(`Agent position: claimed=${pos.totalClaimedMainTokenAmount}`);
+        assert.equal(BigInt(pos.totalClaimedMainTokenAmount as string) > 0n, true, "agent claimed main tokens > 0");
+      }
+
+      return {cli, command: ["deal", "view", "positions"], indexerSnapshot: {positions} as Record<string, unknown>};
     });
   },
 };

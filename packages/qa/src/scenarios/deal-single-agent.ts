@@ -1,12 +1,14 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {getChainTimestamp, setupNativeDacWithDeal} from "./fixtures/index.js";
+import {getChainTimestamp, proposeVoteExecute, setupNativeDacWithDeal} from "./fixtures/index.js";
 
 /**
  * Scenario: Single-Agent Deal — Full Slash
  *
  * Creates a deal with rewardCurve=[0] penaltyCurve=[1e18].
  * At 0 progress, evaluation produces a 100% slash → all stake burned → auto-close.
+ * After full slash: no unstake possible (tokens burned), so DAC recovers the deal
+ * via governance → liquidator assigned → forceReturnCapital.
  */
 export const dealSingleAgentScenario: Scenario = {
   name: "deal-single-agent-lifecycle",
@@ -55,7 +57,7 @@ export const dealSingleAgentScenario: Scenario = {
 
     await h.syncIndexer();
 
-    // ── Verify deal closed after full slash ───────────────────────
+    // ── Verify deal closed + slash amounts ─────────────────────────
 
     await step(h, "verify-deal-closed", async () => {
       const cli = await h.dealView("deal", ["--deal-address", ctx.dealAddress]);
@@ -63,7 +65,66 @@ export const dealSingleAgentScenario: Scenario = {
       assert.defined(deal, "deal in indexer after evaluation");
       if (deal) {
         assert.equal(deal.closed, true, "deal closed after full slash");
+        assert.equal(deal.currentStakedAmount, "0", "all stake slashed");
+        assert.equal(deal.totalSlashedStakeAmount, "10000000000000000000000", "total slashed = original stake");
       }
+      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+    });
+
+    // ── Verify agent position shows slash ────────────────────────
+    // After full slash, all stake is burned — agents cannot unstake (NoStake).
+
+    await step(h, "verify-agent-position", async () => {
+      const cli = await h.dealView("positions", ["--deal-address", ctx.dealAddress]);
+      const positions = cli.data.positions as Array<Record<string, unknown>> | undefined;
+      assert.defined(positions, "agent positions in indexer");
+      assert.gte(positions?.length ?? 0, 1, "at least 1 agent position");
+
+      if (positions && positions.length > 0) {
+        const pos = positions[0];
+        h.log(`Agent position: staked=${pos.currentStakedAmount}, slashed=${pos.totalSlashedAmount}, released=${pos.totalReleasedAmount}`);
+        assert.equal(pos.currentStakedAmount, "0", "position stake is 0");
+        assert.equal(BigInt(pos.totalSlashedAmount as string) > 0n, true, "slashed amount > 0");
+      }
+
+      return {cli, command: ["deal", "view", "positions"], indexerSnapshot: {positions} as Record<string, unknown>};
+    });
+
+    // ── DAC recovers the slashed deal ────────────────────────────
+    // After full slash (totalSupply=0), the deal is recoverable.
+    // DAC governance assigns a liquidator who can then return capital.
+
+    h.log("Recovering slashed deal via DAC governance...");
+
+    await step(h, "recover-deal", async () => {
+      const proposalId = await proposeVoteExecute(h, ctx.dacAddress, [
+        "propose", "recover-deal",
+        ctx.dealNumericId,           // dealId
+        ctx.founderAddress,          // liquidator = founder
+        "1000000000000000000000",    // liquidatorStake (1k — minted directly, no AgentToken needed)
+      ]);
+      assert.defined(proposalId, "recover proposal id");
+      return {
+        cli: {data: {action: "recover-deal", proposalId}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["dac", "propose", "recover-deal"],
+      };
+    });
+
+    await h.syncIndexer();
+
+    // ── Verify deal marked as recovered ──────────────────────────
+
+    await step(h, "verify-deal-recovered", async () => {
+      const cli = await h.dealView("deal", ["--deal-address", ctx.dealAddress]);
+      const deal = cli.data.deal as Record<string, unknown> | undefined;
+      assert.defined(deal, "deal after recovery");
+
+      if (deal) {
+        h.log(`After recovery: closed=${deal.closed}, recovered=${deal.recovered}`);
+        assert.equal(deal.closed, true, "deal still closed");
+        assert.equal(deal.recovered, true, "deal marked as recovered");
+      }
+
       return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
     });
 

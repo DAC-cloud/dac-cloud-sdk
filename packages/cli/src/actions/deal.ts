@@ -721,7 +721,7 @@ async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: stri
   const client = makeIndexer(resolver);
   const page = resolvePage(resolver);
 
-  const resource = z.enum(["deal", "proposal", "proposals", "treasury-actions"]).catch("deal").parse(resourceRaw ?? "deal");
+  const resource = z.enum(["deal", "proposal", "proposals", "positions", "treasury-actions"]).catch("deal").parse(resourceRaw ?? "deal");
 
   if (resource === "deal") {
     const dealId = id ?? resolver.resolveString(["deal-id", "id"]);
@@ -754,6 +754,13 @@ async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: stri
     const dealId = await resolveDealIdOrThrow(resolver);
     const proposals = await client.proposals.listByDeal(dealId, page);
     printJson({action: "deal.view.proposals", dealId, count: proposals.length, proposals});
+    return;
+  }
+
+  if (resource === "positions") {
+    const dealId = await resolveDealIdOrThrow(resolver);
+    const positions = await client.deals.listAgentPositions(dealId, page);
+    printJson({action: "deal.view.positions", dealId, count: positions.length, positions});
     return;
   }
 

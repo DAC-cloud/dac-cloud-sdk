@@ -84,7 +84,7 @@ export const dealEvalPartialRewardScenario: Scenario = {
 
     await h.syncIndexer();
 
-    // ── Verify deal state ────────────────────────────────────────
+    // ── Verify deal state: both reward and slash occurred ──────────
 
     await step(h, "verify-deal-after-eval", async () => {
       const cli = await h.dealView("deal", ["--deal-address", ctx.dealAddress]);
@@ -92,11 +92,41 @@ export const dealEvalPartialRewardScenario: Scenario = {
       assert.defined(deal, "deal in indexer after partial evaluation");
 
       if (deal) {
-        // With 50% progress and linear penalty curve: 50% slash.
-        // After 50% slash, some tokens remain → deal stays open (not auto-closed)
-        // OR if the slash reduces totalSupply to 0, deal auto-closes
-        // Either way is valid — log the state
-        h.log(`Deal after eval: active=${deal.active}, closed=${deal.closed}, stakerCount=${deal.stakerCount}`);
+        h.log(`Deal after eval: active=${deal.active}, closed=${deal.closed}, stakerCount=${deal.stakerCount}, slashed=${deal.totalSlashedStakeAmount}, rewarded=${deal.totalRewardAllocatedAmount}`);
+        // Partial reward → some rewards allocated
+        assert.equal(BigInt(deal.totalRewardAllocatedAmount as string) > 0n, true, "partial rewards allocated > 0");
+        // Partial slash → some stake slashed
+        assert.equal(BigInt(deal.totalSlashedStakeAmount as string) > 0n, true, "partial slash > 0");
+      }
+
+      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+    });
+
+    // ── Claim rewards from partial evaluation ────────────────────
+
+    await step(h, "claim-partial-rewards", async () => {
+      const cli = await h.cli([
+        "deal", "claim",
+        "--deal", ctx.dealAddress,
+        "--config", h.config.configPath,
+        "--pretty-print",
+      ]);
+      assert.defined(cli.data.txHash, "claim tx hash");
+      return {cli, command: ["deal", "claim"]};
+    });
+
+    await h.syncIndexer();
+
+    // ── Verify claim amounts ─────────────────────────────────────
+
+    await step(h, "verify-claim-amounts", async () => {
+      const cli = await h.dealView("deal", ["--deal-address", ctx.dealAddress]);
+      const deal = cli.data.deal as Record<string, unknown> | undefined;
+      assert.defined(deal, "deal after claim");
+
+      if (deal) {
+        h.log(`After claim: allocated=${deal.totalRewardAllocatedAmount}, claimed=${deal.totalRewardClaimedAmount}`);
+        assert.equal(BigInt(deal.totalRewardClaimedAmount as string) > 0n, true, "claimed rewards > 0");
       }
 
       return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
