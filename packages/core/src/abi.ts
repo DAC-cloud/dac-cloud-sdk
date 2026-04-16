@@ -3,7 +3,7 @@ import {commonErrorSignatures} from "./errors";
 
 export const dacFactoryAbi = parseAbi([
   ...commonErrorSignatures,
-  "event DACDeployed(address indexed dac, address mainToken, address agentToken, bool init)",
+  "event DACDeployed(address indexed dac, bytes32 indexed salt, address mainToken, address agentToken, bool init)",
   "event ExistingTokenDACDeployed(address indexed dac, address indexed underlyingToken, address indexed wrappedToken, address governanceOracle, address agentToken, address assetController, address creator, uint256 treasurySeedAmount)",
   "function deployDAC((string symbol,string name,string description,uint256 mainTokenMaxSupply,uint256 defaultQuorum,address founder,uint256 founderAllocation,address treasuryToken,uint256 founderCommitment,bool dividendsEnabled) config, bytes32 salt, address deferBirthRole) returns (address dacAddr, address mainTokenAddr, address agentTokenAddr)",
   "function deployExistingTokenDAC(bytes encodedConfig, bytes32 salt) returns (address dacAddr, address wrappedMainTokenAddr, address agentTokenAddr)",
@@ -160,5 +160,6 @@ export const dealAbi = parseAbi([
   "event ChildVoteCasted(uint256 indexed childProposalId, bool support)",
   "function createStakedAgentProposal((bytes4 typ,address target,bytes32 i,bytes data) params) returns (uint256 proposalId)",
   "function executeStakedAgentProposal(uint256 proposalId)",
-  "function getProposal(uint256 proposalId) view returns (address)"
+  "function getProposal(uint256 proposalId) view returns (address)",
+  "function claimDealRewardPool(uint256 evaluatorId)"
 ]);

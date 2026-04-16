@@ -26,6 +26,7 @@ import {
   wrappedMainTokenAbi,
 } from "./abi";
 import {encodeExistingTokenConfig} from "./encoding";
+import {resolveSalt} from "./salt";
 import type {
   CapitalCall,
   DACConfig,
@@ -45,6 +46,7 @@ export interface DacCoreOptions {
 
 export interface DeployDacResult {
   txHash: Hex;
+  salt: Hex;
   dac?: Address;
   mainToken?: Address;
   agentToken?: Address;
@@ -52,6 +54,7 @@ export interface DeployDacResult {
 
 export interface DeployExistingTokenDacResult {
   txHash: Hex;
+  salt: Hex;
   dac?: Address;
   mainToken?: Address;
   wrappedMainToken?: Address;
@@ -65,8 +68,8 @@ export interface DeployExistingTokenDacResult {
 export interface DacCoreClient {
   walletClient?: WalletClient;
   protocol: ProtocolManifest;
-  deployDac(args: {config: DACConfig; salt: Hex; deferBirthRole?: Address}): Promise<DeployDacResult>;
-  deployExistingTokenDac(args: {config: ExistingTokenDacConfig; salt: Hex}): Promise<DeployExistingTokenDacResult>;
+  deployDac(args: {config: DACConfig; salt?: Hex; referralUid?: string; deferBirthRole?: Address}): Promise<DeployDacResult>;
+  deployExistingTokenDac(args: {config: ExistingTokenDacConfig; salt?: Hex; referralUid?: string}): Promise<DeployExistingTokenDacResult>;
   deployGovernanceOracle(args: {admin: Address; initialPublisher: Address}): Promise<{txHash: Hex; oracleAddress?: Address}>;
   wrapMainToken(args: {wrappedToken: Address; amount: bigint}): Promise<Hex>;
   wrapMainTokenTo(args: {wrappedToken: Address; recipient: Address; amount: bigint}): Promise<Hex>;
@@ -91,6 +94,7 @@ export interface DacCoreClient {
   claimMainToken(args: {dealCell: Address; evaluatorId: bigint}): Promise<Hex>;
   createDealManagementProposal(args: {dealAddress: Address; params: ProposalParams}): Promise<{txHash: Hex; proposalId?: bigint; proposalAddress?: Address}>;
   executeDealProposal(args: {dealAddress: Address; proposalId: bigint}): Promise<Hex>;
+  claimDealRewardPool(args: {dealAddress: Address; evaluatorId: bigint}): Promise<Hex>;
   executeDealProposalDetailed(args: {dealAddress: Address; proposalId: bigint}): Promise<{txHash: Hex; dacProposalId?: bigint; trancheId?: bigint; childProposalId?: bigint; childVoteProposalId?: bigint}>;
   evaluateDeal(args: {dealManager: Address; dealId: bigint; evaluatorId: bigint}): Promise<Hex>;
   forceReturnCapital(args: {dealManager: Address; dealId: bigint}): Promise<Hex>;
@@ -127,16 +131,18 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
     walletClient,
     protocol: options.protocol,
 
-    async deployDac({config, salt, deferBirthRole}) {
+    async deployDac({config, salt, referralUid, deferBirthRole}) {
       if (!walletClient || !walletClient.account) {
         throw new Error("Wallet client with account is required for deployDac");
       }
+
+      const resolvedSalt = resolveSalt({salt, referralUid});
 
       const txHash = await walletClient.writeContract({
         address: options.protocol.dacFactory,
         abi: dacFactoryAbi,
         functionName: "deployDAC",
-        args: [config, salt, deferBirthRole ?? ZERO_ADDRESS],
+        args: [config, resolvedSalt, deferBirthRole ?? ZERO_ADDRESS],
         account: walletClient.account,
       });
 
@@ -164,19 +170,21 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         }
       }
 
-      return {txHash, dac, mainToken, agentToken};
+      return {txHash, salt: resolvedSalt, dac, mainToken, agentToken};
     },
 
-    async deployExistingTokenDac({config, salt}) {
+    async deployExistingTokenDac({config, salt, referralUid}) {
       if (!walletClient || !walletClient.account) {
         throw new Error("Wallet client with account is required for deployExistingTokenDac");
       }
+
+      const resolvedSalt = resolveSalt({salt, referralUid});
 
       const txHash = await walletClient.writeContract({
         address: options.protocol.dacFactory,
         abi: dacFactoryAbi,
         functionName: "deployExistingTokenDAC",
-        args: [encodeExistingTokenConfig(config), salt],
+        args: [encodeExistingTokenConfig(config), resolvedSalt],
         account: walletClient.account,
       });
 
@@ -223,6 +231,7 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
 
       return {
         txHash,
+        salt: resolvedSalt,
         dac,
         mainToken,
         wrappedMainToken,
@@ -701,6 +710,20 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       }
 
       return {txHash, dacProposalId, trancheId, childProposalId, childVoteProposalId};
+    },
+
+    async claimDealRewardPool({dealAddress, evaluatorId}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for claimDealRewardPool");
+      }
+
+      return walletClient.writeContract({
+        address: dealAddress,
+        abi: dealAbi,
+        functionName: "claimDealRewardPool",
+        args: [evaluatorId],
+        account: walletClient.account,
+      });
     },
 
     async evaluateDeal({dealManager, dealId, evaluatorId}) {

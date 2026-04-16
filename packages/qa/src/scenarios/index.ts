@@ -10,6 +10,7 @@ import {dealUnstakeAfterCloseScenario} from "./deal-unstake-after-close.js";
 import {dealMultiMilestoneScenario} from "./deal-multi-milestone.js";
 import {dealVetoScenario} from "./deal-veto.js";
 import {dealApproveExpiredScenario} from "./deal-approve-expired.js";
+import {dealRawModuleScenario} from "./deal-raw-module.js";
 
 export const ALL_SCENARIOS: Scenario[] = [
   existingTokenDacScenario,
@@ -23,6 +24,7 @@ export const ALL_SCENARIOS: Scenario[] = [
   dealMultiMilestoneScenario,
   dealVetoScenario,
   dealApproveExpiredScenario,
+  dealRawModuleScenario,
 ];
 
 export {
@@ -37,4 +39,5 @@ export {
   dealMultiMilestoneScenario,
   dealVetoScenario,
   dealApproveExpiredScenario,
+  dealRawModuleScenario,
 };

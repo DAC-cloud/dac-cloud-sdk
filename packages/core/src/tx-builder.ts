@@ -1,5 +1,6 @@
 import {encodeFunctionData, type Address, type Hex} from "viem";
 import type {ProtocolManifest} from "@dac-cloud/manifests";
+import {resolveSalt} from "./salt";
 import {
   agentTokenAbi,
   dacFactoryAbi,
@@ -33,8 +34,8 @@ export interface DacTxBuilderOptions {
 }
 
 export interface DacTransactionBuilder {
-  deployDac(args: {config: DACConfig; salt: Hex; deferBirthRole?: Address}): TransactionRequest;
-  deployExistingTokenDac(args: {config: ExistingTokenDacConfig; salt: Hex}): TransactionRequest;
+  deployDac(args: {config: DACConfig; salt?: Hex; referralUid?: string; deferBirthRole?: Address}): TransactionRequest;
+  deployExistingTokenDac(args: {config: ExistingTokenDacConfig; salt?: Hex; referralUid?: string}): TransactionRequest;
   deployGovernanceOracle(args: {admin: Address; initialPublisher: Address}): TransactionRequest;
   wrapMainToken(args: {wrappedToken: Address; amount: bigint}): TransactionRequest;
   wrapMainTokenTo(args: {wrappedToken: Address; recipient: Address; amount: bigint}): TransactionRequest;
@@ -59,6 +60,7 @@ export interface DacTransactionBuilder {
   claimMainToken(args: {dealCell: Address; evaluatorId: bigint}): TransactionRequest;
   createDealManagementProposal(args: {dealAddress: Address; params: ProposalParams}): TransactionRequest;
   executeDealProposal(args: {dealAddress: Address; proposalId: bigint}): TransactionRequest;
+  claimDealRewardPool(args: {dealAddress: Address; evaluatorId: bigint}): TransactionRequest;
   evaluateDeal(args: {dealManager: Address; dealId: bigint; evaluatorId: bigint}): TransactionRequest;
   forceReturnCapital(args: {dealManager: Address; dealId: bigint}): TransactionRequest;
   sendDacLegalWrapperMessage(args: {dacCell: Address; kind: Hex; message: Hex}): TransactionRequest;
@@ -85,12 +87,14 @@ export function createDacTransactionBuilder(options: DacTxBuilderOptions): DacTr
   }
 
   return {
-    deployDac({config, salt, deferBirthRole}) {
-      return tx(protocol.dacFactory, dacFactoryAbi, "deployDAC", [config, salt, deferBirthRole ?? ZERO_ADDRESS]);
+    deployDac({config, salt, referralUid, deferBirthRole}) {
+      const resolvedSalt = resolveSalt({salt, referralUid});
+      return tx(protocol.dacFactory, dacFactoryAbi, "deployDAC", [config, resolvedSalt, deferBirthRole ?? ZERO_ADDRESS]);
     },
 
-    deployExistingTokenDac({config, salt}) {
-      return tx(protocol.dacFactory, dacFactoryAbi, "deployExistingTokenDAC", [encodeExistingTokenConfig(config), salt]);
+    deployExistingTokenDac({config, salt, referralUid}) {
+      const resolvedSalt = resolveSalt({salt, referralUid});
+      return tx(protocol.dacFactory, dacFactoryAbi, "deployExistingTokenDAC", [encodeExistingTokenConfig(config), resolvedSalt]);
     },
 
     deployGovernanceOracle({admin, initialPublisher}) {
@@ -187,6 +191,10 @@ export function createDacTransactionBuilder(options: DacTxBuilderOptions): DacTr
 
     executeDealProposal({dealAddress, proposalId}) {
       return tx(dealAddress, dealAbi, "executeStakedAgentProposal", [proposalId]);
+    },
+
+    claimDealRewardPool({dealAddress, evaluatorId}) {
+      return tx(dealAddress, dealAbi, "claimDealRewardPool", [evaluatorId]);
     },
 
     evaluateDeal({dealManager, dealId, evaluatorId}) {

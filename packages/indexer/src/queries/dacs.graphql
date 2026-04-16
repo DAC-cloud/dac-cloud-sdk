@@ -52,6 +52,7 @@ fragment DacViewFields on Dac {
   mainTokenHolderCount
   releasedMainTokenAmount
   mainTokenObligations
+  salt
   createdBlockNumber
   createdBlockTimestamp
   createdTransactionHash

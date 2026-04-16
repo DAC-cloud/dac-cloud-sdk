@@ -37,6 +37,7 @@ const OPTION_SPECS = {
   "oracle-primary-enabled": {flags: "--oracle-primary-enabled", description: "Enable oracle-primary voting path (requires --governance-oracle, default: off)"},
   "dividends-enabled": {flags: "--dividends-enabled", description: "Enable dividends at DAC creation"},
   "defer-birth-role": {flags: "--defer-birth-role <address>", description: "Optional defer birth role address"},
+  "referral-uid": {flags: "--referral-uid <string>", description: "Referral campaign UID (salt = keccak256(referral-uid)); random salt if omitted"},
 
   "dac-id": {flags: "--dac-id <id>", description: "DAC id in indexer"},
   "cell-address": {flags: "--cell-address <address>", description: "DACCell address"},

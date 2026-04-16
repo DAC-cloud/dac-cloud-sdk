@@ -1,4 +1,3 @@
-import {randomBytes} from "node:crypto";
 import {resolve as resolvePath} from "node:path";
 import {
   DAC_PROPOSAL_TYPE,
@@ -16,6 +15,7 @@ import {
   buildUpdateGovernanceOracleProposal,
   buildUpdateGovernanceStrategyProposal,
   normalizePercentInput,
+  resolveSalt,
   type CapitalCall,
   type DACConfig,
   type ExistingTokenDacConfig,
@@ -78,11 +78,8 @@ const DAC_PROPOSAL_TYPES = [
   "add-evaluator",
 ] as const;
 
-function bytes32Random(): Hex {
-  return `0x${randomBytes(32).toString("hex")}` as Hex;
-}
-
-function proposalTypeFromText(text: string) {
+function proposalTypeFromText(text: string): string {
+  if (text.startsWith("0x")) return text;
   return z.enum(DAC_PROPOSAL_TYPES).parse(text);
 }
 
@@ -130,6 +127,7 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
   const defaultQuorum = resolvePercent(resolver, "default-quorum", 50);
   const dividendsEnabled = resolver.resolveBoolean("dividends-enabled", false);
   const deferBirthRole = resolver.resolveString("defer-birth-role") as Address | undefined;
+  const referralUid = resolver.resolveString("referral-uid") ?? undefined;
 
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
@@ -137,9 +135,10 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
       symbol: symbol.slice(0, 8), name, description, mainTokenMaxSupply, defaultQuorum,
       founder: ctx.fromAddress, founderAllocation, treasuryToken, founderCommitment, dividendsEnabled,
     };
-    const transaction = ctx.txBuilder.deployDac({config, salt: bytes32Random(), deferBirthRole});
+    const salt = resolveSalt({referralUid});
+    const transaction = ctx.txBuilder.deployDac({config, salt, deferBirthRole});
     printJson({
-      action: "dac.create", dryRun: true, transaction,
+      action: "dac.create", dryRun: true, transaction, salt, referralUid,
       note: "After confirming, use the DACDeployed event to get mainToken address for delegation.",
     });
     return;
@@ -151,7 +150,7 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
     founder: account.address, founderAllocation, treasuryToken, founderCommitment, dividendsEnabled,
   };
 
-  const result = await core.deployDac({config, salt: bytes32Random(), deferBirthRole});
+  const result = await core.deployDac({config, referralUid, deferBirthRole});
 
   const autoDelegate = resolver.resolveBoolean("auto-delegate", false);
   let delegateTx: Hex | undefined;
@@ -163,6 +162,8 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
     action: "dac.create",
     creator: account.address,
     txHash: result.txHash,
+    salt: result.salt,
+    referralUid,
     dac: result.dac,
     mainToken: result.mainToken,
     agentToken: result.agentToken,
@@ -183,6 +184,7 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
     "--treasury-seed-amount is required for dac create-existing-token",
   );
   const dividendsEnabled = resolver.resolveBoolean("dividends-enabled", false);
+  const referralUid = resolver.resolveString("referral-uid") ?? undefined;
   const governanceStrategy: GovernanceStrategyConfig = {
     quorumPercent: resolvePercent(resolver, "quorum-percent", 50),
     highQuorumPercent: resolvePercent(resolver, "high-quorum-percent", 75),
@@ -226,9 +228,10 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
     if (resolver.resolveBoolean("auto-approve", false) && treasurySeedAmount > 0n) {
       transactions.push(ctx.txBuilder.approveErc20({token: underlyingToken, spender: ctx.protocol.dacFactory, amount: treasurySeedAmount}));
     }
-    transactions.push(ctx.txBuilder.deployExistingTokenDac({config, salt: bytes32Random()}));
+    const salt = resolveSalt({referralUid});
+    transactions.push(ctx.txBuilder.deployExistingTokenDac({config, salt}));
     printJson({
-      action: "dac.create.existing-token", dryRun: true, transactions, governanceStrategy,
+      action: "dac.create.existing-token", dryRun: true, transactions, salt, referralUid, governanceStrategy,
       note: "After confirming, use ExistingTokenDACDeployed event for deployed addresses.",
     });
     return;
@@ -246,7 +249,7 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
     }
   }
 
-  const result = await core.deployExistingTokenDac({config, salt: bytes32Random()});
+  const result = await core.deployExistingTokenDac({config, referralUid});
 
   const autoDelegate = resolver.resolveBoolean("auto-delegate", false);
   let delegateTx: Hex | undefined;
@@ -259,6 +262,8 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
     creator: account.address,
     approveTx,
     txHash: result.txHash,
+    salt: result.salt,
+    referralUid,
     dac: result.dac,
     mainToken: result.mainToken,
     wrappedMainToken: result.wrappedMainToken,
@@ -621,7 +626,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     const dealId = args[0] !== undefined ? BigInt(args[0]) : readBigIntField(input, "dealId", "--input");
     const dealProposalId = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "dealProposalId", "--input");
     params = buildChallengeDealProposal(dealId, dealProposalId);
-  } else {
+  } else if (proposalType === "add-evaluator") {
     if (args.length !== 4 && !input) {
       throw new Error("dac propose add-evaluator requires <dealId> <evaluatorModuleFactory> <evaluatorSelector> <evaluatorConfig> or --input json");
     }
@@ -646,6 +651,23 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
         [dealId, evaluatorModuleFactory, evaluatorConfig],
       ),
     };
+  } else if (proposalType.startsWith("0x")) {
+    const typ = asBytes4(proposalType, "raw proposal type") as Hex;
+    if (!input) {
+      throw new Error("Raw DAC proposal type requires --input JSON with {target, i, data}.");
+    }
+    params = {
+      typ,
+      target: asAddress(readStringField(input, "target", "--input"), "target"),
+      i: asBytes32(readStringField(input, "i", "--input"), "i"),
+      data: z.string().regex(/^0x[0-9a-fA-F]*$/).parse(readStringField(input, "data", "--input")) as Hex,
+    };
+  } else {
+    throw new Error(
+      `Unsupported DAC proposal type '${proposalTypeRaw}'. `
+      + `Supported types: ${DAC_PROPOSAL_TYPES.join(", ")}. `
+      + `Or use a raw 0x bytes4 selector with --input JSON.`,
+    );
   }
 
   if (isDryRun(resolver)) {
@@ -1349,6 +1371,7 @@ export function registerDacCommands(program: Command, resolverFactory: (options:
     "default-quorum",
     "dividends-enabled",
     "defer-birth-role",
+    "referral-uid",
     "auto-delegate",
   ]);
   addCommandHelp(create, {
@@ -1357,9 +1380,11 @@ export function registerDacCommands(program: Command, resolverFactory: (options:
     ],
     notes: [
       "This command deploys the native DAC mode. Use `dac create-existing-token` for wrapping an existing ERC-20 into DAC governance.",
+      "Pass --referral-uid to derive a deterministic salt for referral tracking; otherwise a random salt is used.",
     ],
     examples: [
       "dac create --name \"Ops DAC\" --description \"Operations\" --treasury-token 0x... --commitment 1000 --allocation 1000000",
+      "dac create --name \"Ops DAC\" --description \"Operations\" --treasury-token 0x... --commitment 1000 --allocation 1000000 --referral-uid campaign-42",
     ],
   });
   create.action(async function handleCreate() {
@@ -1388,6 +1413,7 @@ export function registerDacCommands(program: Command, resolverFactory: (options:
     "blocking-on-all-proposals",
     "blocking-on-high-quorum",
     "oracle-primary-enabled",
+    "referral-uid",
     "auto-approve",
     "auto-delegate",
   ]);
@@ -1399,6 +1425,7 @@ export function registerDacCommands(program: Command, resolverFactory: (options:
       "Governance strategy flags are optional; CLI applies protocol-aligned defaults for quorum, timing, and hybrid oracle fallback windows.",
       "Default mode is wrapped-only bootstrap (no oracle). Pass --oracle-primary-enabled --governance-oracle 0x... to enable oracle-primary voting.",
       "Oracle deployment is managed separately from this CLI. Provide an existing governance oracle address.",
+      "Pass --referral-uid to derive a deterministic salt for referral tracking; otherwise a random salt is used.",
     ],
     examples: [
       "dac create-existing-token --name \"Bootstrap\" --underlying-token 0x... --treasury-seed-amount 1000000",
@@ -1441,6 +1468,9 @@ Examples:
   dac propose mint-agent-tokens <amount> <agent>
   dac propose capital-call <recipient> <treasuryToken> <tokenAmount> <cashAmount>
   dac propose update-voting-config --input ./vote-config.json
+
+Raw proposal (3rd party modules):
+  dac propose 0x<bytes4> --input raw.json   (json: {target, i, data})
 `);
   propose.action(async function handlePropose(proposalType: string, args: string[]) {
       const resolver = await resolverFactory(this.optsWithGlobals());

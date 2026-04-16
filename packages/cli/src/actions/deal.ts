@@ -14,6 +14,7 @@ import {z} from "zod";
 import {
   asAddress,
   asBytes4,
+  asBytes32,
   dacAddressFromCompositeId,
   parseBoolText,
   resolveDacRecordOrThrow,
@@ -133,13 +134,18 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
   const dealConfig = dealKind.encodeConfig(parsed.dealConfig);
   const evaluatorConfig = evaluator.encodeConfig(parsed.evaluatorConfig);
 
+  if (evaluator.moduleId === "custom" && !parsed.evaluatorModuleFactory) {
+    throw new Error("'evaluatorModuleFactory' is required in deal JSON for custom evaluator kinds.");
+  }
+
   function buildDealParams(protocol: {coreModuleFactory: unknown; coreDealGovernanceFactory?: unknown}, proposerAddress: string): DealParams {
-    const defaultCoreGovernanceFactory = typeof protocol.coreDealGovernanceFactory === "string"
-      ? protocol.coreDealGovernanceFactory : undefined;
-    const moduleFactory = parsed.moduleFactory ?? dealKind.defaultModuleFactory?.(protocol as never) ?? String(protocol.coreModuleFactory);
-    const governanceFactory = parsed.governanceFactory ?? dealKind.defaultGovernanceFactory?.(protocol as never) ?? defaultCoreGovernanceFactory;
+    const moduleFactory = parsed.moduleFactory ?? dealKind.defaultModuleFactory?.(protocol as never);
+    if (!moduleFactory) {
+      throw new Error("'moduleFactory' is required in deal JSON for custom deal kinds.");
+    }
+    const governanceFactory = parsed.governanceFactory ?? dealKind.defaultGovernanceFactory?.(protocol as never);
     if (!governanceFactory) {
-      throw new Error("Missing governanceFactory. Provide 'governanceFactory' in deal JSON or configure it in module/protocol manifest.");
+      throw new Error("'governanceFactory' is required in deal JSON for custom deal kinds. Provide 'governanceFactory' in deal JSON.");
     }
     const resolvedDealDeadline = parsed.dealDeadline ? parseBigNumberish(parsed.dealDeadline, "dealDeadline") : now + 30n * 24n * 60n * 60n;
     const resolvedEvaluationDeadline = parsed.evaluationDeadline ? parseBigNumberish(parsed.evaluationDeadline, "evaluationDeadline") : resolvedDealDeadline;
@@ -492,6 +498,17 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
   } else if (!params && proposalType === "strike-out-agent") {
     requireNArgs(args, 1, "deal propose strike-out-agent requires <agent>");
     params = buildStrikeOutAgentProposal(asAddress(args[0], "agent"));
+  } else if (!params && proposalType.startsWith("0x")) {
+    const typ = asBytes4(proposalType, "raw proposal type") as Hex;
+    if (!input) {
+      throw new Error("Raw proposal type requires --input JSON with {target, i, data}.");
+    }
+    params = {
+      typ,
+      target: asAddress(readStringField(input, "target", "--input"), "target"),
+      i: asBytes32(readStringField(input, "i", "--input"), "i"),
+      data: z.string().regex(/^0x[0-9a-fA-F]*$/).parse(readStringField(input, "data", "--input")) as Hex,
+    };
   } else if (!params) {
     const moduleProposal = resolvedType.spec;
     if (!moduleProposal) {
@@ -500,7 +517,8 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
       throw new Error(
         `Unsupported deal proposal type '${proposalTypeRaw}'. `
         + `Kernel types: ${supportedKernel.join(", ")}. `
-        + `Module types: ${supportedModule.join(", ")}.`,
+        + `Module types: ${supportedModule.join(", ")}. `
+        + `Or use a raw 0x bytes4 selector with --input JSON.`,
       );
     }
     const {core: moduleCore} = await getCoreContext();
@@ -637,6 +655,23 @@ async function cmdClaim(resolver: OptionResolver, evaluatorIdText?: string): Pro
   const {core, account} = await makeCoreContext(resolver);
   const txHash = await core.claimMainToken({dealCell, evaluatorId});
   printJson({action: "deal.claim", caller: account.address, deal: resolved.dealAddress, dealCell, evaluatorId, txHash});
+}
+
+async function cmdClaimRewardPool(resolver: OptionResolver, evaluatorIdText?: string): Promise<void> {
+  const resolved = await resolveDealRecordOrThrow(resolver);
+  const dealAddress = resolved.dealAddress;
+  const evaluatorId = evaluatorIdText ? BigInt(evaluatorIdText) : (resolver.resolveBigInt("evaluator-id", 0n) ?? 0n);
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.claimDealRewardPool({dealAddress, evaluatorId});
+    printJson({action: "deal.claim-reward-pool", dryRun: true, deal: dealAddress, evaluatorId, transaction});
+    return;
+  }
+
+  const {core, account} = await makeCoreContext(resolver);
+  const txHash = await core.claimDealRewardPool({dealAddress, evaluatorId});
+  printJson({action: "deal.claim-reward-pool", caller: account.address, deal: dealAddress, evaluatorId, txHash});
 }
 
 async function cmdLegalMessage(resolver: OptionResolver, messageFile: string, dealNumericIdText?: string): Promise<void> {
@@ -892,6 +927,9 @@ Request-tranche usage:
   DACDeal by flags: dac deal propose request-tranche [rewards] --capital-call-hash <bytes32>
                     dac deal propose request-tranche [rewards] --capital-call-nonce <uint256>
 
+Raw proposal (3rd party modules):
+  dac deal propose 0x<bytes4> --input raw.json   (json: {target, i, data})
+
 Complex payloads can use --input <json> (for example update-voting-config, treasury module types).
 `);
   propose.action(async function handlePropose(proposalType: string, args: string[]) {
@@ -946,6 +984,22 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
   claim.action(async function handleClaim(evaluatorId: string | undefined) {
     const resolver = await resolverFactory(this.optsWithGlobals());
     await cmdClaim(resolver, evaluatorId);
+  });
+
+  const claimRewardPool = deal.command("claim-reward-pool [evaluatorId]").description("Claim deal reward pool allocation via deal contract");
+  applyOptions(claimRewardPool, ["evaluator-id", ...DEAL_SELECTOR_OPTIONS]);
+  addCommandHelp(claimRewardPool, {
+    requirements: [
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
+    ],
+    notes: [
+      "Claims the deal's reward pool allocation (dealRewardPoolPercent). Called on the deal address by a staked agent.",
+      "Use `deal claim` for individual agent rewards; use `deal claim-reward-pool` for the deal's collective reward pool.",
+    ],
+  });
+  claimRewardPool.action(async function handleClaimRewardPool(evaluatorId: string | undefined) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdClaimRewardPool(resolver, evaluatorId);
   });
 
   const legalMessage = deal.command("legal-message [dealNumericId] <messageFile>")

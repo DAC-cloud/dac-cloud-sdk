@@ -7,4 +7,5 @@ export * from "./scale";
 export * from "./selectors";
 export * from "./tx-builder";
 export * from "./types";
+export * from "./salt";
 export * as coreModule from "./modules/core";
