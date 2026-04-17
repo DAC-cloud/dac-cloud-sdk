@@ -61,6 +61,7 @@ export interface DacTransactionBuilder {
   createDealManagementProposal(args: {dealAddress: Address; params: ProposalParams}): TransactionRequest;
   executeDealProposal(args: {dealAddress: Address; proposalId: bigint}): TransactionRequest;
   claimDealRewardPool(args: {dealAddress: Address; evaluatorId: bigint}): TransactionRequest;
+  setRootCapitalCallID(args: {dealAddress: Address; capitalCallId: bigint}): TransactionRequest;
   evaluateDeal(args: {dealManager: Address; dealId: bigint; evaluatorId: bigint}): TransactionRequest;
   forceReturnCapital(args: {dealManager: Address; dealId: bigint}): TransactionRequest;
   sendDacLegalWrapperMessage(args: {dacCell: Address; kind: Hex; message: Hex}): TransactionRequest;
@@ -70,6 +71,7 @@ export interface DacTransactionBuilder {
   depositTreasury(args: {dacCell: Address; token: Address; amount: bigint}): TransactionRequest;
   recoverTreasury(args: {dacCell: Address; token: Address}): TransactionRequest;
   approveErc20(args: {token: Address; spender: Address; amount: bigint}): TransactionRequest;
+  transferErc20(args: {token: Address; to: Address; amount: bigint}): TransactionRequest;
   delegateVotes(args: {token: Address; delegatee: Address}): TransactionRequest;
 }
 
@@ -197,6 +199,10 @@ export function createDacTransactionBuilder(options: DacTxBuilderOptions): DacTr
       return tx(dealAddress, dealAbi, "claimDealRewardPool", [evaluatorId]);
     },
 
+    setRootCapitalCallID({dealAddress, capitalCallId}) {
+      return tx(dealAddress, dealAbi, "setRootCapitalCallID", [capitalCallId]);
+    },
+
     evaluateDeal({dealManager, dealId, evaluatorId}) {
       return tx(dealManager, dealManagerAbi, "evaluateDeal", [dealId, evaluatorId]);
     },
@@ -231,6 +237,10 @@ export function createDacTransactionBuilder(options: DacTxBuilderOptions): DacTr
 
     approveErc20({token, spender, amount}) {
       return tx(token, erc20Abi, "approve", [spender, amount]);
+    },
+
+    transferErc20({token, to, amount}) {
+      return tx(token, erc20Abi, "transfer", [to, amount]);
     },
 
     delegateVotes({token, delegatee}) {

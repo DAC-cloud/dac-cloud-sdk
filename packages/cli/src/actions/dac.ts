@@ -277,6 +277,14 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
   });
 }
 
+async function cmdBalance(resolver: OptionResolver, tokenText: string, holderText: string): Promise<void> {
+  const token = asAddress(tokenText, "token address");
+  const holder = asAddress(holderText, "holder address");
+  const {core} = await makeCoreContext(resolver);
+  const balance = await core.getErc20Balance({token, holder});
+  printJson({action: "balance", token, holder, balance: balance.toString()});
+}
+
 async function cmdDelegate(resolver: OptionResolver): Promise<void> {
   const dacRecord = await resolveDacRecordOrThrow(resolver);
   const dac = dacRecord.address;
@@ -1136,29 +1144,24 @@ async function cmdDepositTreasury(resolver: OptionResolver): Promise<void> {
   const token = asAddress(resolver.requireString("token", "--token is required for dac deposit-treasury"), "Token");
   const amount = resolver.requireBigInt("amount", "--amount is required for dac deposit-treasury");
 
+  // The protocol restricts DACCell.depositTreasury to deals (capital return path).
+  // For donations / treasury top-ups by EOAs, the proper flow is:
+  //   1. Transfer tokens directly to the DACCell address (regular ERC20 transfer)
+  //   2. Call recoverTreasury, which sweeps the held balance into the asset controller's
+  //      accounting. recoverTreasury is callable by any holder/manager; the sync uses
+  //      the qualification check inside the asset controller.
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
-    const transactions = [];
-    if (resolver.resolveBoolean("auto-approve", false) && amount > 0n) {
-      transactions.push(ctx.txBuilder.approveErc20({token, spender: dac, amount}));
-    }
-    transactions.push(ctx.txBuilder.depositTreasury({dacCell: dac, token, amount}));
-    printJson({action: "dac.deposit-treasury", dryRun: true, dac, token, amount, transactions});
+    const transferTx = ctx.txBuilder.transferErc20({token, to: dac, amount});
+    const recoverTx = ctx.txBuilder.recoverTreasury({dacCell: dac, token});
+    printJson({action: "dac.deposit-treasury", dryRun: true, dac, token, amount, transactions: [transferTx, recoverTx]});
     return;
   }
 
   const {account, core} = await makeCoreContext(resolver);
-  const autoApprove = resolver.resolveBoolean("auto-approve", true);
-  let approveTx: Hex | undefined;
-  if (autoApprove && amount > 0n) {
-    const allowance = await core.getErc20Allowance({token, owner: account.address, spender: dac});
-    if (allowance < amount) {
-      approveTx = await core.approveErc20({token, spender: dac, amount});
-    }
-  }
-
-  const txHash = await core.depositTreasury({dacCell: dac, token, amount});
-  printJson({action: "dac.deposit-treasury", caller: account.address, dac, token, amount, approveTx, txHash});
+  const transferTx = await core.transferErc20({token, to: dac, amount});
+  const recoverTx = await core.recoverTreasury({dacCell: dac, token});
+  printJson({action: "dac.deposit-treasury", caller: account.address, dac, token, amount, transferTx, recoverTx});
 }
 
 async function cmdLegalMessage(resolver: OptionResolver, messageFile: string): Promise<void> {
@@ -1437,6 +1440,17 @@ export function registerDacCommands(program: Command, resolverFactory: (options:
     await cmdCreateExistingToken(resolver);
   });
 
+  const balance = program.command("balance <token> <holder>").description("Read ERC20 balance of a holder for any token");
+  addCommandHelp(balance, {
+    examples: [
+      "dac balance 0x<token> 0x<holder>",
+    ],
+  });
+  balance.action(async function handleBalance(token: string, holder: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdBalance(resolver, token, holder);
+  });
+
   const delegate = program.command("delegate").description("Delegate DAC MainToken votes");
   applyOptions(delegate, ["cell-address", "dac-address", "dac", "delegatee"]);
   addCommandHelp(delegate, {
@@ -1702,12 +1716,16 @@ Raw proposal (3rd party modules):
     await cmdRecoverTreasury(resolver);
   });
 
-  const depositTreasury = program.command("deposit-treasury").description("Deposit treasury funds into DACCell");
-  applyOptions(depositTreasury, ["cell-address", "dac-address", "dac", "token", "amount", "auto-approve"]);
+  const depositTreasury = program.command("deposit-treasury").description("Donate tokens to a DAC's treasury (transfer + recover)");
+  applyOptions(depositTreasury, ["cell-address", "dac-address", "dac", "token", "amount"]);
   addCommandHelp(depositTreasury, {
     requirements: [
       {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
       {mode: "allOf", options: ["token", "amount"]},
+    ],
+    notes: [
+      "Two-step flow: transfers tokens from caller directly to the DAC cell address, then calls `recoverTreasury` to sync the asset controller's accounting.",
+      "Caller must be a qualified holder (per the DAC's voting qualification) to call `recoverTreasury`.",
     ],
   });
   depositTreasury.action(async function handleDepositTreasury() {

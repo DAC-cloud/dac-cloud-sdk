@@ -220,6 +220,48 @@ export async function dealProposeVoteExecute(
   return proposalId;
 }
 
+/**
+ * Mint mock ERC20 tokens to a recipient (works only against ScriptMintableERC20-style mocks
+ * where `mint(address,uint256)` is permissionless). Used by QA scenarios to top up balances
+ * regardless of accumulated chain state across test runs.
+ *
+ * mint(address,uint256) selector = 0x40c10f19
+ */
+export async function mintMockToken(
+  h: Harness,
+  opts: {token: string; to: string; amount: string},
+): Promise<string> {
+  const {token, to, amount} = opts;
+
+  const toHex = to.slice(2).toLowerCase().padStart(64, "0");
+  const amountHex = BigInt(amount).toString(16).padStart(64, "0");
+  const data = `0x40c10f19${toHex}${amountHex}`;
+
+  // Use the founder wallet (any wallet works since mint is permissionless)
+  const founder = h.config.wallets.founder?.address;
+  if (!founder) throw new Error("founder wallet required for mintMockToken");
+
+  await rpcCall(h.config.rpcUrl, "hardhat_impersonateAccount", [founder]);
+  const txHash = await rpcCall(h.config.rpcUrl, "eth_sendTransaction", [{
+    from: founder.toLowerCase(),
+    to: token.toLowerCase(),
+    data,
+    gas: "0x30000",
+  }]) as string;
+  await rpcCall(h.config.rpcUrl, "hardhat_stopImpersonatingAccount", [founder]);
+
+  let receipt: {status: string} | null = null;
+  for (let i = 0; i < 10; i++) {
+    receipt = await rpcCall(h.config.rpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string} | null;
+    if (receipt) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  if (!receipt) throw new Error(`mint receipt not available (tx: ${txHash})`);
+  if (receipt.status !== "0x1") throw new Error(`mint reverted (tx: ${txHash})`);
+
+  return txHash;
+}
+
 async function rpcCall(rpcUrl: string, method: string, params: unknown[] = []): Promise<unknown> {
   const res = await fetch(rpcUrl, {
     method: "POST",

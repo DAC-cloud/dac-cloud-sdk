@@ -2,7 +2,6 @@ import type {Address} from "viem";
 
 export interface DACDealConfig {
   managedEquity: bigint;
-  capitalCallId: bigint;
   config: `0x${string}`;
 }
 

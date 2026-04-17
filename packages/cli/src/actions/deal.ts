@@ -674,6 +674,23 @@ async function cmdClaimRewardPool(resolver: OptionResolver, evaluatorIdText?: st
   printJson({action: "deal.claim-reward-pool", caller: account.address, deal: dealAddress, evaluatorId, txHash});
 }
 
+async function cmdLinkCapitalCall(resolver: OptionResolver, capitalCallIdText: string): Promise<void> {
+  const resolved = await resolveDealRecordOrThrow(resolver);
+  const dealAddress = resolved.dealAddress;
+  const capitalCallId = BigInt(capitalCallIdText);
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.setRootCapitalCallID({dealAddress, capitalCallId});
+    printJson({action: "deal.link-capital-call", dryRun: true, deal: dealAddress, capitalCallId, transaction});
+    return;
+  }
+
+  const {core, account} = await makeCoreContext(resolver);
+  const txHash = await core.setRootCapitalCallID({dealAddress, capitalCallId});
+  printJson({action: "deal.link-capital-call", caller: account.address, deal: dealAddress, capitalCallId, txHash});
+}
+
 async function cmdLegalMessage(resolver: OptionResolver, messageFile: string, dealNumericIdText?: string): Promise<void> {
   const {core, account} = await makeCoreContext(resolver);
   const payload = await readJsonFile<Record<string, unknown>>(resolvePath(messageFile));
@@ -1000,6 +1017,27 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
   claimRewardPool.action(async function handleClaimRewardPool(evaluatorId: string | undefined) {
     const resolver = await resolverFactory(this.optsWithGlobals());
     await cmdClaimRewardPool(resolver, evaluatorId);
+  });
+
+  const linkCapitalCall = deal.command("link-capital-call <capitalCallId>")
+    .description("Link a dac-deal to an existing capital call in the child DAC (must be called before deal approval)");
+  applyOptions(linkCapitalCall, [...DEAL_SELECTOR_OPTIONS]);
+  addCommandHelp(linkCapitalCall, {
+    requirements: [
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
+    ],
+    notes: [
+      "For dac-deals targeting an existing native DAC (not spawning a new child).",
+      "The capital call must already exist in the child DAC with recipient = deal address.",
+      "Must be called by a staked agent before the deal is approved.",
+    ],
+    examples: [
+      "dac deal link-capital-call 1 --deal-address 0x...",
+    ],
+  });
+  linkCapitalCall.action(async function handleLinkCapitalCall(capitalCallId: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdLinkCapitalCall(resolver, capitalCallId);
   });
 
   const legalMessage = deal.command("legal-message [dealNumericId] <messageFile>")

@@ -95,6 +95,7 @@ export interface DacCoreClient {
   createDealManagementProposal(args: {dealAddress: Address; params: ProposalParams}): Promise<{txHash: Hex; proposalId?: bigint; proposalAddress?: Address}>;
   executeDealProposal(args: {dealAddress: Address; proposalId: bigint}): Promise<Hex>;
   claimDealRewardPool(args: {dealAddress: Address; evaluatorId: bigint}): Promise<Hex>;
+  setRootCapitalCallID(args: {dealAddress: Address; capitalCallId: bigint}): Promise<Hex>;
   executeDealProposalDetailed(args: {dealAddress: Address; proposalId: bigint}): Promise<{txHash: Hex; dacProposalId?: bigint; trancheId?: bigint; childProposalId?: bigint; childVoteProposalId?: bigint}>;
   evaluateDeal(args: {dealManager: Address; dealId: bigint; evaluatorId: bigint}): Promise<Hex>;
   forceReturnCapital(args: {dealManager: Address; dealId: bigint}): Promise<Hex>;
@@ -105,8 +106,10 @@ export interface DacCoreClient {
   depositTreasury(args: {dacCell: Address; token: Address; amount: bigint}): Promise<Hex>;
   recoverTreasury(args: {dacCell: Address; token: Address}): Promise<Hex>;
   approveErc20(args: {token: Address; spender: Address; amount: bigint}): Promise<Hex>;
+  transferErc20(args: {token: Address; to: Address; amount: bigint}): Promise<Hex>;
   delegateVotes(args: {token: Address; delegatee: Address}): Promise<Hex>;
   getErc20Allowance(args: {token: Address; owner: Address; spender: Address}): Promise<bigint>;
+  getErc20Balance(args: {token: Address; holder: Address}): Promise<bigint>;
 }
 
 export function accountFromPrivateKey(privateKey: Hex): PrivateKeyAccount {
@@ -726,6 +729,20 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       });
     },
 
+    async setRootCapitalCallID({dealAddress, capitalCallId}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for setRootCapitalCallID");
+      }
+
+      return walletClient.writeContract({
+        address: dealAddress,
+        abi: dealAbi,
+        functionName: "setRootCapitalCallID",
+        args: [capitalCallId],
+        account: walletClient.account,
+      });
+    },
+
     async evaluateDeal({dealManager, dealId, evaluatorId}) {
       if (!walletClient || !walletClient.account) {
         throw new Error("Wallet client with account is required for evaluateDeal");
@@ -852,6 +869,20 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       });
     },
 
+    async transferErc20({token, to, amount}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for transferErc20");
+      }
+
+      return walletClient.writeContract({
+        address: token,
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [to, amount],
+        account: walletClient.account,
+      });
+    },
+
     async delegateVotes({token, delegatee}) {
       if (!walletClient || !walletClient.account) {
         throw new Error("Wallet client with account is required for delegateVotes");
@@ -872,6 +903,15 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         abi: erc20Abi,
         functionName: "allowance",
         args: [owner, spender],
+      });
+    },
+
+    async getErc20Balance({token, holder}) {
+      return publicClient.readContract({
+        address: token,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [holder],
       });
     },
   };

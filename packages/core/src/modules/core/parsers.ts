@@ -40,16 +40,14 @@ const bigintish = z.union([z.string(), z.number(), z.bigint()]);
 
 const dacDealConfigSchema = z.object({
   managedEquity: bigintish,
-  capitalCallId: bigintish,
-  config: z.string().regex(/^0x[0-9a-fA-F]*$/),
+  config: z.string().regex(/^0x[0-9a-fA-F]*$/).optional(),
 });
 
 export function parseDacDealConfig(input: unknown): DACDealConfig {
   const parsed = dacDealConfigSchema.parse(input);
   return {
     managedEquity: parseBigNumberish(parsed.managedEquity, "managedEquity"),
-    capitalCallId: parseBigNumberish(parsed.capitalCallId, "capitalCallId"),
-    config: parsed.config as Hex,
+    config: (parsed.config ?? "0x") as Hex,
   };
 }
 
@@ -177,7 +175,6 @@ export function encodeDacDealConfigFromJson(input: unknown): Hex {
       type: "tuple",
       components: [
         {name: "managedEquity", type: "uint256"},
-        {name: "capitalCallId", type: "uint256"},
         {name: "config", type: "bytes"},
       ],
     }],

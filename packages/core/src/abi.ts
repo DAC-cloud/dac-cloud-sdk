@@ -131,7 +131,9 @@ export const erc20VotesAbi = parseAbi([
 export const erc20Abi = parseAbi([
   ...commonErrorSignatures,
   "function approve(address spender, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)"
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function balanceOf(address account) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)"
 ]);
 
 export const agentTokenAbi = parseAbi([
@@ -161,5 +163,6 @@ export const dealAbi = parseAbi([
   "function createStakedAgentProposal((bytes4 typ,address target,bytes32 i,bytes data) params) returns (uint256 proposalId)",
   "function executeStakedAgentProposal(uint256 proposalId)",
   "function getProposal(uint256 proposalId) view returns (address)",
-  "function claimDealRewardPool(uint256 evaluatorId)"
+  "function claimDealRewardPool(uint256 evaluatorId)",
+  "function setRootCapitalCallID(uint256 capitalCallId)"
 ]);
