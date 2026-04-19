@@ -22,6 +22,7 @@ import {
   erc20VotesAbi,
   governanceOracleAbi,
   hybridDacManagementProposalAbi,
+  permit2TreasuryAbi,
   votingProposalAbi,
   wrappedMainTokenAbi,
 } from "./abi";
@@ -96,6 +97,8 @@ export interface DacCoreClient {
   executeDealProposal(args: {dealAddress: Address; proposalId: bigint}): Promise<Hex>;
   claimDealRewardPool(args: {dealAddress: Address; evaluatorId: bigint}): Promise<Hex>;
   setRootCapitalCallID(args: {dealAddress: Address; capitalCallId: bigint}): Promise<Hex>;
+  recoverProfits(args: {dealAddress: Address; token: Address}): Promise<Hex>;
+  executeAgentSpend(args: {treasuryAddress: Address; token: Address; destination: Address; amount: bigint}): Promise<Hex>;
   executeDealProposalDetailed(args: {dealAddress: Address; proposalId: bigint}): Promise<{txHash: Hex; dacProposalId?: bigint; trancheId?: bigint; childProposalId?: bigint; childVoteProposalId?: bigint}>;
   evaluateDeal(args: {dealManager: Address; dealId: bigint; evaluatorId: bigint}): Promise<Hex>;
   forceReturnCapital(args: {dealManager: Address; dealId: bigint}): Promise<Hex>;
@@ -739,6 +742,34 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         abi: dealAbi,
         functionName: "setRootCapitalCallID",
         args: [capitalCallId],
+        account: walletClient.account,
+      });
+    },
+
+    async recoverProfits({dealAddress, token}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for recoverProfits");
+      }
+
+      return walletClient.writeContract({
+        address: dealAddress,
+        abi: dealAbi,
+        functionName: "recoverProfits",
+        args: [token],
+        account: walletClient.account,
+      });
+    },
+
+    async executeAgentSpend({treasuryAddress, token, destination, amount}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for executeAgentSpend");
+      }
+
+      return walletClient.writeContract({
+        address: treasuryAddress,
+        abi: permit2TreasuryAbi,
+        functionName: "executeAgentSpend",
+        args: [token, destination, amount],
         account: walletClient.account,
       });
     },

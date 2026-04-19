@@ -164,5 +164,12 @@ export const dealAbi = parseAbi([
   "function executeStakedAgentProposal(uint256 proposalId)",
   "function getProposal(uint256 proposalId) view returns (address)",
   "function claimDealRewardPool(uint256 evaluatorId)",
-  "function setRootCapitalCallID(uint256 capitalCallId)"
+  "function setRootCapitalCallID(uint256 capitalCallId)",
+  "function recoverProfits(address token) returns (uint256)"
+]);
+
+export const permit2TreasuryAbi = parseAbi([
+  ...commonErrorSignatures,
+  "function executeAgentSpend(address token, address destination, uint160 amount)",
+  "function executeReceivePermit2(address token, address source, uint160 amount)",
 ]);

@@ -169,7 +169,17 @@ export const dacInvestmentScenario: Scenario = {
     ]);
     await h.syncIndexer();
 
-    // ── Step 1d: Investee mints main tokens into treasury ──────────
+    // ── Step 1d: Increase investee voting duration ─────────────────
+    // The child-vote-proposal on the investor's deal takes ~3610s to complete.
+    // The investee's default voting duration is 3600s — the investee proposal
+    // would expire before DACDeal can cast its vote. Set to 7200s (2 hours).
+    h.log("Increasing investee voting duration to 7200s...");
+    await proposeVoteExecuteAs(h, "agent1", investeeDacAddress!, [
+      "propose", "update-voting-config", "50", "0", "50", "7200", "0", "7200",
+    ]);
+    await h.syncIndexer();
+
+    // ── Step 1e: Investee mints main tokens into treasury ──────────
     // Needed so capital calls (which transfer main tokens FROM treasury to DACDeal) can succeed.
     const investeeTreasuryMainMintAmount = "2000000000000000000000000"; // 2M
     h.log(`Minting ${investeeTreasuryMainMintAmount} main tokens into investee treasury...`);

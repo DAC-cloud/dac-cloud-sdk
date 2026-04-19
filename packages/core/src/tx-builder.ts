@@ -12,6 +12,7 @@ import {
   erc20VotesAbi,
   governanceOracleAbi,
   hybridDacManagementProposalAbi,
+  permit2TreasuryAbi,
   votingProposalAbi,
   wrappedMainTokenAbi,
 } from "./abi";
@@ -62,6 +63,8 @@ export interface DacTransactionBuilder {
   executeDealProposal(args: {dealAddress: Address; proposalId: bigint}): TransactionRequest;
   claimDealRewardPool(args: {dealAddress: Address; evaluatorId: bigint}): TransactionRequest;
   setRootCapitalCallID(args: {dealAddress: Address; capitalCallId: bigint}): TransactionRequest;
+  recoverProfits(args: {dealAddress: Address; token: Address}): TransactionRequest;
+  executeAgentSpend(args: {treasuryAddress: Address; token: Address; destination: Address; amount: bigint}): TransactionRequest;
   evaluateDeal(args: {dealManager: Address; dealId: bigint; evaluatorId: bigint}): TransactionRequest;
   forceReturnCapital(args: {dealManager: Address; dealId: bigint}): TransactionRequest;
   sendDacLegalWrapperMessage(args: {dacCell: Address; kind: Hex; message: Hex}): TransactionRequest;
@@ -201,6 +204,14 @@ export function createDacTransactionBuilder(options: DacTxBuilderOptions): DacTr
 
     setRootCapitalCallID({dealAddress, capitalCallId}) {
       return tx(dealAddress, dealAbi, "setRootCapitalCallID", [capitalCallId]);
+    },
+
+    recoverProfits({dealAddress, token}) {
+      return tx(dealAddress, dealAbi, "recoverProfits", [token]);
+    },
+
+    executeAgentSpend({treasuryAddress, token, destination, amount}) {
+      return tx(treasuryAddress, permit2TreasuryAbi, "executeAgentSpend", [token, destination, amount]);
     },
 
     evaluateDeal({dealManager, dealId, evaluatorId}) {

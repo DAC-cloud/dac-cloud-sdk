@@ -12,6 +12,9 @@ import {dealVetoScenario} from "./deal-veto.js";
 import {dealApproveExpiredScenario} from "./deal-approve-expired.js";
 import {dealRawModuleScenario} from "./deal-raw-module.js";
 import {dacInvestmentScenario} from "./dac-investment.js";
+import {treasuryDealAgentScenario} from "./treasury-deal-agent.js";
+import {dealRewardPoolScenario} from "./deal-reward-pool.js";
+import {revenueEvaluatorScenario} from "./revenue-evaluator.js";
 
 export const ALL_SCENARIOS: Scenario[] = [
   existingTokenDacScenario,
@@ -27,6 +30,9 @@ export const ALL_SCENARIOS: Scenario[] = [
   dealApproveExpiredScenario,
   dealRawModuleScenario,
   dacInvestmentScenario,
+  treasuryDealAgentScenario,
+  dealRewardPoolScenario,
+  revenueEvaluatorScenario,
 ];
 
 export {
@@ -43,4 +49,7 @@ export {
   dealApproveExpiredScenario,
   dealRawModuleScenario,
   dacInvestmentScenario,
+  treasuryDealAgentScenario,
+  dealRewardPoolScenario,
+  revenueEvaluatorScenario,
 };

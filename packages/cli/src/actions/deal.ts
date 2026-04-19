@@ -691,6 +691,50 @@ async function cmdLinkCapitalCall(resolver: OptionResolver, capitalCallIdText: s
   printJson({action: "deal.link-capital-call", caller: account.address, deal: dealAddress, capitalCallId, txHash});
 }
 
+async function cmdAgentSpend(resolver: OptionResolver, tokenText: string, destinationText: string, amountText: string): Promise<void> {
+  const resolved = await resolveDealRecordOrThrow(resolver);
+  const dealAddress = resolved.dealAddress;
+  const token = asAddress(tokenText, "token");
+  const destination = asAddress(destinationText, "destination");
+  const amount = BigInt(amountText);
+
+  // Resolve treasury address from indexer
+  const indexer = makeIndexer(resolver);
+  const deal = await indexer.deals.getByAddress(dealAddress as string);
+  if (!deal?.managedTreasuryAddress) {
+    throw new Error("Deal has no managed treasury address (only treasury deals support agent-spend).");
+  }
+  const treasuryAddress = asAddress(deal.managedTreasuryAddress, "treasury");
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.executeAgentSpend({treasuryAddress, token, destination, amount});
+    printJson({action: "deal.agent-spend", dryRun: true, deal: dealAddress, treasury: treasuryAddress, token, destination, amount, transaction});
+    return;
+  }
+
+  const {core, account} = await makeCoreContext(resolver);
+  const txHash = await core.executeAgentSpend({treasuryAddress, token, destination, amount});
+  printJson({action: "deal.agent-spend", caller: account.address, deal: dealAddress, treasury: treasuryAddress, token, destination, amount, txHash});
+}
+
+async function cmdRecoverProfits(resolver: OptionResolver, tokenText: string): Promise<void> {
+  const resolved = await resolveDealRecordOrThrow(resolver);
+  const dealAddress = resolved.dealAddress;
+  const token = asAddress(tokenText, "token");
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.recoverProfits({dealAddress, token});
+    printJson({action: "deal.recover-profits", dryRun: true, deal: dealAddress, token, transaction});
+    return;
+  }
+
+  const {core, account} = await makeCoreContext(resolver);
+  const txHash = await core.recoverProfits({dealAddress, token});
+  printJson({action: "deal.recover-profits", caller: account.address, deal: dealAddress, token, txHash});
+}
+
 async function cmdLegalMessage(resolver: OptionResolver, messageFile: string, dealNumericIdText?: string): Promise<void> {
   const {core, account} = await makeCoreContext(resolver);
   const payload = await readJsonFile<Record<string, unknown>>(resolvePath(messageFile));
@@ -1038,6 +1082,41 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
   linkCapitalCall.action(async function handleLinkCapitalCall(capitalCallId: string) {
     const resolver = await resolverFactory(this.optsWithGlobals());
     await cmdLinkCapitalCall(resolver, capitalCallId);
+  });
+
+  const agentSpend = deal.command("agent-spend <token> <destination> <amount>")
+    .description("Execute agent spend from deal treasury (requires prior approve-agent-spend proposal)");
+  applyOptions(agentSpend, [...DEAL_SELECTOR_OPTIONS]);
+  addCommandHelp(agentSpend, {
+    requirements: [
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
+    ],
+    notes: [
+      "Caller must be a staked agent with an approved spend allowance.",
+      "Treasury address is resolved from the deal record in the indexer.",
+      "Respects rate limits (singleTxAmount, totalAmount, duration cooldown).",
+    ],
+  });
+  agentSpend.action(async function handleAgentSpend(token: string, destination: string, amount: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdAgentSpend(resolver, token, destination, amount);
+  });
+
+  const recoverProfits = deal.command("recover-profits <token>")
+    .description("Recover non-funding token profits from deal to treasury");
+  applyOptions(recoverProfits, [...DEAL_SELECTOR_OPTIONS]);
+  addCommandHelp(recoverProfits, {
+    requirements: [
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
+    ],
+    notes: [
+      "Only works for tokens that are NOT the deal's funding token.",
+      "Transfers the deal's full balance of the token to the managed treasury.",
+    ],
+  });
+  recoverProfits.action(async function handleRecoverProfits(token: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdRecoverProfits(resolver, token);
   });
 
   const legalMessage = deal.command("legal-message [dealNumericId] <messageFile>")
