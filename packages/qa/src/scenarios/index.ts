@@ -16,6 +16,7 @@ import {treasuryDealAgentScenario} from "./treasury-deal-agent.js";
 import {dealRewardPoolScenario} from "./deal-reward-pool.js";
 import {revenueEvaluatorScenario} from "./revenue-evaluator.js";
 import {permit2TreasuryFlowScenario} from "./permit2-treasury-flow.js";
+import {oracleGovernanceScenario} from "./oracle-governance.js";
 
 export const ALL_SCENARIOS: Scenario[] = [
   existingTokenDacScenario,
@@ -35,6 +36,7 @@ export const ALL_SCENARIOS: Scenario[] = [
   dealRewardPoolScenario,
   revenueEvaluatorScenario,
   permit2TreasuryFlowScenario,
+  oracleGovernanceScenario,
 ];
 
 export {
@@ -55,4 +57,5 @@ export {
   dealRewardPoolScenario,
   revenueEvaluatorScenario,
   permit2TreasuryFlowScenario,
+  oracleGovernanceScenario,
 };

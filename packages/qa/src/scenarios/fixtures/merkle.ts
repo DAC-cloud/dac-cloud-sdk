@@ -5,11 +5,19 @@ export interface DividendLeafInput {
   amount: bigint;
 }
 
-export interface DividendMerkleResult {
+export interface VotingPowerLeafInput {
+  voter: Address;
+  amount: bigint;
+}
+
+export interface MerkleResult {
   root: Hex;
-  leaves: Hex[];   // leaves[i] = leafHash(i, input[i].receiver, input[i].amount)
+  leaves: Hex[];   // leaves[i] = leafHash(i, input[i].address, input[i].amount)
   proofs: Hex[][]; // proofs[i] is the proof for leaves[i]
 }
+
+/** @deprecated Use MerkleResult instead */
+export type DividendMerkleResult = MerkleResult;
 
 /**
  * Leaf format matches contract: keccak256(abi.encodePacked(uint256 index, address receiver, uint256 amount))
@@ -28,6 +36,20 @@ function hashPair(a: Hex, b: Hex): Hex {
 }
 
 /**
+ * Build a voting power merkle tree for oracle governance snapshots.
+ *
+ * Leaf format matches HybridDACManagementProposal.voteMerkle:
+ *   keccak256(abi.encodePacked(uint256 index, address voter, uint256 amount))
+ *
+ * Returns root, leaves, proofs, and totalVotingPower (sum of amounts).
+ */
+export function buildVotingPowerMerkleTree(inputs: VotingPowerLeafInput[]): MerkleResult & {totalVotingPower: bigint} {
+  const result = buildMerkleTreeInternal(inputs.map(({voter, amount}) => ({receiver: voter, amount})));
+  const totalVotingPower = inputs.reduce((sum, {amount}) => sum + amount, 0n);
+  return {...result, totalVotingPower};
+}
+
+/**
  * Build a dividend merkle tree from N ≥ 1 recipients.
  *
  * Strategy: balanced binary tree. If a level has an odd count, the last node is
@@ -36,9 +58,13 @@ function hashPair(a: Hex, b: Hex): Hex {
  *
  * Returns root, the leaf array (in input order), and per-leaf proofs.
  */
-export function buildDividendMerkleTree(inputs: DividendLeafInput[]): DividendMerkleResult {
+export function buildDividendMerkleTree(inputs: DividendLeafInput[]): MerkleResult {
+  return buildMerkleTreeInternal(inputs);
+}
+
+function buildMerkleTreeInternal(inputs: DividendLeafInput[]): MerkleResult {
   if (inputs.length === 0) {
-    throw new Error("buildDividendMerkleTree requires at least 1 leaf");
+    throw new Error("buildMerkleTree requires at least 1 leaf");
   }
 
   const leaves: Hex[] = inputs.map(({receiver, amount}, i) => leafHash(BigInt(i), receiver, amount));

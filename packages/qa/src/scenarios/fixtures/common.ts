@@ -18,6 +18,19 @@ export async function getChainTimestamp(h: Harness): Promise<number> {
 }
 
 /**
+ * Get the current (latest) block number from the chain.
+ */
+export async function getBlockNumber(h: Harness): Promise<number> {
+  const res = await fetch(h.config.rpcUrl, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({jsonrpc: "2.0", id: 1, method: "eth_blockNumber", params: []}),
+  });
+  const json = (await res.json()) as {result?: string};
+  return Number(BigInt(json.result ?? "0"));
+}
+
+/**
  * Resolve the primary treasury/underlying token address from config.
  * Reads from DAC_TREASURY_TOKEN env var (configured in config.env).
  */
