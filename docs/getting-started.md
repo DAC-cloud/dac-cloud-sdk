@@ -55,7 +55,7 @@ dac create \
   --max-supply 10000000000000000000000000 \
   --default-quorum 50 \
   --allocation 1000000000000000000000000 \
-  --treasury-token 0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB \
+  --treasury-token 0x4A679253410272dd5232B3Ff7cF5dbB88f295319 \
   --commitment 0 \
   --auto-delegate \
   --config ./config.env \

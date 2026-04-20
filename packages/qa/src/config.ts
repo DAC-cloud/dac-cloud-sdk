@@ -1,6 +1,9 @@
 import {readFileSync, existsSync} from "node:fs";
 import {resolve} from "node:path";
-import type {QaConfig, WalletConfig} from "./harness/types.js";
+import dotenv from "dotenv";
+import type {QaConfig, TokenConfig, WalletConfig} from "./harness/types.js";
+
+const DEFAULT_PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
 /**
  * Hardhat default accounts (deterministic from mnemonic "test test test test test test test test test test test junk").
@@ -19,15 +22,11 @@ const HARDHAT_ACCOUNTS: WalletConfig[] = [
   {privateKey: "0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6", address: "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720", label: "account9"},
 ];
 
-interface EnvConfig {
-  rpcUrl: string;
-  indexerUrl: string;
-  chainId: number;
-  contractsRoot: string;
-  privateKey?: string;
-}
-
-function parseEnvFile(path: string): EnvConfig {
+/**
+ * Parse a simple KEY=VALUE .env file (for reading CLI config.env which
+ * uses the same format but is NOT the QA .env — it's the CLI's config file).
+ */
+function parseCliConfigFile(path: string): Record<string, string> {
   const content = readFileSync(path, "utf-8");
   const vars: Record<string, string> = {};
   for (const line of content.split("\n")) {
@@ -39,13 +38,7 @@ function parseEnvFile(path: string): EnvConfig {
     const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
     vars[key] = value;
   }
-  return {
-    rpcUrl: vars.DAC_RPC_URL || "http://127.0.0.1:8545",
-    indexerUrl: vars.DAC_INDEXER_URL || "http://127.0.0.1:8080/v1/graphql",
-    chainId: parseInt(vars.DAC_CHAIN_ID || "31337", 10),
-    contractsRoot: vars.DAC_CONTRACTS_ROOT || "",
-    privateKey: vars.DAC_PRIVATE_KEY,
-  };
+  return vars;
 }
 
 export interface QaConfigInput {
@@ -70,12 +63,25 @@ export interface QaConfigInput {
 }
 
 export function loadQaConfig(input: QaConfigInput = {}): QaConfig {
+  // ── Load QA .env (repo root) via dotenv ───────────────────────
+  // This contains QA-specific vars: token addresses, permit2, etc.
+  // dotenv loads from CWD/.env by default and populates process.env.
+  dotenv.config();
+
+  // ── Load CLI config.env (passed to CLI via --config flag) ─────
+  // This contains RPC, indexer, chain ID, contracts root, private key.
   const configPath = resolve(input.configPath ?? "./config.env");
   if (!existsSync(configPath)) {
     throw new Error(`Config file not found: ${configPath}`);
   }
+  const cliVars = parseCliConfigFile(configPath);
 
-  const env = parseEnvFile(configPath);
+  // CLI config values (from config.env file)
+  const rpcUrl = cliVars.DAC_RPC_URL || "http://127.0.0.1:8545";
+  const indexerUrl = cliVars.DAC_INDEXER_URL || "http://127.0.0.1:8080/v1/graphql";
+  const chainId = parseInt(cliVars.DAC_CHAIN_ID || "31337", 10);
+  const contractsRoot = cliVars.DAC_CONTRACTS_ROOT || "";
+  const privateKey = cliVars.DAC_PRIVATE_KEY || undefined;
 
   // Resolve CLI binary
   const cliBin = input.cliBin ?? resolve("./node_modules/.bin/dac");
@@ -85,9 +91,7 @@ export function loadQaConfig(input: QaConfigInput = {}): QaConfig {
 
   // Build wallet map
   const wallets: Record<string, WalletConfig> = {};
-
-  // Default: use Hardhat accounts with role names
-  const isLocal = input.isLocalChain ?? env.chainId === 31337;
+  const isLocal = input.isLocalChain ?? chainId === 31337;
   if (isLocal) {
     const roles = ["founder", "agent1", "agent2", "agent3", "agent4", "agent5", "publisher", "admin", "outsider", "treasury"];
     for (let i = 0; i < roles.length && i < HARDHAT_ACCOUNTS.length; i++) {
@@ -95,36 +99,40 @@ export function loadQaConfig(input: QaConfigInput = {}): QaConfig {
     }
   }
 
-  // Override from env file's private key
-  if (env.privateKey) {
-    // If there's a key in the config, treat it as the founder
+  if (privateKey) {
     wallets.founder = {
       ...wallets.founder,
-      privateKey: env.privateKey,
+      privateKey,
       label: "founder",
     };
   }
 
-  // Load extra wallet configs
   if (input.walletConfigs) {
     for (const [role, walletPath] of Object.entries(input.walletConfigs)) {
-      const walletEnv = parseEnvFile(resolve(walletPath));
-      if (walletEnv.privateKey) {
-        wallets[role] = {
-          privateKey: walletEnv.privateKey,
-          address: "", // Will need to be derived or specified
-          label: role,
-        };
+      const walletVars = parseCliConfigFile(resolve(walletPath));
+      const wk = walletVars.DAC_PRIVATE_KEY;
+      if (wk) {
+        wallets[role] = {privateKey: wk, address: "", label: role};
       }
     }
   }
 
-  // Direct wallet overrides
   if (input.wallets) {
     for (const [role, w] of Object.entries(input.wallets)) {
       wallets[role] = {privateKey: w.privateKey, address: w.address, label: role};
     }
   }
+
+  // Token addresses — read from QA .env (process.env, populated by dotenv)
+  const treasuryToken = process.env.DAC_TREASURY_TOKEN;
+  if (!treasuryToken) {
+    throw new Error("DAC_TREASURY_TOKEN is required in .env (underlying/treasury mock token address)");
+  }
+  const tokens: TokenConfig = {
+    treasury: treasuryToken,
+    secondary: process.env.DAC_SECONDARY_TOKEN || undefined,
+    permit2: process.env.DAC_PERMIT2_ADDRESS || DEFAULT_PERMIT2_ADDRESS,
+  };
 
   // Reviewer config
   let reviewer = undefined;
@@ -139,11 +147,12 @@ export function loadQaConfig(input: QaConfigInput = {}): QaConfig {
   return {
     cliBin,
     configPath,
-    rpcUrl: env.rpcUrl,
-    indexerUrl: env.indexerUrl,
-    chainId: env.chainId,
+    rpcUrl,
+    indexerUrl,
+    chainId,
     wallets,
-    contractsRoot: env.contractsRoot,
+    contractsRoot,
+    tokens,
     indexerSyncTimeoutMs: input.indexerSyncTimeoutMs ?? 30_000,
     indexerPollIntervalMs: input.indexerPollIntervalMs ?? 1_000,
     isLocalChain: isLocal,

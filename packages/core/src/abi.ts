@@ -172,4 +172,5 @@ export const permit2TreasuryAbi = parseAbi([
   ...commonErrorSignatures,
   "function executeAgentSpend(address token, address destination, uint160 amount)",
   "function executeReceivePermit2(address token, address source, uint160 amount)",
+  "function executeReceivePermit2Signature(((address token, uint256 amount) permitted, uint256 nonce, uint256 deadline) permit, (address to, uint256 requestedAmount) transferDetails, address source, bytes signature)",
 ]);

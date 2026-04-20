@@ -294,7 +294,6 @@ async function resolveUnderlyingToken(h: Harness): Promise<string> {
     return "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
   }
 
-  // Local chain: the user's config had this token
-  // 0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB from their examples.md
-  return "0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB";
+  // MockERC20
+  return "0x4A679253410272dd5232B3Ff7cF5dbB88f295319";
 }

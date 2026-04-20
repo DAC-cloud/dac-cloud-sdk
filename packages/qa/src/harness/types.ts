@@ -1,3 +1,12 @@
+export interface TokenConfig {
+  /** Primary treasury/underlying token address */
+  treasury: string;
+  /** Optional secondary token for multi-token testing */
+  secondary?: string;
+  /** Permit2 contract address */
+  permit2: string;
+}
+
 export interface QaConfig {
   /** Path to dac CLI binary */
   cliBin: string;
@@ -13,6 +22,8 @@ export interface QaConfig {
   wallets: Record<string, WalletConfig>;
   /** Contracts root path (for manifest loading) */
   contractsRoot: string;
+  /** Token addresses for scenarios */
+  tokens: TokenConfig;
   /** Max time (ms) to wait for indexer to sync after a tx (default: 30000) */
   indexerSyncTimeoutMs: number;
   /** Polling interval (ms) for indexer sync (default: 1000) */

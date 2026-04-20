@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@dac-cloud/indexer": "0.1.0",
+    "dotenv": "^16.6.1",
     "viem": "^2.39.0"
   },
   "devDependencies": {

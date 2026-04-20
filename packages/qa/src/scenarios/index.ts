@@ -15,6 +15,7 @@ import {dacInvestmentScenario} from "./dac-investment.js";
 import {treasuryDealAgentScenario} from "./treasury-deal-agent.js";
 import {dealRewardPoolScenario} from "./deal-reward-pool.js";
 import {revenueEvaluatorScenario} from "./revenue-evaluator.js";
+import {permit2TreasuryFlowScenario} from "./permit2-treasury-flow.js";
 
 export const ALL_SCENARIOS: Scenario[] = [
   existingTokenDacScenario,
@@ -33,6 +34,7 @@ export const ALL_SCENARIOS: Scenario[] = [
   treasuryDealAgentScenario,
   dealRewardPoolScenario,
   revenueEvaluatorScenario,
+  permit2TreasuryFlowScenario,
 ];
 
 export {
@@ -52,4 +54,5 @@ export {
   treasuryDealAgentScenario,
   dealRewardPoolScenario,
   revenueEvaluatorScenario,
+  permit2TreasuryFlowScenario,
 };

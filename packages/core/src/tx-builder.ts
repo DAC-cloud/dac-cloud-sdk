@@ -65,6 +65,7 @@ export interface DacTransactionBuilder {
   setRootCapitalCallID(args: {dealAddress: Address; capitalCallId: bigint}): TransactionRequest;
   recoverProfits(args: {dealAddress: Address; token: Address}): TransactionRequest;
   executeAgentSpend(args: {treasuryAddress: Address; token: Address; destination: Address; amount: bigint}): TransactionRequest;
+  executeReceivePermit2(args: {treasuryAddress: Address; token: Address; source: Address; amount: bigint}): TransactionRequest;
   evaluateDeal(args: {dealManager: Address; dealId: bigint; evaluatorId: bigint}): TransactionRequest;
   forceReturnCapital(args: {dealManager: Address; dealId: bigint}): TransactionRequest;
   sendDacLegalWrapperMessage(args: {dacCell: Address; kind: Hex; message: Hex}): TransactionRequest;
@@ -212,6 +213,10 @@ export function createDacTransactionBuilder(options: DacTxBuilderOptions): DacTr
 
     executeAgentSpend({treasuryAddress, token, destination, amount}) {
       return tx(treasuryAddress, permit2TreasuryAbi, "executeAgentSpend", [token, destination, amount]);
+    },
+
+    executeReceivePermit2({treasuryAddress, token, source, amount}) {
+      return tx(treasuryAddress, permit2TreasuryAbi, "executeReceivePermit2", [token, source, amount]);
     },
 
     evaluateDeal({dealManager, dealId, evaluatorId}) {

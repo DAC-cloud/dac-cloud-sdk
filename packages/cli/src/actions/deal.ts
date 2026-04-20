@@ -718,6 +718,32 @@ async function cmdAgentSpend(resolver: OptionResolver, tokenText: string, destin
   printJson({action: "deal.agent-spend", caller: account.address, deal: dealAddress, treasury: treasuryAddress, token, destination, amount, txHash});
 }
 
+async function cmdReceivePermit2(resolver: OptionResolver, tokenText: string, sourceText: string, amountText: string): Promise<void> {
+  const resolved = await resolveDealRecordOrThrow(resolver);
+  const dealAddress = resolved.dealAddress;
+  const token = asAddress(tokenText, "token");
+  const source = asAddress(sourceText, "source");
+  const amount = BigInt(amountText);
+
+  const indexer = makeIndexer(resolver);
+  const deal = await indexer.deals.getByAddress(dealAddress as string);
+  if (!deal?.managedTreasuryAddress) {
+    throw new Error("Deal has no managed treasury address (only treasury deals support receive-permit2).");
+  }
+  const treasuryAddress = asAddress(deal.managedTreasuryAddress, "treasury");
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.executeReceivePermit2({treasuryAddress, token, source, amount});
+    printJson({action: "deal.receive-permit2", dryRun: true, deal: dealAddress, treasury: treasuryAddress, token, source, amount, transaction});
+    return;
+  }
+
+  const {core, account} = await makeCoreContext(resolver);
+  const txHash = await core.executeReceivePermit2({treasuryAddress, token, source, amount});
+  printJson({action: "deal.receive-permit2", caller: account.address, deal: dealAddress, treasury: treasuryAddress, token, source, amount, txHash});
+}
+
 async function cmdRecoverProfits(resolver: OptionResolver, tokenText: string): Promise<void> {
   const resolved = await resolveDealRecordOrThrow(resolver);
   const dealAddress = resolved.dealAddress;
@@ -1117,6 +1143,24 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
   recoverProfits.action(async function handleRecoverProfits(token: string) {
     const resolver = await resolverFactory(this.optsWithGlobals());
     await cmdRecoverProfits(resolver, token);
+  });
+
+  const receivePermit2 = deal.command("receive-permit2 <token> <source> <amount>")
+    .description("Receive tokens from a source via Permit2 transferFrom (requires prior assign-claimer)");
+  applyOptions(receivePermit2, [...DEAL_SELECTOR_OPTIONS]);
+  addCommandHelp(receivePermit2, {
+    requirements: [
+      {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
+    ],
+    notes: [
+      "Caller must be an assigned claimer for the given source+token.",
+      "Source must have approved the Permit2 contract via ERC20.approve.",
+      "Treasury address resolved from deal record in indexer.",
+    ],
+  });
+  receivePermit2.action(async function handleReceivePermit2(token: string, source: string, amount: string) {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdReceivePermit2(resolver, token, source, amount);
   });
 
   const legalMessage = deal.command("legal-message [dealNumericId] <messageFile>")

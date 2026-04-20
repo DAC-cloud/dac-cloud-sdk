@@ -18,13 +18,11 @@ export async function getChainTimestamp(h: Harness): Promise<number> {
 }
 
 /**
- * Resolve an ERC20 token address for testing.
+ * Resolve the primary treasury/underlying token address from config.
+ * Reads from DAC_TREASURY_TOKEN env var (configured in config.env).
  */
-export async function resolveUnderlyingToken(h: Harness): Promise<string> {
-  if (h.config.chainId === 84532) {
-    return "0x036CbD53842c5426634e7929541eC2318f3dCF7e"; // Base Sepolia USDC
-  }
-  return "0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB"; // Local Hardhat mock
+export function resolveUnderlyingToken(h: Harness): string {
+  return h.config.tokens.treasury;
 }
 
 /**

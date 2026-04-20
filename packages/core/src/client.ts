@@ -99,6 +99,7 @@ export interface DacCoreClient {
   setRootCapitalCallID(args: {dealAddress: Address; capitalCallId: bigint}): Promise<Hex>;
   recoverProfits(args: {dealAddress: Address; token: Address}): Promise<Hex>;
   executeAgentSpend(args: {treasuryAddress: Address; token: Address; destination: Address; amount: bigint}): Promise<Hex>;
+  executeReceivePermit2(args: {treasuryAddress: Address; token: Address; source: Address; amount: bigint}): Promise<Hex>;
   executeDealProposalDetailed(args: {dealAddress: Address; proposalId: bigint}): Promise<{txHash: Hex; dacProposalId?: bigint; trancheId?: bigint; childProposalId?: bigint; childVoteProposalId?: bigint}>;
   evaluateDeal(args: {dealManager: Address; dealId: bigint; evaluatorId: bigint}): Promise<Hex>;
   forceReturnCapital(args: {dealManager: Address; dealId: bigint}): Promise<Hex>;
@@ -770,6 +771,20 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         abi: permit2TreasuryAbi,
         functionName: "executeAgentSpend",
         args: [token, destination, amount],
+        account: walletClient.account,
+      });
+    },
+
+    async executeReceivePermit2({treasuryAddress, token, source, amount}) {
+      if (!walletClient || !walletClient.account) {
+        throw new Error("Wallet client with account is required for executeReceivePermit2");
+      }
+
+      return walletClient.writeContract({
+        address: treasuryAddress,
+        abi: permit2TreasuryAbi,
+        functionName: "executeReceivePermit2",
+        args: [token, source, amount],
         account: walletClient.account,
       });
     },
