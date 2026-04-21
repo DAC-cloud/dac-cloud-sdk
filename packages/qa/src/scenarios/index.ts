@@ -17,6 +17,9 @@ import {dealRewardPoolScenario} from "./deal-reward-pool.js";
 import {revenueEvaluatorScenario} from "./revenue-evaluator.js";
 import {permit2TreasuryFlowScenario} from "./permit2-treasury-flow.js";
 import {oracleGovernanceScenario} from "./oracle-governance.js";
+import {dealStrikeOutScenario} from "./deal-strike-out.js";
+import {dacAgentDistributorScenario} from "./dac-agent-distributor.js";
+import {dacBurnMainTokensScenario} from "./dac-burn-main-tokens.js";
 
 export const ALL_SCENARIOS: Scenario[] = [
   existingTokenDacScenario,
@@ -37,6 +40,9 @@ export const ALL_SCENARIOS: Scenario[] = [
   revenueEvaluatorScenario,
   permit2TreasuryFlowScenario,
   oracleGovernanceScenario,
+  dealStrikeOutScenario,
+  dacAgentDistributorScenario,
+  dacBurnMainTokensScenario,
 ];
 
 export {
@@ -58,4 +64,7 @@ export {
   revenueEvaluatorScenario,
   permit2TreasuryFlowScenario,
   oracleGovernanceScenario,
+  dealStrikeOutScenario,
+  dacAgentDistributorScenario,
+  dacBurnMainTokensScenario,
 };
