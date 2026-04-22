@@ -273,6 +273,100 @@ export async function mintMockToken(
   return txHash;
 }
 
+/**
+ * Verify a transaction receipt on-chain. Surfaces silent reverts that writeContract doesn't catch.
+ * Returns the receipt status ("0x1" = success, "0x0" = reverted).
+ */
+export async function verifyTxReceipt(
+  h: Harness,
+  txHash: string,
+): Promise<{status: string; gasUsed?: string}> {
+  let receipt: {status: string; gasUsed?: string} | null = null;
+  for (let i = 0; i < 10; i++) {
+    receipt = await rpcCall(h.config.rpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string; gasUsed?: string} | null;
+    if (receipt) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  if (!receipt) {
+    throw new Error(`tx receipt not available (tx: ${txHash})`);
+  }
+  return receipt;
+}
+
+/**
+ * Cross-validate deal-level aggregate fields against the sum of individual position values.
+ * Catches indexer accounting bugs where totals drift from per-position data.
+ *
+ * Invariants checked:
+ *   1. sum(positions.currentStakedAmount) == deal.currentStakedAmount
+ *   2. sum(positions.totalSlashedAmount)  == deal.totalSlashedStakeAmount
+ *   3. sum(positions.totalReleasedAmount) == deal.totalReleasedStakeAmount
+ *   4. sum(positions.totalClaimedMainTokenAmount) == deal.totalRewardClaimedAmount
+ *   5. Per-position: currentStaked + slashed + released == totalStaked  (stake conservation)
+ */
+export async function verifyDealAccountingInvariants(
+  h: Harness,
+  dealAddress: string,
+): Promise<{deal: Record<string, unknown>; positions: Array<Record<string, unknown>>}> {
+  const {assert} = h;
+
+  const dealCli = await h.dealView("deal", ["--deal-address", dealAddress]);
+  const deal = dealCli.data.deal as Record<string, unknown>;
+  assert.defined(deal, "deal data for accounting check");
+
+  const posCli = await h.dealView("positions", ["--deal-address", dealAddress]);
+  const positions = (posCli.data.positions as Array<Record<string, unknown>>) ?? [];
+
+  // ── Aggregate sums ────────────────────────────────────────────
+  let sumStaked = 0n;
+  let sumSlashed = 0n;
+  let sumReleased = 0n;
+  let sumClaimed = 0n;
+
+  for (const p of positions) {
+    const current = BigInt(p.currentStakedAmount as string);
+    const slashed = BigInt(p.totalSlashedAmount as string);
+    const released = BigInt(p.totalReleasedAmount as string);
+    const total = BigInt(p.totalStakedAmount as string);
+    const claimed = BigInt(p.totalClaimedMainTokenAmount as string);
+
+    sumStaked += current;
+    sumSlashed += slashed;
+    sumReleased += released;
+    sumClaimed += claimed;
+
+    // Per-position stake conservation
+    const accounted = current + slashed + released;
+    if (accounted !== total) {
+      h.log(`  ACCOUNTING: position ${p.accountId}: current(${current}) + slashed(${slashed}) + released(${released}) = ${accounted} != totalStaked(${total})`);
+    }
+    assert.equal(
+      accounted, total,
+      `stake conservation for ${p.accountId}: current+slashed+released == totalStaked`,
+    );
+  }
+
+  // ── Cross-validate against deal-level aggregates ──────────────
+  const dealStaked = BigInt(deal.currentStakedAmount as string);
+  const dealSlashed = BigInt(deal.totalSlashedStakeAmount as string);
+  const dealReleased = BigInt(deal.totalReleasedStakeAmount as string);
+  const dealClaimed = BigInt(deal.totalRewardClaimedAmount as string);
+
+  h.log(`ACCOUNTING: positions(${positions.length}) — sumStaked=${sumStaked}, sumSlashed=${sumSlashed}, sumReleased=${sumReleased}, sumClaimed=${sumClaimed}`);
+  h.log(`ACCOUNTING: deal — staked=${dealStaked}, slashed=${dealSlashed}, released=${dealReleased}, claimed=${dealClaimed}`);
+
+  assert.equal(sumStaked, dealStaked, "sum(positions.currentStakedAmount) == deal.currentStakedAmount");
+  assert.equal(sumSlashed, dealSlashed, "sum(positions.totalSlashedAmount) == deal.totalSlashedStakeAmount");
+  assert.equal(sumReleased, dealReleased, "sum(positions.totalReleasedAmount) == deal.totalReleasedStakeAmount");
+  assert.equal(sumClaimed, dealClaimed, "sum(positions.totalClaimedMainTokenAmount) == deal.totalRewardClaimedAmount");
+
+  // Claimed should never exceed allocated
+  const dealAllocated = BigInt(deal.totalRewardAllocatedAmount as string);
+  assert.equal(dealClaimed <= dealAllocated, true, "deal.totalRewardClaimedAmount <= deal.totalRewardAllocatedAmount");
+
+  return {deal, positions};
+}
+
 async function rpcCall(rpcUrl: string, method: string, params: unknown[] = []): Promise<unknown> {
   const res = await fetch(rpcUrl, {
     method: "POST",

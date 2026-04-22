@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {getChainTimestamp, setupNativeDacWithDeal} from "./fixtures/index.js";
+import {getChainTimestamp, setupNativeDacWithDeal, verifyTxReceipt} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Reward Pool Allocation
@@ -101,6 +101,12 @@ export const dealRewardPoolScenario: Scenario = {
         "--config", h.config.configPath, "--pretty-print",
       ]);
       assert.defined(cli.data.txHash, "agent claim tx");
+
+      // Verify on-chain receipt (writeContract doesn't check receipt status)
+      const receipt = await verifyTxReceipt(h, cli.data.txHash as string);
+      h.log(`Agent claim receipt: status=${receipt.status}, gasUsed=${receipt.gasUsed}`);
+      assert.equal(receipt.status, "0x1", "agent claim tx succeeded on-chain");
+
       return {cli, command: ["deal", "claim"]};
     });
 
@@ -113,6 +119,12 @@ export const dealRewardPoolScenario: Scenario = {
         "--config", h.config.configPath, "--pretty-print",
       ]);
       assert.defined(cli.data.txHash, "pool claim tx");
+
+      // Verify on-chain receipt — writeContract returns hash even for reverted txs
+      const receipt = await verifyTxReceipt(h, cli.data.txHash as string);
+      h.log(`Pool claim receipt: status=${receipt.status}, gasUsed=${receipt.gasUsed}`);
+      assert.equal(receipt.status, "0x1", "pool claim tx succeeded on-chain (not silently reverted)");
+
       return {cli, command: ["deal", "claim-reward-pool"]};
     });
 

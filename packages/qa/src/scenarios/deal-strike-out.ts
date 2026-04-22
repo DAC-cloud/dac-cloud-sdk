@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {setupNativeDacWithDeal} from "./fixtures/index.js";
+import {setupNativeDacWithDeal, verifyDealAccountingInvariants} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Strike-Out Agent
@@ -206,6 +206,17 @@ export const dealStrikeOutScenario: Scenario = {
       }
 
       return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+    });
+
+    // ── Cross-validate accounting invariants ───────────────────────
+
+    await step(h, "verify-accounting-invariants", async () => {
+      const {deal, positions} = await verifyDealAccountingInvariants(h, ctx.dealAddress);
+      return {
+        cli: {data: {action: "accounting-check"}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["accounting-invariants"],
+        indexerSnapshot: {deal, positions} as Record<string, unknown>,
+      };
     });
 
     // ── Verify agent1's agent tokens were returned ───────────────

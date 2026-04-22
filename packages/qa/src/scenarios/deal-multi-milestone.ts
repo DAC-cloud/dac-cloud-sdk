@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {getChainTimestamp, setupNativeDacWithDeal, transferErc20} from "./fixtures/index.js";
+import {getChainTimestamp, setupNativeDacWithDeal, transferErc20, verifyDealAccountingInvariants} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Multi-Milestone — Sequential Evaluation
@@ -262,6 +262,17 @@ export const dealMultiMilestoneScenario: Scenario = {
       }
 
       return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+    });
+
+    // ── Cross-validate accounting invariants ─────────────────────
+
+    await step(h, "verify-accounting-invariants", async () => {
+      const {deal, positions} = await verifyDealAccountingInvariants(h, ctx.dealAddress);
+      return {
+        cli: {data: {action: "accounting-check"}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["accounting-invariants"],
+        indexerSnapshot: {deal, positions} as Record<string, unknown>,
+      };
     });
   },
 };

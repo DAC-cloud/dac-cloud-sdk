@@ -83,7 +83,7 @@ export const dacInvestmentScenario: Scenario = {
         "--quorum-percent", "50",
         "--blocking-percent", "25",
         "--high-quorum-percent", "75",
-        "--voting-duration", "3600",
+        "--voting-duration", "7200",
         "--qualification", "0",
         "--execution-validity-duration", "86400",
         "--oracle-publish-deadline", "600",
@@ -170,12 +170,12 @@ export const dacInvestmentScenario: Scenario = {
     await h.syncIndexer();
 
     // ── Step 1d: Increase investee voting duration ─────────────────
-    // The child-vote-proposal on the investor's deal takes ~3610s to complete.
-    // The investee's default voting duration is 3600s — the investee proposal
-    // would expire before DACDeal can cast its vote. Set to 7200s (2 hours).
-    h.log("Increasing investee voting duration to 7200s...");
+    // The child-vote-proposal on the investor's deal takes ~7310s to complete
+    // (deal voting-duration=7200 + margin). The investee proposal must stay open
+    // long enough for DACDeal to cast its vote. Set to 14400s (4 hours).
+    h.log("Increasing investee voting duration to 14400s...");
     await proposeVoteExecuteAs(h, "agent1", investeeDacAddress!, [
-      "propose", "update-voting-config", "50", "0", "50", "7200", "0", "7200",
+      "propose", "update-voting-config", "50", "0", "50", "14400", "0", "14400",
     ]);
     await h.syncIndexer();
 
@@ -359,6 +359,9 @@ export const dacInvestmentScenario: Scenario = {
     const capitalCall2Nonce = capitalCall2ProposalId;
     h.log(`Capital call #2 nonce = ${capitalCall2Nonce}`);
 
+    // Settle chain state after child-vote flow before next deal proposal
+    await h.mineBlock();
+
     // ── Step 3b: Investor's agent submits request-tranche deal proposal ──
     let trancheDealProposalId: string;
     await step(h, "request-tranche-proposal", async () => {
@@ -376,7 +379,8 @@ export const dacInvestmentScenario: Scenario = {
     });
 
     // ── Step 3c: Vote + execute deal-side tranche proposal ─────────
-    // This creates a DAC-level tranche proposal in the dealManager
+    // This creates a DAC-level tranche proposal in the dealManager.
+    // Deal voting duration = 7200s (inherited from investor DAC VotingConfig).
     h.log("Voting/executing deal-side tranche request...");
     await h.advanceTime(10);
     await h.cli([
@@ -384,7 +388,7 @@ export const dacInvestmentScenario: Scenario = {
       "--deal-address", dealAddress!,
       "--config", config.configPath, "--pretty-print",
     ]);
-    await h.advanceTime(3700);
+    await h.advanceTime(7300);
     const trancheExecuteCli = await h.cli([
       "deal", "execute", trancheDealProposalId!,
       "--deal-address", dealAddress!,
@@ -674,14 +678,25 @@ async function proposeVoteExecuteWithChildVote(
   const childVoteProposalId = String(childVoteCli.data.proposalId ?? "");
 
   // 4. Vote + execute the deal-side child-vote proposal
+  // Deal voting duration = 7200s (from investor DAC VotingConfig).
+  // With 100% yes votes the quorum path resolves immediately, but we still
+  // advance past endTime to be safe against edge cases.
   await h.syncIndexer();
   await h.advanceTime(10);
-  await h.cli([
+  const childVoteCli2 = await h.cli([
     "deal", "vote", "proposal", childVoteProposalId, "true",
     "--deal-address", dealAddress,
     "--config", config.configPath, "--pretty-print",
   ]);
-  await h.advanceTime(3700);
+
+  // Verify the vote tx actually succeeded on-chain (writeContract doesn't check receipts)
+  const {verifyTxReceipt} = await import("./fixtures/index.js");
+  const voteReceipt = await verifyTxReceipt(h, childVoteCli2.data.txHash as string);
+  if (voteReceipt.status !== "0x1") {
+    throw new Error(`child-vote vote tx REVERTED on-chain (status=${voteReceipt.status}, tx=${childVoteCli2.data.txHash}). The CLI returned success but the tx failed silently.`);
+  }
+
+  await h.advanceTime(7300);
   await h.cli([
     "deal", "execute", childVoteProposalId,
     "--deal-address", dealAddress,
