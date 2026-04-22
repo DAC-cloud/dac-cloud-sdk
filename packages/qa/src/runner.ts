@@ -1,5 +1,6 @@
 import {createHarness} from "./harness/index.js";
 import {reviewScenario} from "./review/reviewer.js";
+import {reviewScenarioWithAgent} from "./review/reviewer-agent.js";
 import type {QaConfig, Scenario, ScenarioResult} from "./harness/types.js";
 
 export interface RunOptions {
@@ -9,6 +10,8 @@ export interface RunOptions {
   tags?: string[];
   /** Skip agent review even if reviewer is configured */
   skipReview?: boolean;
+  /** Use Claude Code Agent SDK for review (no API key needed, uses Max subscription) */
+  useAgentReview?: boolean;
   /** Stop on first failure */
   bail?: boolean;
 }
@@ -89,12 +92,30 @@ async function runSingle(
     passed = false;
   }
 
-  // Agent review
+  // Agent review — two modes:
+  // 1. API mode: ANTHROPIC_API_KEY set → direct Anthropic API call (ReviewerConfig)
+  // 2. Agent SDK mode: --review flag without API key → Claude Code Agent SDK (uses Max subscription)
   let review = undefined;
-  if (config.reviewer && !opts.skipReview && steps.length > 0) {
-    console.log(`\n  🔍 Running agent review...`);
-    try {
-      review = await reviewScenario(config.reviewer, scenario.name, steps);
+  if (!opts.skipReview && steps.length > 0) {
+    if (config.reviewer) {
+      // API mode — direct Anthropic API
+      console.log(`\n  🔍 Running agent review (API mode)...`);
+      try {
+        review = await reviewScenario(config.reviewer, scenario.name, steps);
+      } catch (err) {
+        console.error(`  ⚠ Agent review error: ${err instanceof Error ? err.message : err}`);
+      }
+    } else if (opts.useAgentReview) {
+      // Agent SDK mode — Claude Code subscription
+      console.log(`\n  🔍 Running agent review (Claude Code)...`);
+      try {
+        review = await reviewScenarioWithAgent(scenario.name, steps);
+      } catch (err) {
+        console.error(`  ⚠ Agent review error: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
+    if (review) {
       if (!review.passed) {
         passed = false;
         console.log(`  ⚠ Agent reviewer found issues:`);
@@ -104,8 +125,6 @@ async function runSingle(
       } else {
         console.log(`  ✓ Agent review passed: ${review.summary}`);
       }
-    } catch (err) {
-      console.error(`  ⚠ Agent review error: ${err instanceof Error ? err.message : err}`);
     }
   }
 

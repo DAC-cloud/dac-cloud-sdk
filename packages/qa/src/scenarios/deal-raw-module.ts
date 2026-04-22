@@ -276,6 +276,17 @@ export const dealRawModuleScenario: Scenario = {
       return {cli, command: ["dac", ...args]};
     });
 
+    await h.syncIndexer();
+
+    // Snapshot deal state after evaluation
+    await step(h, "verify-after-evaluation", async () => {
+      const cli = await h.dealView("deal", ["--deal-address", ctx.dealAddress]);
+      const deal = cli.data.deal as Record<string, unknown>;
+      assert.defined(deal, "deal after evaluation");
+      h.log(`After eval: allocated=${deal.totalRewardAllocatedAmount}, poolAllocated=${deal.totalDealRewardPoolAllocatedAmount}`);
+      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+    });
+
     await step(h, "claim-reward-pool", async () => {
       const args = [
         "deal", "claim-reward-pool",
@@ -287,6 +298,26 @@ export const dealRawModuleScenario: Scenario = {
       assert.defined(cli.data.txHash, "claim-reward-pool tx hash present");
       h.log(`claim-reward-pool tx: ${cli.data.txHash}`);
       return {cli, command: ["dac", ...args]};
+    });
+
+    await h.syncIndexer();
+
+    // Snapshot deal state after claims
+    await step(h, "verify-after-claims", async () => {
+      const cli = await h.dealView("deal", ["--deal-address", ctx.dealAddress]);
+      const deal = cli.data.deal as Record<string, unknown>;
+      assert.defined(deal, "deal after claims");
+      h.log(`After claims: claimed=${deal.totalRewardClaimedAmount}, poolClaimed=${deal.totalDealRewardPoolClaimedAmount}`);
+      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+    });
+
+    // Snapshot raw deal proposals
+    await step(h, "verify-raw-deal-proposals", async () => {
+      const cli = await h.dealView("proposals", ["--deal-address", rawDealAddress!]);
+      const proposals = cli.data.proposals as Array<Record<string, unknown>> | undefined;
+      assert.defined(proposals, "raw deal proposals in indexer");
+      h.log(`Raw deal proposals: ${proposals?.length}`);
+      return {cli, command: ["deal", "view", "proposals"], indexerSnapshot: {proposals} as Record<string, unknown>};
     });
   },
 };

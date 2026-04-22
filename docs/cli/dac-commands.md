@@ -78,17 +78,59 @@ Create a DAC governance proposal. See [Governance Guide](./governance.md) for th
 
 **DAC Proposal Types:**
 
+Governance configuration (all use high quorum):
+
 | Type | Args | Description |
 |------|------|-------------|
-| `mint-agent-tokens` | `<amount> <recipient>` | Mint AgentTokens to an address |
-| `set-metadata` | `<key> <value>` | Update DAC metadata |
-| `dividend-payout` | `<token> <amount> <merkleRoot>` | Distribute dividends |
-| `capital-call` | Complex | Issue capital call to members |
+| `update-voting-config` | `<quorum> <blocking> <highQuorum> <duration> <qualification> [execDuration]` | Update voting parameters |
+| `update-governance-strategy` | `<quorum> <highQuorum> <blocking> <duration> <qual> <execDur> <oraclePubDeadline> <fallbackWarmup> <fallbackDur> <blockAll> <blockHigh> <oraclePrimary>` | Update full governance strategy (existing-token DACs) |
+| `update-deal-creation-config` | `<minAgentBalance> <minInitialAgentStake>` | Set deal creation requirements |
+| `update-governance-oracle` | `<oracleAddress>` | Change governance oracle address |
+| `update-legal-wrapper` | See `--input` | Update legal wrapper reference |
+
+Token management:
+
+| Type | Args | Description |
+|------|------|-------------|
+| `mint-agent-tokens` | `<amount> <recipient>` | Mint AgentTokens directly to an agent |
+| `mint-agent-tokens-distributor` | `<amount> <distributor>` | Mint AgentTokens into distributor inventory |
+| `disable-agent-distributor` | `<distributor>` | Revoke a distributor's role |
+| `revoke-agent-tokens` | `<amount> <agent>` | Revoke AgentTokens from an agent |
+| `mint-main-tokens` | `<amount>` | Mint MainTokens into treasury reserve |
+| `burn-main-tokens` | `<amount>` | Burn MainTokens from treasury reserve |
+
+Dividends and treasury:
+
+| Type | Args | Description |
+|------|------|-------------|
+| `toggle-dividends` | `<true\|false>` | Enable/disable dividend capability |
+| `dividend-payout` | `<token> <amount> <merkleRoot>` | Distribute dividends via Merkle tree |
+| `capital-call` | `<recipient> <treasuryToken> <tokenAmount> <cashAmount>` | Issue capital call |
+| `delegate-from-balance` | `<token> <delegatee> <amount>` | Delegate voting power from treasury balance |
+| `deposit-treasury` | See treasury section below | Deposit ERC20 tokens to treasury |
+
+Offchain and legal:
+
+| Type | Args | Description |
+|------|------|-------------|
+| `approve-offchain-action` | `<actionHash>` | Approve an off-chain governance action |
+
+Module management:
+
+| Type | Args | Description |
+|------|------|-------------|
 | `add-module` | `<moduleFactory>` | Add a module to the DAC |
 | `remove-module` | `<moduleFactory>` | Remove a module |
-| `recover-deal` | `<dealId> <liquidator> <liquidatorStake>` | Recover a closed/slashed deal |
-| `deal-message` | `<dealId> <kind> <message>` | Send message to a deal |
-| `challenge-deal` | `<dealId> <dealProposalId>` | Challenge a deal governance proposal |
+| `add-evaluator` | `<dealId> <evaluatorModule> <evaluatorConfig>` | Add evaluator to an existing deal |
+
+Deal operations (DAC-level):
+
+| Type | Args | Description |
+|------|------|-------------|
+| `recover-deal` | `<dealId> <liquidator> <liquidatorStake>` | Assign liquidator to a closed/slashed deal |
+| `deal-message` | `<dealId> <kind> <message>` | Send governance message to a deal |
+| `challenge-deal` | `<dealId> <dealProposalId>` | Veto a deal governance proposal (requires vetoEnabled) |
+| `cast-veto-deal` | `<dealId> <dealProposalId>` | Alias for challenge-deal |
 
 ### `vote proposal <proposalId> <support>`
 
@@ -151,11 +193,18 @@ Query DAC state from the indexer.
 | Resource | Description |
 |----------|-------------|
 | `dac` | DAC details (default) |
+| `dacs` | List all DACs on chain |
 | `proposals` | List DAC proposals |
 | `proposal` | Single proposal by ID |
 | `deals` | List deals in this DAC |
-| `capital-call` | Capital call details |
+| `capital-calls` | Capital call history |
+| `treasury-holdings` | Token balances in DAC treasury |
+| `treasury-movements` | Treasury deposit/withdrawal history |
+| `treasury-delegations` | Voting power delegations from treasury |
+| `governance-oracles` | Oracle state for existing-token DACs |
 | `accounts` | Governance accounts |
+| `account` | Single account details |
+| `wrapper-actions` | Legal wrapper action history |
 
 ```bash
 dac view dac --dac 0x<dac>

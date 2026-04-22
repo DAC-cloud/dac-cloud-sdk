@@ -14,6 +14,7 @@
     "qa": "node --no-warnings dist/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.117",
     "@dac-cloud/indexer": "0.1.0",
     "dotenv": "^16.6.1",
     "viem": "^2.39.0"

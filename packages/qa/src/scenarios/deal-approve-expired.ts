@@ -185,6 +185,40 @@ export const dealApproveExpiredScenario: Scenario = {
       return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
     });
 
+    // ── Verify agents can unstake from expired deal 1 ─────────────
+    // When a deal's approve deadline expires, staked agents should be able
+    // to unstake and recover their AgentTokens.
+
+    await step(h, "unstake-from-expired-deal", async () => {
+      const cli = await h.cli([
+        "deal", "unstake",
+        "--deal-address", ctx1.dealCell,
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      assert.defined(cli.data.txHash, "unstake from expired deal tx hash");
+      h.log("Unstaked from expired deal");
+      return {cli, command: ["deal", "unstake"]};
+    });
+
+    await h.syncIndexer();
+
+    await step(h, "verify-unstake-from-expired", async () => {
+      const cli = await h.dealView("positions", ["--deal-address", ctx1.dealAddress]);
+      const positions = cli.data.positions as Array<Record<string, unknown>> | undefined;
+      assert.defined(positions, "positions after unstake");
+      if (positions && positions.length > 0) {
+        const pos = positions[0];
+        h.log(`After unstake: staked=${pos.currentStakedAmount}, released=${pos.totalReleasedAmount}`);
+        assert.equal(pos.currentStakedAmount, "0", "stake is 0 after unstake from expired deal");
+        assert.equal(
+          BigInt(pos.totalReleasedAmount as string) > 0n,
+          true,
+          "tokens released on unstake from expired deal",
+        );
+      }
+      return {cli, command: ["deal", "view", "positions"], indexerSnapshot: {positions} as Record<string, unknown>};
+    });
+
     // ── Verify both deals visible in DAC ─────────────────────────
 
     await step(h, "verify-two-deals-in-dac", async () => {

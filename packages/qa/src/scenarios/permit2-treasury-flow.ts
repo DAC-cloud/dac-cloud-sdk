@@ -137,19 +137,36 @@ export const permit2TreasuryFlowScenario: Scenario = {
       return {cli, command: ["deal", "receive-permit2"]};
     });
 
-    // ── Step 4: verify balances ───────────────────────────────────
+    await h.syncIndexer();
+
+    // ── Step 4: verify balances + indexer state ──────────────────
     await step(h, "verify-receive-balances", async () => {
-      // Treasury should have received the tokens
+      // Treasury should have received the tokens (on-chain)
       const treasuryBalCli = await h.cli([
         "balance", underlyingToken, treasuryAddress,
         "--config", config.configPath, "--pretty-print",
       ]);
       const treasuryBal = treasuryBalCli.data.balance as string;
-      h.log(`Treasury balance: ${treasuryBal}`);
-      // Treasury has funding (1k) + received (500) = 1500
+      h.log(`Treasury balance (on-chain): ${treasuryBal}`);
       assert.equal(BigInt(treasuryBal) >= BigInt(receiveAmount), true, "treasury received tokens via Permit2");
 
-      return {cli: treasuryBalCli, command: ["balance"]};
+      // Also check indexer treasury holdings
+      const thCli = await h.view("treasury-holdings", ["--dac", ctx.dacAddress]);
+      const holdings = thCli.data.holdings as Array<Record<string, unknown>> | undefined;
+      const fundingHolding = holdings?.find(
+        (ent) => (ent.tokenAddress as string)?.toLowerCase() === underlyingToken.toLowerCase(),
+      );
+      h.log(`Treasury holding (indexer): ${fundingHolding ? fundingHolding.balance : "not found"}`);
+
+      // Check deal state
+      const dealCli = await h.dealView("deal", ["--deal-address", ctx.dealAddress]);
+      const deal = dealCli.data.deal as Record<string, unknown>;
+
+      return {
+        cli: treasuryBalCli,
+        command: ["balance"],
+        indexerSnapshot: {treasuryBalance: treasuryBal, holdings, deal} as Record<string, unknown>,
+      };
     });
 
     // ══════════════════════════════════════════════════════════════
@@ -173,6 +190,26 @@ export const permit2TreasuryFlowScenario: Scenario = {
       return {
         cli: {data: {proposalId}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
         command: ["deal", "propose", "permit2-spend"],
+      };
+    });
+
+    await h.syncIndexer();
+
+    // ── Verify deal proposals and treasury actions in indexer ─────
+    await step(h, "verify-deal-governance", async () => {
+      const propsCli = await h.dealView("proposals", ["--deal-address", ctx.dealAddress]);
+      const proposals = propsCli.data.proposals as Array<Record<string, unknown>> | undefined;
+      assert.defined(proposals, "deal proposals in indexer");
+      h.log(`Deal proposals: ${proposals?.length}`);
+
+      const actionsCli = await h.dealView("treasury-actions", ["--deal-address", ctx.dealAddress]);
+      const actions = actionsCli.data.actions as Array<Record<string, unknown>> | undefined;
+      h.log(`Treasury actions: ${actions?.length ?? 0}`);
+
+      return {
+        cli: propsCli,
+        command: ["deal", "view", "proposals"],
+        indexerSnapshot: {proposals, actions} as Record<string, unknown>,
       };
     });
 

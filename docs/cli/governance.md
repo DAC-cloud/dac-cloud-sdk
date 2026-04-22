@@ -67,17 +67,28 @@ See [DAC Commands > propose](./dac-commands.md#propose-proposaltype-args) for th
 
 Key types:
 - `mint-agent-tokens` — Mint AgentTokens (needed before agents can stake into deals)
+- `mint-main-tokens` / `burn-main-tokens` — Manage MainToken supply in treasury reserve
 - `recover-deal` — Assign a liquidator to a slashed/closed deal
 - `challenge-deal` — DAC-level veto of a deal governance proposal
+
+**High quorum types** (use `highQuorumPercent` instead of `quorumPercent`):
+All governance configuration proposals use high quorum: `update-governance-strategy`, `update-deal-creation-config`, `update-voting-config`, `update-legal-wrapper`, `update-governance-oracle`, `dividend-payout`, `add-module`, `remove-module`, `toggle-dividends`, `mint-main-tokens`, `burn-main-tokens`.
 
 ## Deal Proposal Types
 
 See [Deal Commands > propose](./deal-commands.md#propose-proposaltype-args) for the full list.
 
-Key types:
-- `toggle-whitelist` — Enable/disable agent whitelist (allowed before approval)
-- `request-tranche` — Request funding from DAC treasury
-- `strike-out-agent` — Force-remove an underperforming agent
+Kernel deal proposal types:
+- `update-voting-config`, `toggle-whitelist`, `toggle-early-returns` — Governance config (high quorum, allowed pre-approval)
+- `enable-veto-right` — Enable DAC challenge capability (high quorum)
+- `request-tranche` — Request funding from DAC treasury (normal quorum + blocking)
+- `add-stake` — Add pending stake from a request (high quorum)
+- `strike-out-agent` — Force-remove an agent, stake released not slashed (high quorum, always challengeable)
+
+Module deal proposal types (core module):
+- `direct-spend`, `permit2-spend` — Treasury operations
+- `child-vote-proposal`, `child-create-proposal` — Cross-DAC governance via DAC deals
+- `return-capital` — Return funds to parent DAC treasury
 
 ### Pre-Approval Proposals
 

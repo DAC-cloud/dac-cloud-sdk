@@ -114,10 +114,27 @@ Deals have their own governance — staked agents (holders of StakedAgent tokens
 | `enable-veto-right` | (none) | Enable DAC challenge capability |
 | `request-tranche` | `<token> <amount> [rewards]` | Request funding tranche from DAC |
 | `add-stake` | `<agent> <amount>` | Add pending stake from a request |
-| `strike-out-agent` | `<agent>` | Force-remove an agent |
+| `strike-out-agent` | `<agent>` | Force-remove an agent (stake released, not slashed) |
+
+**Module deal proposal types** (core module — prefix `core:` optional):
+
+| Type | Args | Description |
+|------|------|-------------|
+| `direct-spend` | `<token> <destination> <amount>` | Transfer tokens from deal treasury |
+| `permit2-spend` | `<token> <destination> <amount>` | Transfer tokens via Permit2 |
+| `return-capital` | `<token> <amount>` | Return capital to DAC treasury |
+| `approve-agent-spend` | `<agent> <token> <amount>` | Approve an agent to spend deal funds |
+| `assign-claimer` | `<agent> <evaluatorId>` | Assign a claimer role |
+| `revoke-agent` | `<agent>` | Revoke an agent's spend rights |
+| `delegate-vote-rights` | `<token> <delegatee>` | Delegate deal's voting power in child DAC |
+| `child-create-proposal` | `<typ> <target> <i> <data>` | Create proposal in child DAC via deal |
+| `child-vote-proposal` | `<proposalId> <support>` | Vote on child DAC proposal via deal |
+| `child-return-profits` | `<token> <amount>` | Return profits from child DAC |
+| `child-reinvest-profits` | `<token> <amount> <capitalCallHash>` | Reinvest profits into child DAC |
 
 ```bash
 dac deal propose toggle-whitelist false --deal 0x<deal> --config ./config.env
+dac deal propose core:direct-spend 0x<token> 0x<dest> 1000 --deal 0x<deal>
 ```
 
 Note: `toggle-whitelist`, `toggle-early-returns`, and `update-voting-config` can be proposed **before** deal approval. All other types require the deal to be approved.
@@ -157,12 +174,28 @@ Claim unlocked MainToken rewards. Each staked agent claims their proportional sh
 dac deal claim --deal 0x<deal> --config ./config.env
 ```
 
+### `claim-reward-pool [evaluatorId]`
+
+Claim the deal's collective reward pool allocation (set by `dealRewardPoolPercent` at deal creation). Called by a staked agent on behalf of the deal contract.
+
+```bash
+dac deal claim-reward-pool --deal 0x<deal> --config ./config.env
+```
+
 ### `withdraw <dealNumericId>`
 
 Force return capital after the deal deadline. Moves remaining funds from the deal cell back to the DAC treasury. Does **not** close the deal.
 
 ```bash
 dac deal withdraw 1 --dac 0x<dac> --config ./config.env
+```
+
+### `link-capital-call <capitalCallId>`
+
+Link a DAC deal to an existing capital call in the child DAC. Must be called by a staked agent before deal approval.
+
+```bash
+dac deal link-capital-call 3 --deal 0x<deal> --config ./config.env
 ```
 
 ## Deal Recovery

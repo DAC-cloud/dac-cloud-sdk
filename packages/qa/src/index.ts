@@ -32,6 +32,9 @@ function parseArgs(argv: string[]): {configInput: QaConfigInput; runOpts: RunOpt
       case "--skip-review":
         runOpts.skipReview = true;
         break;
+      case "--review":
+        runOpts.useAgentReview = true;
+        break;
       case "--bail":
         runOpts.bail = true;
         break;
@@ -100,6 +103,7 @@ Options:
   --filter <name>          Run scenarios matching name (can repeat)
   --tag <tag>              Run scenarios matching tag (can repeat)
   --skip-review            Skip agent reviewer
+  --review                 Enable Claude Code agent reviewer (uses Max subscription, no API key)
   --bail                   Stop on first failure
   --local                  Force local chain mode (enables time manipulation)
   --testnet                Force testnet mode (disables time manipulation)
