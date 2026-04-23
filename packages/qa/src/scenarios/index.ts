@@ -20,6 +20,7 @@ import {oracleGovernanceScenario} from "./oracle-governance.js";
 import {dealStrikeOutScenario} from "./deal-strike-out.js";
 import {dacAgentDistributorScenario} from "./dac-agent-distributor.js";
 import {dacBurnMainTokensScenario} from "./dac-burn-main-tokens.js";
+import {existingTokenAccountingStressScenario} from "./existing-token-accounting-stress.js";
 
 export const ALL_SCENARIOS: Scenario[] = [
   existingTokenDacScenario,
@@ -43,6 +44,7 @@ export const ALL_SCENARIOS: Scenario[] = [
   dealStrikeOutScenario,
   dacAgentDistributorScenario,
   dacBurnMainTokensScenario,
+  existingTokenAccountingStressScenario,
 ];
 
 export {
@@ -67,4 +69,5 @@ export {
   dealStrikeOutScenario,
   dacAgentDistributorScenario,
   dacBurnMainTokensScenario,
+  existingTokenAccountingStressScenario,
 };

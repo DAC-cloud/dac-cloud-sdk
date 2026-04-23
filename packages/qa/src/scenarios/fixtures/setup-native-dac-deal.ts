@@ -61,6 +61,10 @@ export interface DealSetupOptions {
   extraAgents?: AgentStakeConfig[];
   /** Skip deal approval — leave the deal in pending state (default: false) */
   skipApproval?: boolean;
+  /** Treasury seed amount for existing-token DAC (default: "1000000000000000000000" = 1k).
+   *  For deals with rewards, this must be >= rewardsLimit since it's the only way to
+   *  fund the AssetController's mainToken balance. Ignored for native DAC. */
+  treasurySeedAmount?: string;
 }
 
 export interface DealContext {
