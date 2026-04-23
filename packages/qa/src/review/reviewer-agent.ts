@@ -124,6 +124,7 @@ function buildPrompt(scenarioName: string, steps: StepResult[]): string {
 export async function reviewScenarioWithAgent(
   scenarioName: string,
   steps: StepResult[],
+  opts?: {maxTurns?: number},
 ): Promise<ReviewResult> {
   const prompt = buildPrompt(scenarioName, steps);
 
@@ -145,11 +146,11 @@ export async function reviewScenarioWithAgent(
             description: "DAC Cloud protocol QA reviewer — analyzes indexer data for consistency and accounting bugs",
             prompt: DAC_REVIEWER_PROMPT,
             tools: ["Read"],
-            maxTurns: 8,
+            maxTurns: opts?.maxTurns ?? 8,
           },
         },
         allowedTools: ["Read"],
-        maxTurns: 8,
+        maxTurns: opts?.maxTurns ?? 8,
         outputFormat: {
           type: "json_schema",
           schema: REVIEW_JSON_SCHEMA,

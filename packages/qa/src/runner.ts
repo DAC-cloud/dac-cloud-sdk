@@ -14,6 +14,8 @@ export interface RunOptions {
   useAgentReview?: boolean;
   /** Stop on first failure */
   bail?: boolean;
+  /** Max turns for agent reviewer (default: 8) */
+  reviewerMaxTurns?: number;
 }
 
 export async function runScenarios(
@@ -109,7 +111,7 @@ async function runSingle(
       // Agent SDK mode — Claude Code subscription
       console.log(`\n  🔍 Running agent review (Claude Code)...`);
       try {
-        review = await reviewScenarioWithAgent(scenario.name, steps);
+        review = await reviewScenarioWithAgent(scenario.name, steps, {maxTurns: opts.reviewerMaxTurns});
       } catch (err) {
         console.error(`  ⚠ Agent review error: ${err instanceof Error ? err.message : err}`);
       }
@@ -124,6 +126,14 @@ async function runSingle(
         }
       } else {
         console.log(`  ✓ Agent review passed: ${review.summary}`);
+        // Show observations (warning/info findings) even when passing
+        const observations = review.findings.filter((f) => f.severity === "warning" || f.severity === "info");
+        if (observations.length > 0) {
+          console.log(`  📋 Observations (${observations.length}):`);
+          for (const f of observations) {
+            console.log(`    [${f.severity}] ${f.step}: ${f.message}`);
+          }
+        }
       }
     }
   }

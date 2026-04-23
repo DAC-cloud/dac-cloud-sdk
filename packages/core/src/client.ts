@@ -892,12 +892,26 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         throw new Error("Wallet client with account is required for recoverTreasury");
       }
 
+      // recoverTreasury involves a deep call chain through proxies: transfer → onMainMove
+      // → recordDeposit → syncTreasury → getVotingConfig (governance schema proxy).
+      // Viem's auto gas estimate can be tight when called right after a state-changing
+      // transfer (storage slot warm/cold transitions affect estimation accuracy).
+      // We add a 50% buffer to the estimate to prevent out-of-gas reverts.
+      const gasEstimate = await publicClient.estimateContractGas({
+        address: dacCell,
+        abi: dacCellAbi,
+        functionName: "recoverTreasury",
+        args: [token],
+        account: walletClient.account,
+      });
+
       return walletClient.writeContract({
         address: dacCell,
         abi: dacCellAbi,
         functionName: "recoverTreasury",
         args: [token],
         account: walletClient.account,
+        gas: gasEstimate + (gasEstimate / 2n),
       });
     },
 

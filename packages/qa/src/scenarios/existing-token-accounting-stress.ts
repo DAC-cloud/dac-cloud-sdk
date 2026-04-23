@@ -190,7 +190,10 @@ export const existingTokenAccountingStressScenario: Scenario = {
     // user path for adding reward capacity after DAC creation.
 
     await step(h, "deposit-treasury-wrapped", async () => {
-      h.log("Testing deposit-treasury for WrappedMainToken (2k)...");
+      // Test the standard user path for adding reward capacity post-creation:
+      // deposit-treasury for WrappedMainToken (ERC20 transfer + recoverTreasury).
+      // Requires the contract fix that skips _autoDelegate for controlled addresses.
+      h.log("Depositing WrappedMainToken to treasury (2k) for reward top-up...");
       const depositCli = await h.cli([
         "deposit-treasury", "--token", ctx.wrappedMainTokenAddress,
         "--amount", "2000000000000000000000", // 2k wrapped

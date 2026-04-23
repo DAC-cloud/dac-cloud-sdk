@@ -44,6 +44,9 @@ function parseArgs(argv: string[]): {configInput: QaConfigInput; runOpts: RunOpt
       case "--reviewer-model":
         configInput.reviewerModel = args[++i];
         break;
+      case "--reviewer-max-turns":
+        runOpts.reviewerMaxTurns = parseInt(args[++i], 10);
+        break;
       case "--indexer-timeout":
         configInput.indexerSyncTimeoutMs = parseInt(args[++i], 10);
         break;
@@ -110,6 +113,7 @@ Options:
   --indexer-timeout <ms>   Indexer sync timeout in ms (default: 30000)
   --reviewer-api-key <key> Anthropic API key for agent reviewer
   --reviewer-model <model> Reviewer model (default: claude-haiku-4-5-20251001)
+  --reviewer-max-turns <n> Max turns for agent reviewer (default: 8)
   --wallet-<role> <path>   Extra wallet config file for role
   --list                   List available scenarios
   --help                   Show this help
