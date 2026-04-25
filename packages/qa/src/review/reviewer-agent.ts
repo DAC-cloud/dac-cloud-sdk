@@ -92,16 +92,21 @@ const REVIEW_JSON_SCHEMA = {
   required: ["passed", "summary", "findings"],
 };
 
+/** JSON replacer that converts BigInt values to decimal strings (avoids "Do not know how to serialize a BigInt"). */
+function bigIntReplacer(_key: string, value: unknown): unknown {
+  return typeof value === "bigint" ? value.toString() : value;
+}
+
 function buildPrompt(scenarioName: string, steps: StepResult[]): string {
   const parts = [`# Scenario: ${scenarioName}\n`];
 
   for (const step of steps) {
     parts.push(`## Step: ${step.label}`);
     parts.push(`Command: ${step.command.join(" ")}`);
-    parts.push(`CLI Output:\n\`\`\`json\n${JSON.stringify(step.cli.data, null, 2)}\n\`\`\``);
+    parts.push(`CLI Output:\n\`\`\`json\n${JSON.stringify(step.cli.data, bigIntReplacer, 2)}\n\`\`\``);
 
     if (step.indexerSnapshot) {
-      parts.push(`Indexer Snapshot:\n\`\`\`json\n${JSON.stringify(step.indexerSnapshot, null, 2)}\n\`\`\``);
+      parts.push(`Indexer Snapshot:\n\`\`\`json\n${JSON.stringify(step.indexerSnapshot, bigIntReplacer, 2)}\n\`\`\``);
     }
 
     if (step.assertions.length > 0) {

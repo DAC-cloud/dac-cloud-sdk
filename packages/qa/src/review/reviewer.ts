@@ -34,16 +34,21 @@ Respond with a JSON object matching this schema:
 Be specific. Reference exact field names and values. Don't flag things that are working correctly.
 If everything looks good, return passed: true with an empty findings array.`;
 
+/** JSON replacer that converts BigInt values to decimal strings (avoids "Do not know how to serialize a BigInt"). */
+function bigIntReplacer(_key: string, value: unknown): unknown {
+  return typeof value === "bigint" ? value.toString() : value;
+}
+
 function buildPrompt(scenarioName: string, steps: StepResult[]): string {
   const parts = [`# Scenario: ${scenarioName}\n`];
 
   for (const step of steps) {
     parts.push(`## Step: ${step.label}`);
     parts.push(`Command: ${step.command.join(" ")}`);
-    parts.push(`CLI Output:\n\`\`\`json\n${JSON.stringify(step.cli.data, null, 2)}\n\`\`\``);
+    parts.push(`CLI Output:\n\`\`\`json\n${JSON.stringify(step.cli.data, bigIntReplacer, 2)}\n\`\`\``);
 
     if (step.indexerSnapshot) {
-      parts.push(`Indexer Snapshot:\n\`\`\`json\n${JSON.stringify(step.indexerSnapshot, null, 2)}\n\`\`\``);
+      parts.push(`Indexer Snapshot:\n\`\`\`json\n${JSON.stringify(step.indexerSnapshot, bigIntReplacer, 2)}\n\`\`\``);
     }
 
     if (step.assertions.length > 0) {

@@ -21,6 +21,9 @@ import {dealStrikeOutScenario} from "./deal-strike-out.js";
 import {dacAgentDistributorScenario} from "./dac-agent-distributor.js";
 import {dacBurnMainTokensScenario} from "./dac-burn-main-tokens.js";
 import {existingTokenAccountingStressScenario} from "./existing-token-accounting-stress.js";
+import {dealActiveStakingScenario} from "./deal-active-staking.js";
+import {dealMultiDealNativeRewardsScenario} from "./deal-multi-deal-native-rewards.js";
+import {dealMultiDealWrappedRewardsScenario} from "./deal-multi-deal-wrapped-rewards.js";
 
 export const ALL_SCENARIOS: Scenario[] = [
   existingTokenDacScenario,
@@ -45,6 +48,9 @@ export const ALL_SCENARIOS: Scenario[] = [
   dacAgentDistributorScenario,
   dacBurnMainTokensScenario,
   existingTokenAccountingStressScenario,
+  dealActiveStakingScenario,
+  dealMultiDealNativeRewardsScenario,
+  dealMultiDealWrappedRewardsScenario,
 ];
 
 export {
@@ -70,4 +76,7 @@ export {
   dacAgentDistributorScenario,
   dacBurnMainTokensScenario,
   existingTokenAccountingStressScenario,
+  dealActiveStakingScenario,
+  dealMultiDealNativeRewardsScenario,
+  dealMultiDealWrappedRewardsScenario,
 };
