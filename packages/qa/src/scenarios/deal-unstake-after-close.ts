@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {getChainTimestamp, setupNativeDacWithDeal, transferErc20} from "./fixtures/index.js";
+import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, transferErc20} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Unstake After Close — Multi-Agent
@@ -120,6 +120,9 @@ export const dealUnstakeAfterCloseScenario: Scenario = {
     });
 
     // ── Deposit + evaluate Deal 1 for full reward → close ───────
+
+    // Mint treasury tokens for the founder (fresh anvil may have zero balance)
+    await mintMockToken(h, {token: ctx.treasuryToken, to: ctx.founderAddress, amount: "10000000000000000000000"}); // 10k
 
     h.log(`Depositing ${depositAmount} tokens to deal 1 cell ${ctx.dealCell}...`);
 

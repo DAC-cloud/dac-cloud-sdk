@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {getChainTimestamp, setupNativeDacWithDeal, transferErc20} from "./fixtures/index.js";
+import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, transferErc20} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Evaluation — Milestone Extension
@@ -49,6 +49,9 @@ export const dealEvalExtensionScenario: Scenario = {
     const extendedTs = milestoneTs + extensionDelta; // after extension: +14 days from chainTimestamp
 
     // ── Deposit 60% to simulate partial progress ────────────────
+
+    // Mint treasury tokens for the founder (fresh anvil may have zero balance)
+    await mintMockToken(h, {token: ctx.treasuryToken, to: ctx.founderAddress, amount: "10000000000000000000000"}); // 10k
 
     h.log(`Depositing ${partialDeposit} tokens (60% of expected)...`);
 

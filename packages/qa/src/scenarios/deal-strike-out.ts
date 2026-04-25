@@ -219,22 +219,35 @@ export const dealStrikeOutScenario: Scenario = {
       };
     });
 
-    // ── Verify agent1's agent tokens were returned ───────────────
+    // ── Verify agent1's position shows full release (indexer) ──
 
-    await step(h, "verify-agent1-token-balance", async () => {
-      const cli = await h.cli([
-        "balance", ctx.agentTokenAddress, agent1Wallet.address,
-        "--config", config.configPath, "--pretty-print",
-      ]);
-      const balance = cli.data.balance as string;
-      h.log(`Agent1 agent-token balance after strike-out: ${balance}`);
-      // Agent1 was minted 50k and staked 5k. After strike-out, 5k returned → balance should be 50k
-      assert.equal(
-        BigInt(balance) >= BigInt(agent1Stake),
-        true,
-        "agent1 got agent tokens back after strike-out",
-      );
-      return {cli, command: ["balance"]};
+    await step(h, "verify-agent1-position-released", async () => {
+      const cli = await h.dealView("positions", ["--deal-address", ctx.dealAddress]);
+      const positions = cli.data.positions as Array<Record<string, unknown>> | undefined;
+      assert.defined(positions, "positions after strike-out");
+
+      const agent1Pos = positions ? findPosition(positions, agent1Wallet.address) : undefined;
+      assert.defined(agent1Pos, "agent1 position found in indexer");
+
+      if (agent1Pos) {
+        h.log(`Agent1 position: staked=${agent1Pos.currentStakedAmount}, released=${agent1Pos.totalReleasedAmount}, totalStaked=${agent1Pos.totalStakedAmount}`);
+        // Strike-out releases the full stake — agent tokens returned to the agent
+        assert.equal(agent1Pos.currentStakedAmount, "0", "agent1 current stake is 0");
+        assert.equal(
+          agent1Pos.totalReleasedAmount, agent1Stake,
+          "agent1 released amount equals original stake",
+        );
+        // Stake conservation: current(0) + slashed(0) + released(5k) == totalStaked(5k)
+        const conserved = BigInt(agent1Pos.currentStakedAmount as string)
+          + BigInt(agent1Pos.totalSlashedAmount as string)
+          + BigInt(agent1Pos.totalReleasedAmount as string);
+        assert.equal(
+          conserved, BigInt(agent1Pos.totalStakedAmount as string),
+          "agent1 stake conservation: current + slashed + released == totalStaked",
+        );
+      }
+
+      return {cli, command: ["deal", "view", "positions"], indexerSnapshot: {positions} as Record<string, unknown>};
     });
   },
 };

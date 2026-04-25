@@ -9,13 +9,13 @@ import {
   proposeVoteExecute,
   dealProposeVoteExecute,
   resolveUnderlyingToken,
-  ZERO_ADDR,
+  verifyDealAccountingInvariants,
 } from "./fixtures/index.js";
 
 /**
  * Scenario: Revenue Evaluator Lifecycle
  *
- * Tests the revenue-based evaluator across multiple evaluation cycles.
+ * Tests the revenue-based evaluator across evaluation cycles.
  * Revenue is measured via `getReturnedCapital(token)` on the deal cell,
  * which is updated when the treasury returns capital via `return-capital`
  * proposals. So the flow is:
@@ -24,15 +24,21 @@ import {
  *      through deal → deal cell, updating returnedCapital
  *   3. Evaluator reads returnedCapital as "revenue"
  *
+ * Contract rule: once a deal is closed (e.g. after a penalty slash that
+ * reduces totalSupply to 0), no further evaluations are possible.
+ *
  * Cycles:
  *   Cycle 1: Revenue returned → reward unlocked
  *   Cycle 2: No return (missed) → within grace, no penalty
- *   Cycle 3: No return again → penalty applied
- *   Cycle 4: Revenue returned → recovery
+ *   Cycle 3: No return again → penalty applied (may close deal)
+ *   If deal still open after cycle 3:
+ *     Cycle 4: Revenue returned → recovery
+ *
+ * After cycles complete: claim rewards, verify accounting invariants.
  */
 export const revenueEvaluatorScenario: Scenario = {
   name: "revenue-evaluator-lifecycle",
-  description: "Revenue evaluator: 4 cycles with revenue returns, misses, penalties, and recovery",
+  description: "Revenue evaluator: cycles with revenue returns, misses, penalties, and optional recovery",
   tags: ["deal", "revenue-evaluator", "evaluation", "cycles", "penalty"],
 
   async run(h: Harness) {
@@ -155,9 +161,6 @@ export const revenueEvaluatorScenario: Scenario = {
     // PHASE 2: EVALUATION CYCLES
     // ══════════════════════════════════════════════════════════════
 
-    // Note: we'll advance past approveDeadline + evaluationStart together below
-    // after enabling early returns.
-
     // Enable early returns so return-capital works before deal deadline
     h.log("Enabling early returns on the deal...");
     await dealProposeVoteExecute(h, dealAddress, [
@@ -165,7 +168,6 @@ export const revenueEvaluatorScenario: Scenario = {
     ]);
 
     // Advance past approveDeadline (10000) + evaluationStart (12000)
-    // This puts us right at the start of cycle tracking, before any cycles have elapsed
     const evalStartTs = chainTimestamp + 12000;
     const nowForStart = await getChainTimestamp(h);
     if (nowForStart < evalStartTs) {
@@ -175,8 +177,6 @@ export const revenueEvaluatorScenario: Scenario = {
     }
 
     // ── Cycle 1: Return capital as "revenue" → reward ─────────────
-    // Use return-capital proposal to send 1k from treasury back through
-    // deal → deal cell. This updates returnedCapital = revenue.
     h.log("Cycle 1: Returning capital as revenue...");
     await dealProposeVoteExecute(h, dealAddress, [
       "deal", "propose", "return-capital", underlyingToken, revenueTarget,
@@ -190,7 +190,7 @@ export const revenueEvaluatorScenario: Scenario = {
         "--config", config.configPath, "--pretty-print",
       ]);
       assert.defined(cli.data.txHash, "cycle 1 evaluate tx");
-      return {cli, command: ["dac", "deal", "evaluate"]};
+      return {cli, command: ["deal", "evaluate"]};
     });
 
     await h.syncIndexer();
@@ -198,10 +198,19 @@ export const revenueEvaluatorScenario: Scenario = {
       const cli = await h.dealView("deal", ["--deal-address", dealAddress]);
       const deal = cli.data.deal as Record<string, unknown>;
       const allocated = BigInt(deal.totalRewardAllocatedAmount as string ?? "0");
-      h.log(`After cycle 1: rewardsAllocated=${allocated}, evals=${deal.totalEvaluationCount}`);
+      h.log(`After cycle 1: rewardsAllocated=${allocated}, evals=${deal.totalEvaluationCount}, closed=${deal.closed}`);
       assert.equal(allocated > 0n, true, "rewards allocated after cycle 1");
-      assert.equal(deal.closed, false, "deal still open");
-      return {cli, command: ["deal", "view", "deal"]};
+      assert.equal(deal.closed, false, "deal still open after cycle 1");
+
+      const posCli = await h.dealView("positions", ["--deal-address", dealAddress]);
+      const positions = posCli.data.positions as Array<Record<string, unknown>> | undefined;
+      if (positions) {
+        for (const p of positions) {
+          h.log(`  position: accountId=${p.accountId}, staked=${p.currentStakedAmount}, slashed=${p.totalSlashedAmount}`);
+        }
+      }
+
+      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: {deal, positions} as Record<string, unknown>};
     });
 
     // ── Cycle 2: Miss (no return) → within grace ──────────────────
@@ -214,16 +223,16 @@ export const revenueEvaluatorScenario: Scenario = {
         "--config", config.configPath, "--pretty-print",
       ]);
       assert.defined(cli.data.txHash, "cycle 2 evaluate tx");
-      return {cli, command: ["dac", "deal", "evaluate"]};
+      return {cli, command: ["deal", "evaluate"]};
     });
 
     await h.syncIndexer();
     await step(h, "verify-cycle-2", async () => {
       const cli = await h.dealView("deal", ["--deal-address", dealAddress]);
       const deal = cli.data.deal as Record<string, unknown>;
-      h.log(`After cycle 2 (miss): evals=${deal.totalEvaluationCount}, closed=${deal.closed}`);
+      h.log(`After cycle 2 (miss): evals=${deal.totalEvaluationCount}, closed=${deal.closed}, slashed=${deal.totalSlashedStakeAmount}`);
       assert.equal(deal.closed, false, "deal still open after 1 miss (within grace)");
-      return {cli, command: ["deal", "view", "deal"]};
+      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
     });
 
     // ── Cycle 3: Miss again → penalty applied ─────────────────────
@@ -236,44 +245,72 @@ export const revenueEvaluatorScenario: Scenario = {
         "--config", config.configPath, "--pretty-print",
       ]);
       assert.defined(cli.data.txHash, "cycle 3 evaluate tx");
-      return {cli, command: ["dac", "deal", "evaluate"]};
+      return {cli, command: ["deal", "evaluate"]};
     });
 
     await h.syncIndexer();
+
+    let dealClosedAfterPenalty = false;
     await step(h, "verify-cycle-3", async () => {
       const cli = await h.dealView("deal", ["--deal-address", dealAddress]);
       const deal = cli.data.deal as Record<string, unknown>;
       const slashed = BigInt(deal.totalSlashedStakeAmount as string ?? "0");
-      h.log(`After cycle 3 (penalty): slashed=${slashed}, evals=${deal.totalEvaluationCount}, closed=${deal.closed}`);
+      dealClosedAfterPenalty = deal.closed === true;
+      h.log(`After cycle 3 (penalty): slashed=${slashed}, evals=${deal.totalEvaluationCount}, closed=${deal.closed}, active=${deal.active}`);
       assert.equal(slashed > 0n, true, "stake slashed after penalty");
-      return {cli, command: ["deal", "view", "deal"]};
+
+      const posCli = await h.dealView("positions", ["--deal-address", dealAddress]);
+      const positions = posCli.data.positions as Array<Record<string, unknown>> | undefined;
+      if (positions) {
+        for (const p of positions) {
+          h.log(`  position: accountId=${p.accountId}, staked=${p.currentStakedAmount}, slashed=${p.totalSlashedAmount}, released=${p.totalReleasedAmount}`);
+        }
+      }
+
+      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: {deal, positions} as Record<string, unknown>};
     });
 
-    // ── Cycle 4: Return revenue → recovery ────────────────────────
-    h.log("Cycle 4: Returning capital as revenue (recovery)...");
-    await dealProposeVoteExecute(h, dealAddress, [
-      "deal", "propose", "return-capital", underlyingToken, revenueTarget,
-    ]);
+    // ── Cycle 4: Conditional — only if deal is still open ─────────
+    // Contract rule: once closed, no more evaluations are possible.
+    if (dealClosedAfterPenalty) {
+      h.log("Deal closed after penalty — skipping cycle 4 (contract prevents further evaluations).");
 
-    await h.advanceTime(cycleDuration + 60);
-
-    await step(h, "evaluate-cycle-4-recovery", async () => {
-      const cli = await h.cli([
-        "deal", "evaluate", "--deal-id", dealNumericId, "--dac", dacAddress,
-        "--config", config.configPath, "--pretty-print",
+      // Verify that attempting to evaluate a closed deal fails
+      await step(h, "verify-closed-deal-no-eval", async () => {
+        const cli = await h.cli([
+          "deal", "evaluate", "--deal-id", dealNumericId, "--dac", dacAddress,
+          "--config", config.configPath, "--pretty-print",
+        ], {allowFailure: true});
+        h.log(`Evaluate closed deal: exitCode=${cli.exitCode}`);
+        assert.equal(cli.exitCode !== 0, true, "evaluation of closed deal should fail");
+        return {cli, command: ["deal", "evaluate"]};
+      });
+    } else {
+      h.log("Cycle 4: Returning capital as revenue (recovery)...");
+      await dealProposeVoteExecute(h, dealAddress, [
+        "deal", "propose", "return-capital", underlyingToken, revenueTarget,
       ]);
-      assert.defined(cli.data.txHash, "cycle 4 evaluate tx");
-      return {cli, command: ["dac", "deal", "evaluate"]};
-    });
 
-    await h.syncIndexer();
-    await step(h, "verify-cycle-4", async () => {
-      const cli = await h.dealView("deal", ["--deal-address", dealAddress]);
-      const deal = cli.data.deal as Record<string, unknown>;
-      const allocated = BigInt(deal.totalRewardAllocatedAmount as string ?? "0");
-      h.log(`After cycle 4 (recovery): rewardsAllocated=${allocated}, evals=${deal.totalEvaluationCount}`);
-      return {cli, command: ["deal", "view", "deal"]};
-    });
+      await h.advanceTime(cycleDuration + 60);
+
+      await step(h, "evaluate-cycle-4-recovery", async () => {
+        const cli = await h.cli([
+          "deal", "evaluate", "--deal-id", dealNumericId, "--dac", dacAddress,
+          "--config", config.configPath, "--pretty-print",
+        ]);
+        assert.defined(cli.data.txHash, "cycle 4 evaluate tx");
+        return {cli, command: ["deal", "evaluate"]};
+      });
+
+      await h.syncIndexer();
+      await step(h, "verify-cycle-4", async () => {
+        const cli = await h.dealView("deal", ["--deal-address", dealAddress]);
+        const deal = cli.data.deal as Record<string, unknown>;
+        const allocated = BigInt(deal.totalRewardAllocatedAmount as string ?? "0");
+        h.log(`After cycle 4 (recovery): rewardsAllocated=${allocated}, evals=${deal.totalEvaluationCount}`);
+        return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+      });
+    }
 
     // ── Claim rewards ────────────────────────────────────────────
     await step(h, "claim-rewards", async () => {
@@ -285,7 +322,7 @@ export const revenueEvaluatorScenario: Scenario = {
       return {cli, command: ["deal", "claim"]};
     });
 
-    // ── Final verification ───────────────────────────────────────
+    // ── Final verification + accounting invariants ───────────────
     await h.syncIndexer();
     await step(h, "verify-final", async () => {
       const cli = await h.dealView("deal", ["--deal-address", dealAddress]);
@@ -294,10 +331,33 @@ export const revenueEvaluatorScenario: Scenario = {
       const totalAllocated = BigInt(deal.totalRewardAllocatedAmount as string ?? "0");
       const totalSlashed = BigInt(deal.totalSlashedStakeAmount as string ?? "0");
       const evalCount = Number(deal.totalEvaluationCount ?? 0);
-      h.log(`Final: evals=${evalCount}, allocated=${totalAllocated}, claimed=${totalClaimed}, slashed=${totalSlashed}`);
-      assert.gte(evalCount, 4, "at least 4 evaluation cycles");
+      h.log(`Final: evals=${evalCount}, allocated=${totalAllocated}, claimed=${totalClaimed}, slashed=${totalSlashed}, closed=${deal.closed}`);
+
+      // At minimum 3 cycles if deal closed after penalty, 4 if recovery happened
+      const minCycles = dealClosedAfterPenalty ? 3 : 4;
+      assert.gte(evalCount, minCycles, `at least ${minCycles} evaluation cycles`);
       assert.equal(totalClaimed > 0n, true, "rewards claimed");
-      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+      assert.equal(totalClaimed <= totalAllocated, true, "claimed <= allocated");
+
+      // Per-position snapshot
+      const posCli = await h.dealView("positions", ["--deal-address", dealAddress]);
+      const positions = posCli.data.positions as Array<Record<string, unknown>> | undefined;
+      if (positions) {
+        for (const p of positions) {
+          h.log(`  final position: accountId=${p.accountId}, staked=${p.currentStakedAmount}, slashed=${p.totalSlashedAmount}, claimed=${p.totalClaimedMainTokenAmount}`);
+        }
+      }
+
+      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: {deal, positions} as Record<string, unknown>};
+    });
+
+    await step(h, "verify-accounting-invariants", async () => {
+      const {deal, positions} = await verifyDealAccountingInvariants(h, dealAddress);
+      return {
+        cli: {data: {action: "accounting-check"}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["accounting-invariants"],
+        indexerSnapshot: {deal, positions} as Record<string, unknown>,
+      };
     });
   },
 };

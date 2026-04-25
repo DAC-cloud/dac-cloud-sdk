@@ -1,5 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
+import {mintMockToken} from "./fixtures/index.js";
 
 /**
  * Scenario: Existing-Token DAC Full Lifecycle
@@ -54,6 +55,9 @@ export const existingTokenDacScenario: Scenario = {
     // should have deployed a test token. We'll look it up or skip if not available.
     // For now, use the underlying token from the contracts deploy manifest.
     const underlyingToken = await resolveUnderlyingToken(h);
+
+    // Mint underlying tokens for the founder — required for treasury-seed-amount
+    await mintMockToken(h, {token: underlyingToken, to: founderWallet.address, amount: "10000000000000000000000"}); // 10k
 
     await step(h, "create-existing-token-dac", async () => {
       const args = [

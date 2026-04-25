@@ -178,7 +178,7 @@ export const dacAgentDistributorScenario: Scenario = {
     });
 
     // ══════════════════════════════════════════════════════════════
-    // PHASE 5: VERIFY PROPOSALS IN INDEXER
+    // PHASE 5: VERIFY PROPOSALS + DAC STATE IN INDEXER
     // ══════════════════════════════════════════════════════════════
 
     await step(h, "verify-proposals", async () => {
@@ -188,7 +188,48 @@ export const dacAgentDistributorScenario: Scenario = {
       // Expected: distributor approval + disable + direct mint = 3 proposals
       assert.gte(proposals?.length ?? 0, 3, "at least 3 governance proposals recorded");
       h.log(`Total proposals in DAC: ${proposals?.length}`);
+      if (proposals) {
+        for (const p of proposals) {
+          h.log(`  Proposal #${p.proposalNumericId}: kind=${p.kindName ?? p.kindSelector}, executed=${p.executed}, passed=${p.passed}`);
+        }
+      }
       return {cli, command: ["dac", "view", "proposals"], indexerSnapshot: {proposals} as Record<string, unknown>};
+    });
+
+    // ── Verify DAC state + token entities ──────────────────────────
+
+    await step(h, "verify-dac-state", async () => {
+      const cli = await h.view("dac", ["--dac", dacAddress!]);
+      const dac = cli.data.dac as Record<string, unknown>;
+      assert.defined(dac, "DAC in indexer");
+      h.log(`DAC: agentTokenAddress=${dac.agentTokenAddress}, mainTokenAddress=${dac.mainTokenAddress}`);
+      return {cli, command: ["view", "dac"], indexerSnapshot: dac as Record<string, unknown>};
+    });
+
+    // ── Verify agent token total supply reflects all mints ────────
+    // Distributor received 20k, agent2 received 15k = 35k total minted via governance
+    // (founder allocation from DAC creation may also be reflected)
+
+    await step(h, "verify-agent-token-balances", async () => {
+      const agent1Cli = await h.cli([
+        "balance", agentTokenAddress!, agent1Wallet.address,
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      const agent2Cli = await h.cli([
+        "balance", agentTokenAddress!, agent2Wallet.address,
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      const agent1Balance = agent1Cli.data.balance as string;
+      const agent2Balance = agent2Cli.data.balance as string;
+      h.log(`Agent token balances: agent1(distributor)=${agent1Balance}, agent2(direct)=${agent2Balance}`);
+      assert.equal(agent1Balance, distributorAmount, "agent1 distributor balance unchanged");
+      assert.equal(agent2Balance, directMintAmount, "agent2 direct mint balance correct");
+
+      return {
+        cli: agent1Cli,
+        command: ["balance"],
+        indexerSnapshot: {agent1Balance, agent2Balance} as Record<string, unknown>,
+      };
     });
   },
 };

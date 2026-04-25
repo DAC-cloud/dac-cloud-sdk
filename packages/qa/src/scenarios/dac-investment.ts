@@ -584,6 +584,98 @@ export const dacInvestmentScenario: Scenario = {
       }
       return {cli, command: ["dac", "view", "treasury-holdings"], indexerSnapshot: {holdings} as Record<string, unknown>};
     });
+
+    // ══════════════════════════════════════════════════════════════
+    // PHASE 6: UNSTAKE + FORCE RETURN CAPITAL
+    // ══════════════════════════════════════════════════════════════
+
+    // Contract requires either: deal past deadline, OR all agents unstaked
+    // for forceReturnCapital to succeed. Deal is closed but not past deadline,
+    // so we must unstake first.
+
+    h.log("Unstaking founder from closed deal (required before withdraw)...");
+
+    await step(h, "unstake-from-closed-deal", async () => {
+      const cli = await h.cli([
+        "deal", "unstake",
+        "--deal-address", dealCell!,
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      assert.defined(cli.data.txHash, "unstake tx hash");
+      h.log(`Unstake tx: ${cli.data.txHash}`);
+      return {cli, command: ["deal", "unstake"]};
+    });
+
+    await h.syncIndexer();
+
+    // Verify position shows 0 staked after unstake
+    await step(h, "verify-unstaked", async () => {
+      const cli = await h.dealView("positions", ["--deal-address", dealAddress!]);
+      const positions = cli.data.positions as Array<Record<string, unknown>> | undefined;
+      assert.defined(positions, "positions after unstake");
+      if (positions && positions.length > 0) {
+        const pos = positions[0];
+        h.log(`Position after unstake: staked=${pos.currentStakedAmount}, released=${pos.totalReleasedAmount}`);
+        assert.equal(pos.currentStakedAmount, "0", "stake is 0 after unstake");
+      }
+      return {cli, command: ["deal", "view", "positions"], indexerSnapshot: {positions} as Record<string, unknown>};
+    });
+
+    // Now force-return-capital can proceed (all agents unstaked)
+    h.log("Force-returning capital to recover dividend earnings...");
+
+    // Check pre-withdraw deal cell balance
+    await step(h, "verify-deal-pre-withdraw", async () => {
+      const cli = await h.cli([
+        "balance", underlyingToken, dealAddress!,
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      const balance = cli.data.balance as string;
+      h.log(`DACDeal underlying balance before withdraw: ${balance}`);
+      assert.equal(BigInt(balance) > 0n, true, "DACDeal holds dividend earnings before withdraw");
+      return {cli, command: ["balance"], indexerSnapshot: {dealBalance: balance} as Record<string, unknown>};
+    });
+
+    await step(h, "force-return-capital", async () => {
+      const cli = await h.cli([
+        "deal", "withdraw", dealNumericId!,
+        "--dac", investorDacAddress!,
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      assert.defined(cli.data.txHash, "withdraw tx hash present");
+      h.log(`Force-return-capital tx: ${cli.data.txHash}`);
+      return {cli, command: ["deal", "withdraw"]};
+    });
+
+    await h.syncIndexer();
+
+    // Verify deal cell balance is now 0
+    await step(h, "verify-deal-post-withdraw", async () => {
+      const cli = await h.cli([
+        "balance", underlyingToken, dealAddress!,
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      const balance = cli.data.balance as string;
+      h.log(`DACDeal underlying balance after withdraw: ${balance}`);
+      assert.equal(balance, "0", "DACDeal balance is 0 after force-return-capital");
+      return {cli, command: ["balance"], indexerSnapshot: {dealBalance: balance} as Record<string, unknown>};
+    });
+
+    // Verify investor treasury gained the returned capital
+    await step(h, "verify-treasury-after-withdraw", async () => {
+      const cli = await h.view("treasury-holdings", ["--dac", investorDacAddress!]);
+      const holdings = cli.data.holdings as Array<Record<string, unknown>> | undefined;
+      assert.defined(holdings, "treasury holdings after withdraw");
+
+      const underlyingHolding = holdings?.find(
+        (ent) => (ent.tokenAddress as string)?.toLowerCase() === underlyingToken.toLowerCase(),
+      );
+      if (underlyingHolding) {
+        h.log(`Investor treasury underlying balance after withdraw: ${underlyingHolding.balance}`);
+      }
+
+      return {cli, command: ["view", "treasury-holdings"], indexerSnapshot: {holdings} as Record<string, unknown>};
+    });
   },
 };
 

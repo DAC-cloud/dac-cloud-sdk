@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {getChainTimestamp, setupNativeDacWithDeal, transferErc20, verifyDealAccountingInvariants} from "./fixtures/index.js";
+import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, transferErc20, verifyDealAccountingInvariants} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Multi-Milestone — Sequential Evaluation
@@ -79,6 +79,9 @@ export const dealMultiMilestoneScenario: Scenario = {
     });
 
     // ── Deposit for milestone 1 ──────────────────────────────────
+
+    // Mint treasury tokens for the founder (fresh anvil may have zero balance)
+    await mintMockToken(h, {token: ctx.treasuryToken, to: ctx.founderAddress, amount: "10000000000000000000000"}); // 10k
 
     h.log(`Depositing ${deposit1} for milestone 1 (120% of m1, 40% of m2)...`);
 

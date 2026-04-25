@@ -459,6 +459,18 @@ export const oracleGovernanceScenario: Scenario = {
 
     await h.syncIndexer();
 
+    // Verify update-voting-config proposal in indexer after execution
+    await step(h, "verify-update-voting-config-executed", async () => {
+      const cli = await h.view("proposals", ["--dac", dacAddress!]);
+      const proposals = cli.data.proposals as Array<Record<string, unknown>>;
+      const prop = proposals.find((p) => String(p.proposalNumericId) === configProposalId);
+      assert.defined(prop, "update-voting-config proposal found in indexer");
+      assert.equal(prop!.passed, true, "update-voting-config passed");
+      assert.equal(prop!.executed, true, "update-voting-config executed");
+      h.log(`Proposal #${configProposalId}: merkleVotes=${prop!.merkleVoteCount}, voteCount=${prop!.voteCount}, yesVotes=${prop!.yesVotes}`);
+      return {cli, command: ["view", "proposals"], indexerSnapshot: {proposal: prop} as Record<string, unknown>};
+    });
+
     // ══════════════════════════════════════════════════════════════
     // PHASE 4: GOVERNANCE CONFIG PROPOSALS
     // ══════════════════════════════════════════════════════════════
@@ -609,6 +621,25 @@ export const oracleGovernanceScenario: Scenario = {
       };
     });
 
+    // ── Verify all Phase 4 proposals resolved & executed in indexer ──
+    await step(h, "verify-phase4-proposals", async () => {
+      const cli = await h.view("proposals", ["--dac", dacAddress!]);
+      const proposals = cli.data.proposals as Array<Record<string, unknown>>;
+      assert.defined(proposals, "proposals list");
+
+      // Check that proposals 3-6 (governance-strategy, deal-creation-config,
+      // legal-wrapper, offchain-action) are all executed
+      let executedCount = 0;
+      for (const p of proposals) {
+        if (p.executed === true) executedCount++;
+        h.log(`  Proposal #${p.proposalNumericId}: kind=${p.kindName ?? p.kindSelector}, passed=${p.passed}, executed=${p.executed}, resolved=${p.resolved}`);
+      }
+      // At minimum, proposals 1 (mint-agent-tokens) + 2 (update-voting-config) + 4 Phase 4 proposals = 6 executed
+      assert.gte(executedCount, 6, "at least 6 proposals executed (Phase 2 + 3 + Phase 4)");
+
+      return {cli, command: ["view", "proposals"], indexerSnapshot: {proposals} as Record<string, unknown>};
+    });
+
     // ══════════════════════════════════════════════════════════════
     // PHASE 5: ORACLE SWAP
     // ══════════════════════════════════════════════════════════════
@@ -703,6 +734,31 @@ export const oracleGovernanceScenario: Scenario = {
 
       h.log("New oracle verified: proposal created, snapshot published, voted, executed");
       return {cli, command: ["verify-new-oracle"]};
+    });
+
+    await h.syncIndexer();
+
+    // Verify the oracle swap and final proposal in indexer
+    await step(h, "verify-oracle-swap-indexed", async () => {
+      // Confirm DAC's governanceOracle field is updated
+      const dacCli = await h.view("dac", ["--dac", dacAddress!]);
+      const dacRecord = dacCli.data.dac as Record<string, unknown>;
+      const currentOracle = (dacRecord.governanceOracleAddress as string)?.toLowerCase();
+      assert.equal(currentOracle, newOracleAddress!.toLowerCase(), "DAC oracle address updated in indexer");
+
+      // Confirm all proposals are indexed (including the verification proposal via new oracle)
+      const propCli = await h.view("proposals", ["--dac", dacAddress!]);
+      const proposals = propCli.data.proposals as Array<Record<string, unknown>>;
+      const executedCount = proposals.filter((p) => p.executed === true).length;
+      h.log(`Final: ${proposals.length} proposals total, ${executedCount} executed, oracle=${currentOracle}`);
+      // All 8 proposals should be executed (Phase 2: mint, Phase 3: voting-config, Phase 4: 4 config, Phase 5: oracle swap + verify mint)
+      assert.gte(executedCount, 8, "all 8 proposals executed");
+
+      return {
+        cli: dacCli,
+        command: ["view", "dac"],
+        indexerSnapshot: {dac: dacRecord, proposalCount: proposals.length, executedCount} as Record<string, unknown>,
+      };
     });
 
     h.log("\n✓ Oracle governance scenario completed: primary merkle voting + mixed voting + 5 config proposals + oracle swap");

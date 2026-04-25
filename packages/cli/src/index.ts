@@ -53,6 +53,9 @@ async function main(): Promise<void> {
 
 main().catch((error: unknown) => {
   const message = formatViemError(error);
+  // Output structured JSON error to stdout so consumers always get parseable output
+  const errorJson = JSON.stringify({error: message});
+  process.stdout.write(`${errorJson}\n`);
   process.stderr.write(`${message}\n`);
   process.exit(1);
 });

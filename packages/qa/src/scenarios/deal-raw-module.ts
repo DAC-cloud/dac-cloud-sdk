@@ -4,7 +4,7 @@ import {tmpdir} from "node:os";
 import {toFunctionSelector, encodeAbiParameters} from "viem";
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {getChainTimestamp, proposeVoteExecute, setupNativeDacWithDeal} from "./fixtures/index.js";
+import {getChainTimestamp, proposeVoteExecute, setupNativeDacWithDeal, verifyDealAccountingInvariants} from "./fixtures/index.js";
 
 // Raw bytes4 selectors — same as core module but hardcoded to test the raw path
 const RAW_PERMIT2_TREASURY_SELECTOR = toFunctionSelector("createPermit2TreasuryDeal()");
@@ -224,6 +224,32 @@ export const dealRawModuleScenario: Scenario = {
       return {cli, command: ["dac", ...args]};
     });
 
+    await h.syncIndexer();
+
+    // Verify raw deal proposal in indexer
+    await step(h, "verify-raw-deal-proposal-indexed", async () => {
+      const cli = await h.dealView("proposals", ["--deal-address", rawDealAddress!]);
+      const proposals = cli.data.proposals as Array<Record<string, unknown>> | undefined;
+      assert.defined(proposals, "raw deal proposals in indexer");
+      assert.gte(proposals?.length ?? 0, 1, "at least 1 raw deal proposal");
+
+      if (proposals && proposals.length > 0) {
+        const prop = proposals[0];
+        h.log(`Raw deal proposal indexed: id=${prop.proposalNumericId}, kindSelector=${prop.kindSelector}`);
+      }
+
+      return {cli, command: ["deal", "view", "proposals"], indexerSnapshot: {proposals} as Record<string, unknown>};
+    });
+
+    // Verify raw deal state now shows proposalCount > 0
+    await step(h, "verify-raw-deal-after-proposal", async () => {
+      const cli = await h.dealView("deal", ["--deal-address", rawDealAddress!]);
+      const deal = cli.data.deal as Record<string, unknown>;
+      assert.defined(deal, "raw deal in indexer after proposal");
+      h.log(`Raw deal after proposal: proposalCount=${deal.proposalCount}, active=${deal.active}`);
+      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+    });
+
     // ── Step 6: Raw DAC proposal ────────────────────────────────────
     // Submit a raw 0x bytes4 DAC proposal — use the offchain action selector as example
 
@@ -240,6 +266,8 @@ export const dealRawModuleScenario: Scenario = {
     const rawDacProposalPath = join(tmpdir(), `qa-raw-dac-proposal-${Date.now()}.json`);
     writeFileSync(rawDacProposalPath, JSON.stringify(rawDacProposalInput, null, 2));
 
+    let rawDacProposalId: string;
+
     await step(h, "raw-dac-proposal", async () => {
       const args = [
         "propose", rawDacProposalSelector,
@@ -250,8 +278,29 @@ export const dealRawModuleScenario: Scenario = {
       const cli = await h.cli(args);
       assert.defined(cli.data.txHash, "raw DAC proposal tx hash");
       assert.defined(cli.data.proposalId, "raw DAC proposal id");
-      h.log(`Raw DAC proposal created: id=${cli.data.proposalId}`);
+      rawDacProposalId = String(cli.data.proposalId ?? "");
+      h.log(`Raw DAC proposal created: id=${rawDacProposalId}`);
       return {cli, command: ["dac", ...args]};
+    });
+
+    await h.syncIndexer();
+
+    // Verify raw DAC proposal in indexer
+    await step(h, "verify-raw-dac-proposal-indexed", async () => {
+      const cli = await h.view("proposals", ["--dac", ctx.dacAddress]);
+      const proposals = cli.data.proposals as Array<Record<string, unknown>> | undefined;
+      assert.defined(proposals, "DAC proposals in indexer");
+
+      const rawProp = proposals?.find((p) =>
+        String(p.proposalNumericId ?? p.proposalId) === rawDacProposalId,
+      );
+      assert.defined(rawProp, "raw DAC proposal found in indexer");
+
+      if (rawProp) {
+        h.log(`Raw DAC proposal indexed: id=${rawDacProposalId}, kindSelector=${rawProp.kindSelector}, scope=${rawProp.scope}`);
+      }
+
+      return {cli, command: ["view", "proposals"], indexerSnapshot: {rawDacProposal: rawProp} as Record<string, unknown>};
     });
 
     // ── Step 7: Test claim-reward-pool on the reference deal ────────
@@ -278,13 +327,33 @@ export const dealRawModuleScenario: Scenario = {
 
     await h.syncIndexer();
 
-    // Snapshot deal state after evaluation
+    // Snapshot deal state + positions after evaluation
     await step(h, "verify-after-evaluation", async () => {
       const cli = await h.dealView("deal", ["--deal-address", ctx.dealAddress]);
       const deal = cli.data.deal as Record<string, unknown>;
       assert.defined(deal, "deal after evaluation");
-      h.log(`After eval: allocated=${deal.totalRewardAllocatedAmount}, poolAllocated=${deal.totalDealRewardPoolAllocatedAmount}`);
-      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+      h.log(`After eval: allocated=${deal.totalRewardAllocatedAmount}, poolAllocated=${deal.totalDealRewardPoolAllocatedAmount}, staked=${deal.currentStakedAmount}, slashed=${deal.totalSlashedStakeAmount}`);
+
+      // Per-position snapshot for cross-checking
+      const posCli = await h.dealView("positions", ["--deal-address", ctx.dealAddress]);
+      const positions = posCli.data.positions as Array<Record<string, unknown>> | undefined;
+      if (positions) {
+        for (const p of positions) {
+          h.log(`  position: accountId=${p.accountId}, staked=${p.currentStakedAmount}, slashed=${p.totalSlashedAmount}, released=${p.totalReleasedAmount}`);
+        }
+      }
+
+      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: {deal, positions} as Record<string, unknown>};
+    });
+
+    // Cross-validate accounting invariants on reference deal
+    await step(h, "verify-accounting-after-eval", async () => {
+      const {deal, positions} = await verifyDealAccountingInvariants(h, ctx.dealAddress);
+      return {
+        cli: {data: {action: "accounting-check"}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["accounting-invariants"],
+        indexerSnapshot: {deal, positions} as Record<string, unknown>,
+      };
     });
 
     await step(h, "claim-reward-pool", async () => {

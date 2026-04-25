@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {getChainTimestamp, setupNativeDacWithDeal, transferErc20, verifyDealAccountingInvariants} from "./fixtures/index.js";
+import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, transferErc20, verifyDealAccountingInvariants} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Evaluation — Full Reward + Claim
@@ -41,6 +41,9 @@ export const dealEvalFullRewardScenario: Scenario = {
     });
 
     // ── Deposit tokens to deal cell to simulate full returns ─────
+
+    // Mint treasury tokens for the founder (fresh anvil may have zero balance)
+    await mintMockToken(h, {token: ctx.treasuryToken, to: ctx.founderAddress, amount: "10000000000000000000000"}); // 10k
 
     h.log(`Depositing ${depositAmount} tokens to deal cell ${ctx.dealCell}...`);
 

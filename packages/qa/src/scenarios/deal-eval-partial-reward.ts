@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {getChainTimestamp, setupNativeDacWithDeal, transferErc20} from "./fixtures/index.js";
+import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, transferErc20, verifyDealAccountingInvariants} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Evaluation — Partial Reward
@@ -43,6 +43,9 @@ export const dealEvalPartialRewardScenario: Scenario = {
     });
 
     // ── Deposit tokens to deal cell to simulate 50% returns ──────
+
+    // Mint treasury tokens for the founder (fresh anvil may have zero balance)
+    await mintMockToken(h, {token: ctx.treasuryToken, to: ctx.founderAddress, amount: "10000000000000000000000"}); // 10k
 
     h.log(`Depositing ${halfReturn} tokens to deal cell ${ctx.dealCell}...`);
 
@@ -99,7 +102,27 @@ export const dealEvalPartialRewardScenario: Scenario = {
         assert.equal(BigInt(deal.totalSlashedStakeAmount as string) > 0n, true, "partial slash > 0");
       }
 
-      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+      // Capture per-position snapshot for cross-checking
+      const posCli = await h.dealView("positions", ["--deal-address", ctx.dealAddress]);
+      const positions = posCli.data.positions as Array<Record<string, unknown>> | undefined;
+      if (positions) {
+        for (const p of positions) {
+          h.log(`  position: accountId=${p.accountId}, staked=${p.currentStakedAmount}, slashed=${p.totalSlashedAmount}, released=${p.totalReleasedAmount}`);
+        }
+      }
+
+      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: {deal, positions} as Record<string, unknown>};
+    });
+
+    // ── Cross-validate accounting invariants ────────────────────
+
+    await step(h, "verify-accounting-after-eval", async () => {
+      const {deal, positions} = await verifyDealAccountingInvariants(h, ctx.dealAddress);
+      return {
+        cli: {data: {action: "accounting-check"}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["accounting-invariants"],
+        indexerSnapshot: {deal, positions} as Record<string, unknown>,
+      };
     });
 
     // ── Claim rewards from partial evaluation ────────────────────
@@ -127,9 +150,34 @@ export const dealEvalPartialRewardScenario: Scenario = {
       if (deal) {
         h.log(`After claim: allocated=${deal.totalRewardAllocatedAmount}, claimed=${deal.totalRewardClaimedAmount}`);
         assert.equal(BigInt(deal.totalRewardClaimedAmount as string) > 0n, true, "claimed rewards > 0");
+        assert.equal(
+          BigInt(deal.totalRewardClaimedAmount as string) <= BigInt(deal.totalRewardAllocatedAmount as string),
+          true,
+          "claimed <= allocated",
+        );
       }
 
-      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: deal as Record<string, unknown>};
+      // Per-position claim data
+      const posCli = await h.dealView("positions", ["--deal-address", ctx.dealAddress]);
+      const positions = posCli.data.positions as Array<Record<string, unknown>> | undefined;
+      if (positions) {
+        for (const p of positions) {
+          h.log(`  position after claim: accountId=${p.accountId}, claimed=${p.totalClaimedMainTokenAmount}`);
+        }
+      }
+
+      return {cli, command: ["deal", "view", "deal"], indexerSnapshot: {deal, positions} as Record<string, unknown>};
+    });
+
+    // ── Final accounting invariants ─────────────────────────────
+
+    await step(h, "verify-final-accounting", async () => {
+      const {deal, positions} = await verifyDealAccountingInvariants(h, ctx.dealAddress);
+      return {
+        cli: {data: {action: "accounting-check"}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["accounting-invariants"],
+        indexerSnapshot: {deal, positions} as Record<string, unknown>,
+      };
     });
   },
 };
