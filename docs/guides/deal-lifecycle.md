@@ -58,7 +58,31 @@ dac vote proposal <proposalId> true --dac 0x<dac>
 dac execute <proposalId> --dac 0x<dac>
 ```
 
-After approval, the deal becomes `active=true`. No more staking is allowed.
+After approval, the deal becomes `active=true`. Pre-approval staking is no longer possible — see [Active Staking](#4a-active-staking-post-approval) for the post-approval path.
+
+## 4a. Active Staking (Post-Approval)
+
+After a deal is approved, new agents can still join through the **stake request** flow. This requires deal governance approval from existing staked agents.
+
+```bash
+# 1. New agent requests to stake (approves AgentTokens to the deal cell)
+dac deal request 5000000000000000000000 --deal 0x<deal> --dac 0x<dac> \
+  --private-key 0x<new-agent-key>
+
+# 2. An existing staked agent proposes add-stake via deal governance
+dac deal propose add-stake 0x<new-agent> --from-request --dac 0x<dac> --deal 0x<deal>
+
+# 3. Staked agents vote (quorum required)
+dac deal vote proposal <proposalId> true --deal 0x<deal>
+dac deal vote proposal <proposalId> true --deal 0x<deal> --private-key 0x<other-agent-key>
+
+# 4. Execute (must be within executionValidityDuration of quorum being reached)
+dac deal execute <proposalId> --deal 0x<deal>
+```
+
+An already-staked agent can also increase their stake through the same flow — `deal request` + `deal propose add-stake`. The position accumulates (not replaced).
+
+**Important timing**: Deal governance proposals auto-resolve when quorum is met during voting (`_checkAndEmitResolution` in Proposal.sol). The execution window starts from the resolution timestamp, not the end of the voting period. Execute promptly after quorum is reached.
 
 ## 5. Evaluate
 
@@ -103,10 +127,24 @@ Note: After a full slash (100%), all StakedAgent tokens are **burned**. Unstake 
 
 ## 8. Force Return Capital
 
-If the deal deadline passes without full evaluation, anyone with MainToken can force-return remaining capital:
+Return remaining capital from a deal to the DAC treasury:
 
 ```bash
 dac deal withdraw <dealNumericId> --dac 0x<dac>
+```
+
+Requirements (at least one must be true):
+- The deal deadline has passed, **OR**
+- All agents have unstaked (for closed deals before the deadline)
+
+For closed deals that haven't reached the deadline, unstake all agents first:
+
+```bash
+# Each agent unstakes
+dac deal unstake --deal 0x<deal>
+
+# Then force return capital
+dac deal withdraw <dealId> --dac 0x<dac>
 ```
 
 This returns funds to the DAC treasury but does **not** close the deal.

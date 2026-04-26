@@ -100,6 +100,20 @@ Request to stake in an active (already approved) deal. Creates an ERC20 approval
 dac deal request 5000000000000000000000 --deal 0x<deal> --dac 0x<dac>
 ```
 
+Already-staked agents can also request to increase their stake — the position accumulates.
+
+After the request, a staked agent must create an `add-stake` proposal:
+
+```bash
+# Using --from-request reads the approved amount from the on-chain allowance
+dac deal propose add-stake 0x<agent> --from-request --dac 0x<dac> --deal 0x<deal>
+
+# Or specify the amount explicitly
+dac deal propose add-stake 0x<agent> 5000000000000000000000 --deal 0x<deal>
+```
+
+Note: `--dac` is **required** with `--from-request` to resolve the AgentToken address for allowance lookup.
+
 ## Deal Governance
 
 Deals have their own governance — staked agents (holders of StakedAgent tokens) can propose, vote, and execute deal-level changes.
@@ -113,7 +127,7 @@ Deals have their own governance — staked agents (holders of StakedAgent tokens
 | `toggle-early-returns` | `<true\|false>` | Allow/disallow early capital returns |
 | `enable-veto-right` | (none) | Enable DAC challenge capability |
 | `request-tranche` | `<token> <amount> [rewards]` | Request funding tranche from DAC |
-| `add-stake` | `<agent> <amount>` | Add pending stake from a request |
+| `add-stake` | `<agent> <amount>` or `<agent> --from-request --dac <dac>` | Add pending stake from a request |
 | `strike-out-agent` | `<agent>` | Force-remove an agent (stake released, not slashed) |
 
 **Module deal proposal types** (core module — prefix `core:` optional):
@@ -184,11 +198,13 @@ dac deal claim-reward-pool --deal 0x<deal> --config ./config.env
 
 ### `withdraw <dealNumericId>`
 
-Force return capital after the deal deadline. Moves remaining funds from the deal cell back to the DAC treasury. Does **not** close the deal.
+Force return capital from the deal to the DAC treasury. Does **not** close the deal.
 
 ```bash
 dac deal withdraw 1 --dac 0x<dac> --config ./config.env
 ```
+
+Requires either: deal deadline has passed, or all agents have unstaked (for closed deals before the deadline).
 
 ### `link-capital-call <capitalCallId>`
 

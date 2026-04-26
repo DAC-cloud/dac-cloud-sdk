@@ -22,7 +22,7 @@ packages/
   core/        @dac-cloud/core       — Viem-based contract client (ABIs, types, proposal builders, selectors)
   indexer/     @dac-cloud/indexer     — GraphQL client for Envio indexer read-model
   cli/         @dac-cloud/cli        — Commander.js CLI tool (bin: dac)
-  qa/          @dac-cloud/qa         — E2E QA harness (21 scenarios, accounting invariants, agent reviewer)
+  qa/          @dac-cloud/qa         — E2E QA harness (25 scenarios, accounting invariants, agent reviewer)
 ```
 
 Dependencies flow: `cli → core → manifests`, `cli → indexer`, `qa → cli`.

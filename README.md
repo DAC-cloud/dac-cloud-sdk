@@ -10,7 +10,7 @@ TypeScript SDK and CLI for the [DAC Cloud](https://dac.cloud) protocol — EVM s
 | `@dac-cloud/indexer` | GraphQL client for the Envio indexer read-model |
 | `@dac-cloud/cli` | Commander.js CLI tool (`dac` binary) |
 | `@dac-cloud/manifests` | Contract deployment manifest loaders |
-| `@dac-cloud/qa` | QA harness and E2E scenario tests |
+| `@dac-cloud/qa` | QA harness with 25 E2E scenarios and AI reviewer |
 
 ## Quick Start
 

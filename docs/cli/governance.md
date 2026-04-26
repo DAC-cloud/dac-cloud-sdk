@@ -50,6 +50,8 @@ dac deal execute <proposalId> --deal 0x<deal>
 
 The `--advance-seconds` flag can advance time before execution (local testing).
 
+**Important: Execution Validity Window.** Proposals auto-resolve as soon as quorum is reached during voting (not when the voting period ends). The execution window is `[resolutionTime, resolutionTime + executionValidityDuration]`. For deal governance, where `votingDuration` may be 7 days but `executionValidityDuration` is only 1 day, you must execute promptly after the last needed vote — waiting for the full voting period to end may cause the execution window to expire.
+
 ## Voting Parameters
 
 | Parameter | Description | Typical Range |
