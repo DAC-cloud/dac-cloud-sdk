@@ -77,11 +77,14 @@ export function loadQaConfig(input: QaConfigInput = {}): QaConfig {
   const cliVars = parseCliConfigFile(configPath);
 
   // CLI config values (from config.env file)
-  const rpcUrl = cliVars.DAC_RPC_URL || "http://127.0.0.1:8545";
-  const indexerUrl = cliVars.DAC_INDEXER_URL || "http://127.0.0.1:8080/v1/graphql";
+  const apiUrl = cliVars.DAC_API_URL || "http://localhost:3500";
   const chainId = parseInt(cliVars.DAC_CHAIN_ID || "31337", 10);
-  const contractsRoot = cliVars.DAC_CONTRACTS_ROOT || "";
   const privateKey = cliVars.DAC_PRIVATE_KEY || undefined;
+
+  // QA-specific: direct RPC for dev methods (evm_increaseTime, hardhat_*)
+  const localRpcUrl = process.env.DAC_LOCAL_RPC_URL || cliVars.DAC_LOCAL_RPC_URL || "http://127.0.0.1:8545";
+  // QA-specific: direct indexer for sync polling (chain_metadata)
+  const localIndexerUrl = process.env.DAC_LOCAL_INDEXER_URL || cliVars.DAC_LOCAL_INDEXER_URL || "http://127.0.0.1:8080/v1/graphql";
 
   // Resolve CLI binary
   const cliBin = input.cliBin ?? resolve("./node_modules/.bin/dac");
@@ -147,11 +150,11 @@ export function loadQaConfig(input: QaConfigInput = {}): QaConfig {
   return {
     cliBin,
     configPath,
-    rpcUrl,
-    indexerUrl,
+    apiUrl,
+    localRpcUrl,
+    localIndexerUrl,
     chainId,
     wallets,
-    contractsRoot,
     tokens,
     indexerSyncTimeoutMs: input.indexerSyncTimeoutMs ?? 30_000,
     indexerPollIntervalMs: input.indexerPollIntervalMs ?? 1_000,

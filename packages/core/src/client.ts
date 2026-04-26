@@ -43,6 +43,8 @@ export interface DacCoreOptions {
   rpcUrl: string;
   protocol: ProtocolManifest;
   account?: PrivateKeyAccount;
+  /** Extra fetch options passed to viem's http transport (e.g. auth headers). */
+  fetchOptions?: {headers?: Record<string, string>};
 }
 
 export interface DeployDacResult {
@@ -121,16 +123,18 @@ export function accountFromPrivateKey(privateKey: Hex): PrivateKeyAccount {
 }
 
 export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
+  const transport = http(options.rpcUrl, options.fetchOptions ? {fetchOptions: options.fetchOptions} : undefined);
+
   const publicClient = createPublicClient({
     chain: options.chain,
-    transport: http(options.rpcUrl),
+    transport,
   });
 
   const walletClient = options.account
     ? createWalletClient({
         chain: options.chain,
         account: options.account,
-        transport: http(options.rpcUrl),
+        transport,
       })
     : undefined;
 

@@ -150,21 +150,12 @@ export const dealMultiDealWrappedRewardsScenario: Scenario = {
     // Mint underlying tokens for all operations
     await mintMockToken(h, {token: underlyingToken, to: founderWallet.address, amount: "200000000000000000000000"}); // 200k
 
-    // Deploy governance oracle
-    h.log("Deploying governance oracle...");
-    const oracleCli = await h.cli([
-      "oracle", "deploy", founderWallet.address, founderWallet.address,
-      "--config", config.configPath, "--pretty-print",
-    ]);
-    const oracleAddress = oracleCli.data.oracleAddress as string;
-    assert.isAddress(oracleAddress, "oracle deployed");
-
     // PROTOCOL CONSTRAINT: existing-token DAC rewards are paid in WrappedMainToken.
     // treasury-seed-amount provides the initial WrappedMainToken supply that backs
     // reward allocations. Must be >= sum of both deals' rewardsLimit.
     const treasurySeedAmount = "100000000000000000000000"; // 100k (covers 40k + 20k + buffer)
 
-    h.log("Creating existing-token DAC...");
+    h.log("Creating existing-token DAC (fallback-only, no oracle)...");
     const dacCreateCli = await h.cli([
       "create-existing-token",
       "--name", "Multi-Deal Wrapped QA DAC",
@@ -181,7 +172,6 @@ export const dealMultiDealWrappedRewardsScenario: Scenario = {
       "--oracle-publish-deadline", "30",
       "--fallback-warmup-duration", "10",
       "--fallback-duration", "3600",
-      "--governance-oracle", oracleAddress,
       "--auto-delegate",
       "--auto-approve",
       "--config", config.configPath, "--pretty-print",

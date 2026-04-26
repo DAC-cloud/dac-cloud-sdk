@@ -39,7 +39,7 @@ import {
 } from "./shared";
 import {addCommandHelp, applyOptions, type OptionKey} from "../cli/options";
 import type {OptionResolver} from "../runtime/config";
-import {advanceTime, makeCoreContext, makeDryRunContext, makeIndexer} from "../runtime/chain";
+import {makeCoreContext, makeDryRunContext, makeIndexer} from "../runtime/chain";
 import {printJson, readJsonFile} from "../runtime/io";
 
 function isDryRun(resolver: OptionResolver): boolean {
@@ -716,9 +716,7 @@ async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string,
     return;
   }
 
-  const {core, rpcUrl} = await makeCoreContext(resolver);
-  const preVoteAdvanceSeconds = resolver.resolveNumber("pre-vote-advance-seconds", 1) ?? 1;
-  await advanceTime(rpcUrl, preVoteAdvanceSeconds);
+  const {core} = await makeCoreContext(resolver);
 
   const txHash = await core.voteProposal({proposalAddress, support});
 
@@ -743,14 +741,10 @@ async function cmdExecute(resolver: OptionResolver, proposalIdText: string): Pro
     return;
   }
 
-  const {core, rpcUrl} = await makeCoreContext(resolver);
+  const {core} = await makeCoreContext(resolver);
   const proposal = await resolveDacProposalByNumericIdOrThrow(resolver, proposalIdText);
   const proposalAddress = proposal.proposalAddress ? asAddress(proposal.proposalAddress, "Proposal address") : undefined;
 
-  const advanceSeconds = resolver.resolveNumber("advance-seconds", 0) ?? 0;
-  if (advanceSeconds > 0) {
-    await advanceTime(rpcUrl, advanceSeconds);
-  }
 
   const txHash = await core.executeDacProposal({dacCell: dac, proposalId});
 
@@ -814,11 +808,7 @@ async function cmdProposalPhaseTransition(
     return;
   }
 
-  const {core, rpcUrl} = await makeCoreContext(resolver);
-  const advanceSeconds = resolver.resolveNumber("advance-seconds", 0) ?? 0;
-  if (advanceSeconds > 0) {
-    await advanceTime(rpcUrl, advanceSeconds);
-  }
+  const {core} = await makeCoreContext(resolver);
 
   const {dac, proposalId, proposalAddress} = await resolveProposalAddressForPhase(resolver, proposalIdText);
 
@@ -872,9 +862,7 @@ async function cmdProposalVoteMerkle(
     return;
   }
 
-  const {core, rpcUrl} = await makeCoreContext(resolver);
-  const preVoteAdvanceSeconds = resolver.resolveNumber("pre-vote-advance-seconds", 1) ?? 1;
-  await advanceTime(rpcUrl, preVoteAdvanceSeconds);
+  const {core} = await makeCoreContext(resolver);
 
   const {dac, proposalId, proposalAddress} = await resolveProposalAddressForPhase(resolver, proposalIdText);
   const txHash = await core.voteMerkle({proposalAddress, support, index, amount, proof});
@@ -1005,7 +993,7 @@ async function cmdOracleDeactivate(resolver: OptionResolver): Promise<void> {
 }
 
 async function cmdOracleStatus(resolver: OptionResolver): Promise<void> {
-  const indexer = makeIndexer(resolver);
+  const indexer = await makeIndexer(resolver);
   const dacId = await resolveDacIdOrThrow(resolver);
   const oracles = await indexer.oracle.listByDac(dacId, {limit: 50, offset: 0});
 
@@ -1044,7 +1032,7 @@ async function cmdJoin(resolver: OptionResolver): Promise<void> {
   let nonce = resolver.resolveBigInt("nonce");
 
   if (!treasuryTokenText || !recipientText || tokenAmount === undefined || cashAmount === undefined || nonce === undefined) {
-    const client = makeIndexer(resolver);
+    const client = await makeIndexer(resolver);
     const dacId = await resolveDacIdOrThrow(resolver);
     const calls = await client.capitalCalls.listByDac(dacId, {limit: 200, offset: 0});
 
@@ -1221,7 +1209,7 @@ async function cmdClaimDividend(resolver: OptionResolver, proofFile: string): Pr
 }
 
 async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: string): Promise<void> {
-  const client = makeIndexer(resolver);
+  const client = await makeIndexer(resolver);
   const page = resolvePage(resolver);
 
   const resource = z.enum([
@@ -1493,7 +1481,7 @@ Raw proposal (3rd party modules):
 
   const vote = program.command("vote").description("Vote DAC proposals");
   const voteProposal = vote.command("proposal <proposalId> <support>").description("Vote for a DAC proposal");
-  applyOptions(voteProposal, ["cell-address", "dac-address", "dac", "pre-vote-advance-seconds"]);
+  applyOptions(voteProposal, ["cell-address", "dac-address", "dac"]);
   addCommandHelp(voteProposal, {
     requirements: [
       {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
@@ -1505,7 +1493,7 @@ Raw proposal (3rd party modules):
   });
 
   const execute = program.command("execute <proposalId>").description("Execute a passed DAC proposal");
-  applyOptions(execute, ["cell-address", "dac-address", "dac", "advance-seconds"]);
+  applyOptions(execute, ["cell-address", "dac-address", "dac"]);
   addCommandHelp(execute, {
     requirements: [
       {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
@@ -1523,7 +1511,7 @@ Raw proposal (3rd party modules):
 
   const proposalActivatePrimary = proposal.command("activate-primary <proposalId>")
     .description("Activate primary voting after the oracle snapshot has been published");
-  applyOptions(proposalActivatePrimary, [...proposalSelectorOpts, "advance-seconds"]);
+  applyOptions(proposalActivatePrimary, [...proposalSelectorOpts]);
   addCommandHelp(proposalActivatePrimary, {
     requirements: [proposalSelectorRequirement],
     notes: ["Hybrid mode only. The contract also auto-activates this phase when vote() is called, so explicit activation is optional."],
@@ -1535,7 +1523,7 @@ Raw proposal (3rd party modules):
 
   const proposalBeginWarmup = proposal.command("begin-warmup <proposalId>")
     .description("Begin fallback warmup after oracle missed the snapshot deadline");
-  applyOptions(proposalBeginWarmup, [...proposalSelectorOpts, "advance-seconds"]);
+  applyOptions(proposalBeginWarmup, [...proposalSelectorOpts]);
   addCommandHelp(proposalBeginWarmup, {
     requirements: [proposalSelectorRequirement],
     notes: ["Required when oracle did not publish a snapshot before the deadline, or oracle is inactive."],
@@ -1547,7 +1535,7 @@ Raw proposal (3rd party modules):
 
   const proposalTriggerFallback = proposal.command("trigger-fallback <proposalId>")
     .description("Emergency fallback transition when the oracle was deactivated mid-flight");
-  applyOptions(proposalTriggerFallback, [...proposalSelectorOpts, "advance-seconds"]);
+  applyOptions(proposalTriggerFallback, [...proposalSelectorOpts]);
   addCommandHelp(proposalTriggerFallback, {
     requirements: [proposalSelectorRequirement],
     notes: [
@@ -1562,7 +1550,7 @@ Raw proposal (3rd party modules):
 
   const proposalActivateFallback = proposal.command("activate-fallback <proposalId>")
     .description("Activate fallback voting after the warmup period has elapsed");
-  applyOptions(proposalActivateFallback, [...proposalSelectorOpts, "advance-seconds"]);
+  applyOptions(proposalActivateFallback, [...proposalSelectorOpts]);
   addCommandHelp(proposalActivateFallback, {
     requirements: [proposalSelectorRequirement],
     notes: ["The contract also auto-activates this phase when vote() is called after warmup, so explicit activation is optional."],
@@ -1574,7 +1562,7 @@ Raw proposal (3rd party modules):
 
   const proposalVoteMerkle = proposal.command("vote-merkle <proposalId> <support> <index> <amount> <proof>")
     .description("Vote on a hybrid proposal using a Merkle proof (unwrapped holders during PrimaryVoting)");
-  applyOptions(proposalVoteMerkle, [...proposalSelectorOpts, "pre-vote-advance-seconds"]);
+  applyOptions(proposalVoteMerkle, [...proposalSelectorOpts]);
   addCommandHelp(proposalVoteMerkle, {
     requirements: [proposalSelectorRequirement],
     notes: [

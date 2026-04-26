@@ -57,19 +57,7 @@ export const dacInvestmentScenario: Scenario = {
     h.log("Minting mock underlying tokens to founder A...");
     await mintMockToken(h, {token: underlyingToken, to: founderA.address, amount: "1000000000000000000000000"});
 
-    // ── Step 1a: Deploy governance oracle for investor DAC ─────────
-    let oracleAddress: string;
-    await step(h, "deploy-governance-oracle", async () => {
-      const cli = await h.cli([
-        "oracle", "deploy", founderA.address,
-        "--config", config.configPath, "--pretty-print",
-      ]);
-      oracleAddress = cli.data.oracleAddress as string;
-      assert.isAddress(oracleAddress, "oracle deployed");
-      return {cli, command: ["dac", "oracle", "deploy"]};
-    });
-
-    // ── Step 1b: Create investor DAC (existing-token) ──────────────
+    // ── Step 1: Create investor DAC (existing-token, fallback-only) ──
     let investorDacAddress: string;
     let investorMainTokenAddress: string;
     await step(h, "create-investor-dac", async () => {
@@ -89,7 +77,6 @@ export const dacInvestmentScenario: Scenario = {
         "--oracle-publish-deadline", "600",
         "--fallback-warmup-duration", "10",
         "--fallback-duration", "3600",
-        "--governance-oracle", oracleAddress!,
         "--auto-delegate", "--auto-approve",
         "--config", config.configPath, "--pretty-print",
       ]);

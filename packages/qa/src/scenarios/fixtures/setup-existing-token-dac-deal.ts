@@ -7,7 +7,6 @@ import {getChainTimestamp, mintMockToken, resolveUnderlyingToken, ZERO_ADDR} fro
 import type {DealContext, DealSetupOptions, MilestoneConfig} from "./setup-native-dac-deal.js";
 
 export interface ExistingTokenDealContext extends DealContext {
-  oracleAddress: string;
   wrappedMainTokenAddress: string;
   underlyingTokenAddress: string;
 }
@@ -65,10 +64,10 @@ export async function existingTokenProposeVoteExecute(
 /**
  * Set up an existing-token DAC with an approved deal, ready for evaluation or other lifecycle actions.
  *
- * Flow: mint underlying → deploy oracle → create-existing-token DAC → wrap → mint agent tokens
+ * Flow: mint underlying → create-existing-token DAC (no oracle, fallback-only) → wrap → mint agent tokens
  *       (fallback voting) → create deal → stake → approve deal (fallback voting) → verify active.
  *
- * Uses fallback voting path (no oracle publisher configured). The DAC is created with short
+ * Uses fallback voting path (no oracle configured). The DAC is created with short
  * oracle-publish-deadline (30s) and fallback-warmup (10s) for fast test execution.
  */
 export async function setupExistingTokenDacWithDeal(h: Harness, opts: DealSetupOptions = {}): Promise<ExistingTokenDealContext> {
@@ -83,17 +82,7 @@ export async function setupExistingTokenDacWithDeal(h: Harness, opts: DealSetupO
   h.log("Minting underlying tokens for existing-token DAC setup...");
   await mintMockToken(h, {token: underlyingToken, to: founderWallet.address, amount: "100000000000000000000000"}); // 100k
 
-  // ── Deploy governance oracle ──────────────────────────────────
-
-  h.log("Deploying governance oracle...");
-  const oracleCli = await h.cli([
-    "oracle", "deploy", founderWallet.address, founderWallet.address,
-    "--config", config.configPath, "--pretty-print",
-  ]);
-  const oracleAddress = oracleCli.data.oracleAddress as string;
-  assert.isAddress(oracleAddress, "oracle deployed");
-
-  // ── Create existing-token DAC ─────────────────────────────────
+  // ── Create existing-token DAC (fallback-only, no oracle) ──────
 
   h.log("Creating existing-token DAC...");
   const dacCreateCli = await h.cli([
@@ -112,7 +101,6 @@ export async function setupExistingTokenDacWithDeal(h: Harness, opts: DealSetupO
     "--oracle-publish-deadline", "30",
     "--fallback-warmup-duration", "10",
     "--fallback-duration", "3600",
-    "--governance-oracle", oracleAddress,
     "--auto-delegate",
     "--auto-approve",
     "--config", config.configPath,
@@ -286,7 +274,7 @@ export async function setupExistingTokenDacWithDeal(h: Harness, opts: DealSetupO
       treasuryToken: underlyingToken,
       chainTimestamp,
       founderAddress: founderWallet.address,
-      oracleAddress,
+
       wrappedMainTokenAddress,
       underlyingTokenAddress: underlyingToken,
     };
@@ -330,7 +318,6 @@ export async function setupExistingTokenDacWithDeal(h: Harness, opts: DealSetupO
     treasuryToken: underlyingToken,
     chainTimestamp,
     founderAddress: founderWallet.address,
-    oracleAddress,
     wrappedMainTokenAddress,
     underlyingTokenAddress: underlyingToken,
   };

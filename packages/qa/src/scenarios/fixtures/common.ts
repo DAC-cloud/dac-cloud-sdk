@@ -8,7 +8,7 @@ export {ZERO_ADDR};
  * Get the current chain block timestamp (EVM time, not wall clock).
  */
 export async function getChainTimestamp(h: Harness): Promise<number> {
-  const res = await fetch(h.config.rpcUrl, {
+  const res = await fetch(h.config.localRpcUrl, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: ["latest", false]}),
@@ -21,7 +21,7 @@ export async function getChainTimestamp(h: Harness): Promise<number> {
  * Get the current (latest) block number from the chain.
  */
 export async function getBlockNumber(h: Harness): Promise<number> {
-  const res = await fetch(h.config.rpcUrl, {
+  const res = await fetch(h.config.localRpcUrl, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({jsonrpc: "2.0", id: 1, method: "eth_blockNumber", params: []}),
@@ -56,7 +56,7 @@ export async function inviteAgentToDeal(
 ): Promise<void> {
   const {dealCell, inviter, invitee, grantInviteRight = false} = opts;
 
-  await rpcCall(h.config.rpcUrl, "hardhat_impersonateAccount", [inviter]);
+  await rpcCall(h.config.localRpcUrl, "hardhat_impersonateAccount", [inviter]);
 
   // invite(address,bool) selector = 0xd9caed12... let's compute properly
   // keccak256("invite(address,bool)") first 4 bytes
@@ -66,21 +66,21 @@ export async function inviteAgentToDeal(
   const boolPadded = boolHex.padStart(64, "0");
   // invite(address,bool) = 0x3109f4c0 (computed from keccak)
   // Let's use a more reliable approach — compute via the raw function signature
-  const data = `0x${await computeSelector(h.config.rpcUrl, "invite(address,bool)")}${inviteeHex}${boolPadded}`;
+  const data = `0x${await computeSelector(h.config.localRpcUrl, "invite(address,bool)")}${inviteeHex}${boolPadded}`;
 
-  const txHash = await rpcCall(h.config.rpcUrl, "eth_sendTransaction", [{
+  const txHash = await rpcCall(h.config.localRpcUrl, "eth_sendTransaction", [{
     from: inviter.toLowerCase(),
     to: dealCell.toLowerCase(),
     data,
     gas: "0x50000",
   }]) as string;
 
-  await rpcCall(h.config.rpcUrl, "hardhat_stopImpersonatingAccount", [inviter]);
+  await rpcCall(h.config.localRpcUrl, "hardhat_stopImpersonatingAccount", [inviter]);
 
   // Wait for receipt
   let receipt: {status: string} | null = null;
   for (let i = 0; i < 10; i++) {
-    receipt = await rpcCall(h.config.rpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string} | null;
+    receipt = await rpcCall(h.config.localRpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string} | null;
     if (receipt) break;
     await new Promise((r) => setTimeout(r, 200));
   }
@@ -113,26 +113,26 @@ export async function transferErc20(
   const {token, from, to, amount} = opts;
 
   // Impersonate the sender (Hardhat only)
-  await rpcCall(h.config.rpcUrl, "hardhat_impersonateAccount", [from]);
+  await rpcCall(h.config.localRpcUrl, "hardhat_impersonateAccount", [from]);
 
   // ERC20.transfer(to, amount) selector = 0xa9059cbb
   const amountHex = BigInt(amount).toString(16).padStart(64, "0");
   const toHex = to.slice(2).toLowerCase().padStart(64, "0");
   const data = `0xa9059cbb${toHex}${amountHex}`;
 
-  const txHash = await rpcCall(h.config.rpcUrl, "eth_sendTransaction", [{
+  const txHash = await rpcCall(h.config.localRpcUrl, "eth_sendTransaction", [{
     from: from.toLowerCase(),
     to: token.toLowerCase(),
     data,
     gas: "0x30000",
   }]) as string;
 
-  await rpcCall(h.config.rpcUrl, "hardhat_stopImpersonatingAccount", [from]);
+  await rpcCall(h.config.localRpcUrl, "hardhat_stopImpersonatingAccount", [from]);
 
   // Wait for receipt (Hardhat may not return it immediately)
   let receipt: {status: string} | null = null;
   for (let i = 0; i < 10; i++) {
-    receipt = await rpcCall(h.config.rpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string} | null;
+    receipt = await rpcCall(h.config.localRpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string} | null;
     if (receipt) break;
     await new Promise((r) => setTimeout(r, 200));
   }
@@ -252,18 +252,18 @@ export async function mintMockToken(
   const founder = h.config.wallets.founder?.address;
   if (!founder) throw new Error("founder wallet required for mintMockToken");
 
-  await rpcCall(h.config.rpcUrl, "hardhat_impersonateAccount", [founder]);
-  const txHash = await rpcCall(h.config.rpcUrl, "eth_sendTransaction", [{
+  await rpcCall(h.config.localRpcUrl, "hardhat_impersonateAccount", [founder]);
+  const txHash = await rpcCall(h.config.localRpcUrl, "eth_sendTransaction", [{
     from: founder.toLowerCase(),
     to: token.toLowerCase(),
     data,
     gas: "0x30000",
   }]) as string;
-  await rpcCall(h.config.rpcUrl, "hardhat_stopImpersonatingAccount", [founder]);
+  await rpcCall(h.config.localRpcUrl, "hardhat_stopImpersonatingAccount", [founder]);
 
   let receipt: {status: string} | null = null;
   for (let i = 0; i < 10; i++) {
-    receipt = await rpcCall(h.config.rpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string} | null;
+    receipt = await rpcCall(h.config.localRpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string} | null;
     if (receipt) break;
     await new Promise((r) => setTimeout(r, 200));
   }
@@ -283,7 +283,7 @@ export async function verifyTxReceipt(
 ): Promise<{status: string; gasUsed?: string}> {
   let receipt: {status: string; gasUsed?: string} | null = null;
   for (let i = 0; i < 10; i++) {
-    receipt = await rpcCall(h.config.rpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string; gasUsed?: string} | null;
+    receipt = await rpcCall(h.config.localRpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string; gasUsed?: string} | null;
     if (receipt) break;
     await new Promise((r) => setTimeout(r, 200));
   }

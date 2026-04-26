@@ -18,25 +18,25 @@ export async function approvePermit2(
   const {token, owner, amount} = opts;
   const permit2 = h.config.tokens.permit2;
 
-  await rpcCall(h.config.rpcUrl, "hardhat_impersonateAccount", [owner]);
+  await rpcCall(h.config.localRpcUrl, "hardhat_impersonateAccount", [owner]);
 
   // ERC20.approve(address,uint256) selector = 0x095ea7b3
   const spenderHex = permit2.slice(2).toLowerCase().padStart(64, "0");
   const amountHex = BigInt(amount).toString(16).padStart(64, "0");
   const data = `0x095ea7b3${spenderHex}${amountHex}`;
 
-  const txHash = await rpcCall(h.config.rpcUrl, "eth_sendTransaction", [{
+  const txHash = await rpcCall(h.config.localRpcUrl, "eth_sendTransaction", [{
     from: owner.toLowerCase(),
     to: token.toLowerCase(),
     data,
     gas: "0x30000",
   }]) as string;
 
-  await rpcCall(h.config.rpcUrl, "hardhat_stopImpersonatingAccount", [owner]);
+  await rpcCall(h.config.localRpcUrl, "hardhat_stopImpersonatingAccount", [owner]);
 
   let receipt: {status: string} | null = null;
   for (let i = 0; i < 10; i++) {
-    receipt = await rpcCall(h.config.rpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string} | null;
+    receipt = await rpcCall(h.config.localRpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string} | null;
     if (receipt) break;
     await new Promise((r) => setTimeout(r, 200));
   }
@@ -61,7 +61,7 @@ export async function approvePermit2Allowance(
   // Use a very high expiration to avoid AllowanceExpired errors (chain time may be far ahead of wall clock)
   const expiration = opts.expiration ?? 4294967295; // max uint32 — year 2106
 
-  await rpcCall(h.config.rpcUrl, "hardhat_impersonateAccount", [owner]);
+  await rpcCall(h.config.localRpcUrl, "hardhat_impersonateAccount", [owner]);
 
   // permit2.approve(address token, address spender, uint160 amount, uint48 expiration)
   const tokenHex = token.slice(2).toLowerCase().padStart(64, "0");
@@ -70,18 +70,18 @@ export async function approvePermit2Allowance(
   const expHex = BigInt(expiration).toString(16).padStart(64, "0");
   const data = `0x87517c45${tokenHex}${spenderHex}${amountHex}${expHex}`;
 
-  const txHash = await rpcCall(h.config.rpcUrl, "eth_sendTransaction", [{
+  const txHash = await rpcCall(h.config.localRpcUrl, "eth_sendTransaction", [{
     from: owner.toLowerCase(),
     to: permit2.toLowerCase(),
     data,
     gas: "0x50000",
   }]) as string;
 
-  await rpcCall(h.config.rpcUrl, "hardhat_stopImpersonatingAccount", [owner]);
+  await rpcCall(h.config.localRpcUrl, "hardhat_stopImpersonatingAccount", [owner]);
 
   let receipt: {status: string} | null = null;
   for (let i = 0; i < 10; i++) {
-    receipt = await rpcCall(h.config.rpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string} | null;
+    receipt = await rpcCall(h.config.localRpcUrl, "eth_getTransactionReceipt", [txHash]) as {status: string} | null;
     if (receipt) break;
     await new Promise((r) => setTimeout(r, 200));
   }

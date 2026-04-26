@@ -1,4 +1,3 @@
-import {resolve} from "node:path";
 import {
   accountFromPrivateKey,
   createDacCoreClient,
@@ -7,32 +6,68 @@ import {
   type DacTransactionBuilder,
 } from "@dac-cloud/core";
 import {createIndexerClient} from "@dac-cloud/indexer";
-import {loadProtocolManifest, type ProtocolManifest} from "@dac-cloud/manifests";
+import {fetchManifest, type ProtocolManifest} from "@dac-cloud/manifests";
 import {defineChain, type Address, type Hex, type PrivateKeyAccount} from "viem";
+import {resolveAuthToken} from "../auth/flows.js";
 import type {OptionResolver} from "./config";
 
 export const DEFAULT_ANVIL_PK_0 =
   "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as Hex;
 
+const DEFAULT_API_URL = "https://api.dac.cloud";
+
 export interface CoreContext {
   chainId: number;
-  rpcUrl: string;
-  contractsRoot: string;
+  apiUrl: string;
   account: PrivateKeyAccount;
   protocol: ProtocolManifest;
   core: DacCoreClient;
 }
 
+export function resolveApiUrl(resolver: OptionResolver): string {
+  return resolver.resolveString("api-url", DEFAULT_API_URL) ?? DEFAULT_API_URL;
+}
+
+export function deriveRpcUrl(apiUrl: string, chainId: number): string {
+  return `${apiUrl.replace(/\/+$/, "")}/rpc/${chainId}`;
+}
+
+export function deriveGraphqlUrl(apiUrl: string): string {
+  return `${apiUrl.replace(/\/+$/, "")}/graphql`;
+}
+
+/**
+ * Collect DAC addresses from command options for auth scoping.
+ */
+function collectDacsFromResolver(resolver: OptionResolver): string[] {
+  const dacs: string[] = [];
+  for (const key of ["dac-address", "dac", "cell-address"]) {
+    const val = resolver.resolveString(key);
+    if (val && !dacs.includes(val)) dacs.push(val);
+  }
+  return dacs;
+}
+
+function authHeaders(token: string): Record<string, string> {
+  return {authorization: `Bearer ${token}`};
+}
+
 export async function makeCoreContext(resolver: OptionResolver): Promise<CoreContext> {
-  const chainId = resolver.resolveNumber("chain-id", 31337) ?? 31337;
-  const rpcUrl = resolver.resolveString("rpc-url", "http://127.0.0.1:8545") ?? "http://127.0.0.1:8545";
-  const contractsRoot = resolve(
-    resolver.resolveString("contracts-root", process.env.DAC_CONTRACTS_ROOT ?? "../dac-cloud-contracts")
-      ?? "../dac-cloud-contracts",
-  );
+  const chainId = resolver.resolveNumber("chain-id") ?? 31337;
+  const apiUrl = resolveApiUrl(resolver);
+  const rpcUrl = deriveRpcUrl(apiUrl, chainId);
 
   const privateKey = (resolver.resolveString("private-key", DEFAULT_ANVIL_PK_0) ?? DEFAULT_ANVIL_PK_0) as Hex;
   const account = accountFromPrivateKey(privateKey);
+
+  const authToken = await resolveAuthToken({
+    configToken: resolver.resolveString("auth-token"),
+    configTokenExpires: resolver.resolveString("auth-expires"),
+    chainId,
+    account,
+    apiUrl,
+    dacs: collectDacsFromResolver(resolver),
+  });
 
   const chain = defineChain({
     id: chainId,
@@ -44,13 +79,18 @@ export async function makeCoreContext(resolver: OptionResolver): Promise<CoreCon
     },
   });
 
-  const protocol = await loadProtocolManifest(chainId, {contractsRoot});
-  const core = createDacCoreClient({chain, rpcUrl, account, protocol});
+  const protocol = await fetchManifest(chainId, apiUrl);
+  const core = createDacCoreClient({
+    chain,
+    rpcUrl,
+    account,
+    protocol,
+    fetchOptions: {headers: authHeaders(authToken)},
+  });
 
   return {
     chainId,
-    rpcUrl,
-    contractsRoot,
+    apiUrl,
     account,
     protocol,
     core,
@@ -59,70 +99,70 @@ export async function makeCoreContext(resolver: OptionResolver): Promise<CoreCon
 
 export interface DryRunContext {
   chainId: number;
-  contractsRoot: string;
+  apiUrl: string;
   fromAddress: Address;
   protocol: ProtocolManifest;
   txBuilder: DacTransactionBuilder;
 }
 
 export async function makeDryRunContext(resolver: OptionResolver): Promise<DryRunContext> {
-  const chainId = resolver.resolveNumber("chain-id", 31337) ?? 31337;
-  const contractsRoot = resolve(
-    resolver.resolveString("contracts-root", process.env.DAC_CONTRACTS_ROOT ?? "../dac-cloud-contracts")
-      ?? "../dac-cloud-contracts",
-  );
+  const chainId = resolver.resolveNumber("chain-id") ?? 31337;
+  const apiUrl = resolveApiUrl(resolver);
 
   const fromRaw = resolver.resolveString("from");
   const privateKeyRaw = resolver.resolveString("private-key");
 
   let fromAddress: Address;
+  let account: PrivateKeyAccount | undefined;
   if (fromRaw) {
     fromAddress = fromRaw as Address;
+    if (privateKeyRaw) {
+      account = accountFromPrivateKey(privateKeyRaw as Hex);
+    }
   } else if (privateKeyRaw) {
-    fromAddress = accountFromPrivateKey(privateKeyRaw as Hex).address;
+    account = accountFromPrivateKey(privateKeyRaw as Hex);
+    fromAddress = account.address;
   } else {
     throw new Error("--dry-run requires --from <address> or --private-key to derive sender address");
   }
 
-  const protocol = await loadProtocolManifest(chainId, {contractsRoot});
-  const txBuilder = createDacTransactionBuilder({chainId, fromAddress, protocol});
-
-  return {chainId, contractsRoot, fromAddress, protocol, txBuilder};
-}
-
-export function makeIndexer(resolver: OptionResolver) {
-  const indexerUrl = resolver.resolveString("indexer-url", "http://127.0.0.1:8080/v1/graphql")
-    ?? "http://127.0.0.1:8080/v1/graphql";
-  return createIndexerClient({url: indexerUrl});
-}
-
-async function rpcCall<T>(rpcUrl: string, method: string, params: unknown[]): Promise<T> {
-  const response = await fetch(rpcUrl, {
-    method: "POST",
-    headers: {"content-type": "application/json"},
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: Date.now(),
-      method,
-      params,
-    }),
+  // Dry-run requires a valid token but can work without a private key
+  await resolveAuthToken({
+    configToken: resolver.resolveString("auth-token"),
+    configTokenExpires: resolver.resolveString("auth-expires"),
+    chainId,
+    account,
+    apiUrl,
+    dacs: collectDacsFromResolver(resolver),
   });
 
-  const payload = await response.json() as {result?: T; error?: {message?: string}};
-  if (!response.ok || payload.error) {
-    throw new Error(payload.error?.message ?? `RPC call failed: ${method}`);
-  }
+  const protocol = await fetchManifest(chainId, apiUrl);
+  const txBuilder = createDacTransactionBuilder({chainId, fromAddress, protocol});
 
-  return payload.result as T;
+  return {chainId, apiUrl, fromAddress, protocol, txBuilder};
 }
 
-export async function advanceTime(rpcUrl: string, seconds: number): Promise<void> {
-  if (seconds <= 0) {
-    return;
-  }
+export async function makeIndexer(resolver: OptionResolver) {
+  const apiUrl = resolveApiUrl(resolver);
+  const chainId = resolver.resolveNumber("chain-id") ?? 31337;
+  const indexerUrl = deriveGraphqlUrl(apiUrl);
 
-  await rpcCall<string>(rpcUrl, "evm_increaseTime", [seconds]);
-  await rpcCall<string>(rpcUrl, "evm_mine", []);
+  const privateKeyRaw = resolver.resolveString("private-key");
+  const account = privateKeyRaw ? accountFromPrivateKey(privateKeyRaw as Hex) : undefined;
+
+  const authToken = await resolveAuthToken({
+    configToken: resolver.resolveString("auth-token"),
+    configTokenExpires: resolver.resolveString("auth-expires"),
+    chainId,
+    account,
+    apiUrl,
+    dacs: collectDacsFromResolver(resolver),
+  });
+
+  return createIndexerClient({
+    url: indexerUrl,
+    headers: authHeaders(authToken),
+  });
 }
 
 export function listQueryPage(resolver: OptionResolver): {limit?: number; offset?: number} {

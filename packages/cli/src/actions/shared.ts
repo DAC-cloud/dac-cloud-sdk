@@ -83,7 +83,7 @@ export async function resolveDacIdOrThrow(resolver: OptionResolver): Promise<str
     throw new Error("Provide --dac-id or --cell-address");
   }
 
-  const client = makeIndexer(resolver);
+  const client = await makeIndexer(resolver);
   const found = await client.dacs.getByAddress(address);
   if (!found) {
     throw new Error("DAC not found in indexer");
@@ -92,7 +92,7 @@ export async function resolveDacIdOrThrow(resolver: OptionResolver): Promise<str
 }
 
 export async function resolveDacRecordOrThrow(resolver: OptionResolver): Promise<ResolvedDacRecord> {
-  const client = makeIndexer(resolver);
+  const client = await makeIndexer(resolver);
   const directId = resolver.resolveString(["dac-id", "id"]);
   const byAddress = resolver.resolveString(["cell-address", "dac-address", "dac", "address"]);
 
@@ -125,7 +125,7 @@ export async function resolveDacRecordOrThrow(resolver: OptionResolver): Promise
 export async function resolveDealIdOrThrow(resolver: OptionResolver): Promise<string> {
   const direct = resolver.resolveString(["deal-id", "id"]);
   if (direct) {
-    const client = makeIndexer(resolver);
+    const client = await makeIndexer(resolver);
     // Try as composite indexer ID first, then as on-chain numeric ID with DAC context
     const byComposite = await client.deals.getById(direct);
     if (byComposite) return byComposite.id;
@@ -141,7 +141,7 @@ export async function resolveDealIdOrThrow(resolver: OptionResolver): Promise<st
     throw new Error("Provide --deal-id or --deal-address");
   }
 
-  const client = makeIndexer(resolver);
+  const client = await makeIndexer(resolver);
   const found = await client.deals.getByAddress(address);
   if (!found) {
     throw new Error("Deal not found in indexer");
@@ -154,7 +154,7 @@ export async function resolveDealIdOrThrow(resolver: OptionResolver): Promise<st
  * Requires --dac / --dac-address / --cell-address to identify the DAC.
  */
 async function resolveDealByNumericId(
-  client: ReturnType<typeof makeIndexer>,
+  client: Awaited<ReturnType<typeof makeIndexer>>,
   resolver: OptionResolver,
   numericIdText: string,
 ) {
@@ -173,7 +173,7 @@ async function resolveDealByNumericId(
 }
 
 export async function resolveDealRecordOrThrow(resolver: OptionResolver): Promise<ResolvedDealRecord> {
-  const client = makeIndexer(resolver);
+  const client = await makeIndexer(resolver);
   const directId = resolver.resolveString(["deal-id", "id"]);
   const byAddress = resolver.resolveString(["deal-address", "address", "deal", "deal-cell"]);
 
@@ -222,7 +222,7 @@ export async function resolveDealRecordOrThrow(resolver: OptionResolver): Promis
 }
 
 export async function viewProposalByIdOrThrow(resolver: OptionResolver, proposalId: string) {
-  const client = makeIndexer(resolver);
+  const client = await makeIndexer(resolver);
   const proposal = await client.proposals.getById(proposalId);
   if (!proposal) {
     throw new Error("Proposal not found in indexer");
@@ -231,7 +231,7 @@ export async function viewProposalByIdOrThrow(resolver: OptionResolver, proposal
 }
 
 export async function resolveDacProposalByNumericIdOrThrow(resolver: OptionResolver, proposalNumericIdText: string) {
-  const client = makeIndexer(resolver);
+  const client = await makeIndexer(resolver);
   const dacId = await resolveDacIdOrThrow(resolver);
   const proposal = await client.proposals.getByDacAndNumericId(dacId, proposalNumericIdText);
   if (!proposal) {
@@ -241,7 +241,7 @@ export async function resolveDacProposalByNumericIdOrThrow(resolver: OptionResol
 }
 
 export async function resolveDealProposalByNumericIdOrThrow(resolver: OptionResolver, proposalNumericIdText: string) {
-  const client = makeIndexer(resolver);
+  const client = await makeIndexer(resolver);
   const dealId = await resolveDealIdOrThrow(resolver);
   const proposal = await client.proposals.getByDealAndNumericId(dealId, proposalNumericIdText);
   if (!proposal) {

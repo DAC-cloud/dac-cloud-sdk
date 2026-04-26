@@ -3,6 +3,7 @@ import {formatViemError} from "@dac-cloud/core";
 import {Command} from "commander";
 import {registerDacCommands} from "./actions/dac";
 import {registerDealCommands} from "./actions/deal";
+import {registerAuthCommands} from "./auth/commands";
 import {applyOptions, GLOBAL_OPTION_KEYS} from "./cli/options";
 import {loadOptionResolver} from "./runtime/config";
 
@@ -23,23 +24,28 @@ Config resolution order:
   4) process environment
 
 Option keys support both plain and DAC_ prefixed env names.
-Example: --rpc-url resolves from RPC_URL or DAC_RPC_URL.
+Example: --api-url resolves from API_URL or DAC_API_URL.
 
 Defaults:
   --chain-id 31337
-  --rpc-url http://127.0.0.1:8545
-  --indexer-url http://127.0.0.1:8080/v1/graphql
+  --api-url https://api.dac.cloud
   --private-key anvil account #0
+
+Authentication:
+  dac auth login      Auto-login (requires private key in config)
+  dac auth challenge  Request SIWE message for external signing
+  dac auth verify     Complete auth with externally-signed message
 
 Dry-run mode:
   --dry-run --from <address>   Return unsigned tx data instead of broadcasting.
-  Useful for managed wallets, multisig, and agent harnesses.
+  Requires a valid auth token (run 'dac auth challenge' + 'dac auth verify').
 
 All command outputs are JSON. Bigint values are serialized as decimal strings.
 `);
 
   const resolverFactory = loadOptionResolver;
 
+  registerAuthCommands(program, resolverFactory);
   registerDacCommands(program, resolverFactory);
   registerDealCommands(program, resolverFactory);
 

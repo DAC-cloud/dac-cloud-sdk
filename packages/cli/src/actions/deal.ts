@@ -33,7 +33,7 @@ import {
 } from "../modules/registry";
 import {addCommandHelp, applyOptions} from "../cli/options";
 import type {OptionResolver} from "../runtime/config";
-import {advanceTime, makeCoreContext, makeDryRunContext, makeIndexer} from "../runtime/chain";
+import {makeCoreContext, makeDryRunContext, makeIndexer} from "../runtime/chain";
 import {printJson, readJsonFile} from "../runtime/io";
 
 function isDryRun(resolver: OptionResolver): boolean {
@@ -348,7 +348,7 @@ const BASE_DEAL_PROPOSAL_TYPES = new Set<string>(BASE_DEAL_PROPOSAL_TYPE_LIST);
 async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, args: string[]): Promise<void> {
   const resolved = await resolveDealRecordOrThrow(resolver);
   const dealAddress = resolved.dealAddress;
-  const indexer = makeIndexer(resolver);
+  const indexer = await makeIndexer(resolver);
   const inputPath = resolver.resolveString("input");
   const input = inputPath ? await readJsonFile<Record<string, unknown>>(resolvePath(inputPath)) : undefined;
   const resolvedType = resolveDealProposalType(proposalTypeRaw);
@@ -579,9 +579,7 @@ async function cmdVoteProposal(resolver: OptionResolver, proposalIdText: string,
     return;
   }
 
-  const {core, rpcUrl} = await makeCoreContext(resolver);
-  const preVoteAdvanceSeconds = resolver.resolveNumber("pre-vote-advance-seconds", 1) ?? 1;
-  await advanceTime(rpcUrl, preVoteAdvanceSeconds);
+  const {core} = await makeCoreContext(resolver);
   const txHash = await core.voteProposal({proposalAddress, support});
   printJson({action: "deal.vote.proposal", deal: dealAddress, proposalId, proposalAddress, support, txHash});
 }
@@ -598,14 +596,10 @@ async function cmdExecute(resolver: OptionResolver, proposalIdText: string): Pro
     return;
   }
 
-  const {core, rpcUrl} = await makeCoreContext(resolver);
+  const {core} = await makeCoreContext(resolver);
   const proposal = await resolveDealProposalByNumericIdOrThrow(resolver, proposalIdText);
   const proposalAddress = proposal.proposalAddress ? asAddress(proposal.proposalAddress, "Proposal address") : undefined;
 
-  const advanceSeconds = resolver.resolveNumber("advance-seconds", 0) ?? 0;
-  if (advanceSeconds > 0) {
-    await advanceTime(rpcUrl, advanceSeconds);
-  }
 
   const details = await core.executeDealProposalDetailed({dealAddress, proposalId});
   printJson({
@@ -699,7 +693,7 @@ async function cmdAgentSpend(resolver: OptionResolver, tokenText: string, destin
   const amount = BigInt(amountText);
 
   // Resolve treasury address from indexer
-  const indexer = makeIndexer(resolver);
+  const indexer = await makeIndexer(resolver);
   const deal = await indexer.deals.getByAddress(dealAddress as string);
   if (!deal?.managedTreasuryAddress) {
     throw new Error("Deal has no managed treasury address (only treasury deals support agent-spend).");
@@ -725,7 +719,7 @@ async function cmdReceivePermit2(resolver: OptionResolver, tokenText: string, so
   const source = asAddress(sourceText, "source");
   const amount = BigInt(amountText);
 
-  const indexer = makeIndexer(resolver);
+  const indexer = await makeIndexer(resolver);
   const deal = await indexer.deals.getByAddress(dealAddress as string);
   if (!deal?.managedTreasuryAddress) {
     throw new Error("Deal has no managed treasury address (only treasury deals support receive-permit2).");
@@ -840,7 +834,7 @@ async function cmdWithdraw(resolver: OptionResolver, dealNumericIdText: string):
 }
 
 async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: string): Promise<void> {
-  const client = makeIndexer(resolver);
+  const client = await makeIndexer(resolver);
   const page = resolvePage(resolver);
 
   const resource = z.enum(["deal", "proposal", "proposals", "positions", "treasury-actions"]).catch("deal").parse(resourceRaw ?? "deal");
@@ -1026,7 +1020,7 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
 
   const vote = deal.command("vote").description("Vote deal proposals");
   const voteProposal = vote.command("proposal <proposalId> <support>").description("Vote for a deal proposal");
-  applyOptions(voteProposal, [...DEAL_SELECTOR_OPTIONS, "pre-vote-advance-seconds"]);
+  applyOptions(voteProposal, [...DEAL_SELECTOR_OPTIONS]);
   addCommandHelp(voteProposal, {
     requirements: [
       {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},
@@ -1038,7 +1032,7 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
   });
 
   const execute = deal.command("execute <proposalId>").description("Execute a passed deal proposal");
-  applyOptions(execute, [...DEAL_SELECTOR_OPTIONS, "advance-seconds"]);
+  applyOptions(execute, [...DEAL_SELECTOR_OPTIONS]);
   addCommandHelp(execute, {
     requirements: [
       {mode: "oneOf", options: [...DEAL_SELECTOR_OPTIONS], label: "Deal selector"},

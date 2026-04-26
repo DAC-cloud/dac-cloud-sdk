@@ -4,6 +4,7 @@ import {
   mintMockToken,
   resolveUnderlyingToken,
   buildVotingPowerMerkleTree,
+  existingTokenProposeVoteExecute,
 } from "./fixtures/index.js";
 
 /**
@@ -65,21 +66,7 @@ export const oracleGovernanceScenario: Scenario = {
     await mintMockToken(h, {token: underlyingToken, to: agent1.address, amount: "3000000000000000000000"});   // 3k
     await mintMockToken(h, {token: underlyingToken, to: agent2.address, amount: "2000000000000000000000"});   // 2k
 
-    // ── Deploy governance oracle ──
-    let oracleAddress: string;
-
-    await step(h, "deploy-oracle", async () => {
-      const cli = await h.cli([
-        "oracle", "deploy", founder.address, founder.address,
-        "--config", config.configPath, "--pretty-print",
-      ]);
-      oracleAddress = cli.data.oracleAddress as string;
-      assert.isAddress(oracleAddress, "oracle deployed");
-      h.log(`Oracle deployed: ${oracleAddress}`);
-      return {cli, command: ["oracle", "deploy"]};
-    });
-
-    // ── Create existing-token DAC with oracle primary enabled ──
+    // ── Create existing-token DAC (fallback-only initially, oracle added via governance) ──
     let dacAddress: string;
     let wrappedMainTokenAddress: string;
 
@@ -100,8 +87,6 @@ export const oracleGovernanceScenario: Scenario = {
         "--oracle-publish-deadline", "600",
         "--fallback-warmup-duration", "10",
         "--fallback-duration", "3600",
-        "--oracle-primary-enabled",
-        "--governance-oracle", oracleAddress!,
         "--auto-delegate",
         "--auto-approve",
         "--config", config.configPath,
@@ -115,6 +100,20 @@ export const oracleGovernanceScenario: Scenario = {
     });
 
     await h.syncIndexer();
+
+    // ── Deploy governance oracle (as DAC member now) ──
+    let oracleAddress: string;
+
+    await step(h, "deploy-oracle", async () => {
+      const cli = await h.cli([
+        "oracle", "deploy", founder.address, founder.address,
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      oracleAddress = cli.data.oracleAddress as string;
+      assert.isAddress(oracleAddress, "oracle deployed");
+      h.log(`Oracle deployed: ${oracleAddress}`);
+      return {cli, command: ["oracle", "deploy"]};
+    });
 
     // ── Wrap tokens for founder (additional 500 beyond the 1k seed) ──
     // This gives founder wrapped voting power for the "mixed voting" phase.
@@ -131,6 +130,49 @@ export const oracleGovernanceScenario: Scenario = {
 
     await h.syncIndexer();
 
+    // ── Set oracle on DAC via governance (fallback voting) ──
+    // The DAC was created without an oracle. Now that we're a member,
+    // deploy oracle and enable oracle-primary mode via governance proposals.
+
+    h.log("Setting oracle on DAC via governance...");
+
+    await step(h, "set-oracle-on-dac", async () => {
+      await existingTokenProposeVoteExecute(h, dacAddress!, [
+        "propose", "update-governance-oracle", oracleAddress!,
+      ]);
+      return {
+        cli: {data: {action: "set-oracle"}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["propose", "update-governance-oracle"],
+      };
+    });
+
+    await h.syncIndexer();
+
+    // Enable oracle-primary voting via update-governance-strategy
+    await step(h, "enable-oracle-primary", async () => {
+      await existingTokenProposeVoteExecute(h, dacAddress!, [
+        "propose", "update-governance-strategy",
+        "50",     // quorumPercent
+        "75",     // highQuorumPercent
+        "0",      // blockingPercent
+        "3600",   // duration
+        "0",      // qualification
+        "86400",  // executionValidityDuration
+        "600",    // oraclePublishDeadline
+        "10",     // fallbackWarmupDuration
+        "3600",   // fallbackDuration
+        "false",  // blockingOnAllProposals
+        "false",  // blockingOnHighQuorum
+        "true",   // oraclePrimaryEnabled
+      ]);
+      return {
+        cli: {data: {action: "enable-oracle-primary"}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["propose", "update-governance-strategy"],
+      };
+    });
+
+    await h.syncIndexer();
+
     // At this point:
     // - founder: 8500 underlying (unwrapped), 1500 wrapped (delegated to self)
     // - agent1: 3000 underlying (unwrapped), 0 wrapped
@@ -138,6 +180,7 @@ export const oracleGovernanceScenario: Scenario = {
     // Total underlying for merkle: 8500 + 3000 + 2000 = 13500
     // wrappedVotable varies, totalVotingPower = 13500 + wrappedVotable
     // With 50% quorum and smallest-first vote order, all 3 get to vote before resolution
+    // Oracle is now set and oracle-primary voting is enabled.
 
     // ══════════════════════════════════════════════════════════════
     // PHASE 2: ORACLE PRIMARY VOTING (3 merkle voters)

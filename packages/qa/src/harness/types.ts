@@ -10,18 +10,18 @@ export interface TokenConfig {
 export interface QaConfig {
   /** Path to dac CLI binary */
   cliBin: string;
-  /** Path to base config.env file */
+  /** Path to base config.env file (passed to CLI via --config) */
   configPath: string;
-  /** RPC URL (for direct JSON-RPC calls like evm_mine, evm_increaseTime) */
-  rpcUrl: string;
-  /** Indexer GraphQL URL */
-  indexerUrl: string;
+  /** Backend API URL (CLI routes all traffic through this) */
+  apiUrl: string;
+  /** Direct RPC URL for dev-only methods (evm_increaseTime, evm_mine, hardhat_*) */
+  localRpcUrl: string;
+  /** Direct indexer URL for sync polling (chain_metadata query) */
+  localIndexerUrl: string;
   /** Chain ID */
   chainId: number;
   /** Private keys for multi-wallet scenarios, keyed by role name */
   wallets: Record<string, WalletConfig>;
-  /** Contracts root path (for manifest loading) */
-  contractsRoot: string;
   /** Token addresses for scenarios */
   tokens: TokenConfig;
   /** Max time (ms) to wait for indexer to sync after a tx (default: 30000) */

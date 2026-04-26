@@ -108,7 +108,12 @@ export function formatViemError(error: unknown): string {
       return `${selectorMap.get(selector)} [selector ${selector}]`;
     }
 
-    return error.shortMessage || error.message;
+    // Include details for HTTP/transport errors (e.g., backend proxy error body)
+    const base = error.shortMessage || error.message;
+    if (error.details && error.details !== base) {
+      return `${base} — ${error.details}`;
+    }
+    return base;
   }
 
   if (error instanceof Error) {

@@ -1,4 +1,4 @@
-import {existsSync, readFileSync} from "node:fs";
+import {existsSync, readFileSync, writeFileSync} from "node:fs";
 import {resolve} from "node:path";
 import {parse as parseDotEnv} from "dotenv";
 import {setPrettyPrint} from "./io";
@@ -179,6 +179,43 @@ export class OptionResolver {
     }
     return value;
   }
+}
+
+/**
+ * Update or append a key in a dotenv-style config file.
+ * Preserves existing comments and whitespace.
+ */
+export function writeConfigKey(configPath: string, key: string, value: string): void {
+  const absPath = resolve(configPath);
+  let content = "";
+  if (existsSync(absPath)) {
+    content = readFileSync(absPath, "utf8");
+  }
+
+  const pattern = new RegExp(`^${key}=.*$`, "m");
+  const newLine = `${key}=${value}`;
+
+  if (pattern.test(content)) {
+    content = content.replace(pattern, newLine);
+  } else {
+    const separator = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
+    content = `${content}${separator}${newLine}\n`;
+  }
+
+  writeFileSync(absPath, content, "utf8");
+}
+
+/**
+ * Remove a key from a dotenv-style config file.
+ */
+export function removeConfigKey(configPath: string, key: string): void {
+  const absPath = resolve(configPath);
+  if (!existsSync(absPath)) return;
+
+  let content = readFileSync(absPath, "utf8");
+  const pattern = new RegExp(`^${key}=.*\n?`, "m");
+  content = content.replace(pattern, "");
+  writeFileSync(absPath, content, "utf8");
 }
 
 export async function loadOptionResolver(cliOptions: Record<string, unknown>): Promise<OptionResolver> {

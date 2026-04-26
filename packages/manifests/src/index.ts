@@ -1,6 +1,3 @@
-import {readFile} from "node:fs/promises";
-import {resolve} from "node:path";
-
 export type ProtocolAddress = `0x${string}`;
 
 export const PROTOCOL_MANIFEST_CORE_ADDRESS_KEYS = [
@@ -110,41 +107,6 @@ export interface ProtocolManifest {
   [key: string]: unknown;
 }
 
-export interface ManifestLocatorOptions {
-  contractsRoot?: string;
-  deploymentsDir?: string;
-}
-
-export function resolveDeploymentsDir(options: ManifestLocatorOptions = {}): string {
-  if (options.deploymentsDir) {
-    return options.deploymentsDir;
-  }
-
-  if (options.contractsRoot) {
-    return resolve(options.contractsRoot, "deployments");
-  }
-
-  const fromEnv = process.env.DAC_CONTRACTS_ROOT;
-  if (fromEnv) {
-    return resolve(fromEnv, "deployments");
-  }
-
-  return resolve(process.cwd(), "../dac-cloud-contracts/deployments");
-}
-
-export async function loadJsonManifest<T>(path: string): Promise<T> {
-  const raw = await readFile(path, "utf8");
-  return JSON.parse(raw) as T;
-}
-
-export function resolveProtocolManifestPath(
-  chainId: number,
-  options: ManifestLocatorOptions = {},
-): string {
-  const deploymentsDir = resolveDeploymentsDir(options);
-  return resolve(deploymentsDir, String(chainId), "protocol.json");
-}
-
 export function isProtocolAddress(value: unknown): value is ProtocolAddress {
   return typeof value === "string" && /^0x[a-fA-F0-9]{40}$/.test(value);
 }
@@ -161,16 +123,6 @@ function assertProtocolManifest(manifest: ProtocolManifest): void {
   }
 }
 
-export async function loadProtocolManifest(
-  chainId: number,
-  options: ManifestLocatorOptions = {},
-): Promise<ProtocolManifest> {
-  const protocolPath = resolveProtocolManifestPath(chainId, options);
-  const manifest = await loadJsonManifest<ProtocolManifest>(protocolPath);
-  assertProtocolManifest(manifest);
-  return manifest;
-}
-
 export function requireProtocolAddress<TKey extends ProtocolManifestAddressKey>(
   manifest: ProtocolManifest,
   key: TKey,
@@ -180,4 +132,28 @@ export function requireProtocolAddress<TKey extends ProtocolManifestAddressKey>(
     throw new Error(`Protocol manifest is missing required address '${String(key)}'`);
   }
   return value as Extract<ProtocolManifest[TKey], ProtocolAddress>;
+}
+
+/**
+ * Fetch a protocol manifest from the backend API.
+ *
+ * GET {apiUrl}/manifest/{chainId}
+ */
+export async function fetchManifest(
+  chainId: number,
+  apiUrl: string,
+): Promise<ProtocolManifest> {
+  const url = `${apiUrl.replace(/\/+$/, "")}/manifest/${chainId}`;
+  const response = await fetch(url, {
+    headers: {accept: "application/json"},
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`Failed to fetch manifest for chain ${chainId}: ${response.status} ${response.statusText}${body ? ` — ${body}` : ""}`);
+  }
+
+  const manifest = await response.json() as ProtocolManifest;
+  assertProtocolManifest(manifest);
+  return manifest;
 }

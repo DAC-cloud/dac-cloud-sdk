@@ -17,7 +17,7 @@ import {mintMockToken} from "./fixtures/index.js";
  */
 export const existingTokenDacScenario: Scenario = {
   name: "existing-token-dac-lifecycle",
-  description: "Deploy oracle → create existing-token DAC → wrap → propose → vote → execute",
+  description: "Create existing-token DAC (fallback-only) → wrap → propose → vote → execute",
   tags: ["dac", "existing-token", "hybrid", "lifecycle"],
 
   async run(h: Harness) {
@@ -26,35 +26,14 @@ export const existingTokenDacScenario: Scenario = {
     if (!founderWallet) throw new Error("founder wallet required");
 
     // Track addresses across steps
-    let oracleAddress: string;
     let dacAddress: string;
     let mainTokenAddress: string;
     let agentTokenAddress: string;
     let wrappedMainTokenAddress: string;
 
-    // ── Step 1: Deploy governance oracle ──────────────────────────
+    // ── Step 1: Create existing-token DAC (fallback-only) ────────
 
-    await step(h, "deploy-governance-oracle", async () => {
-      const args = [
-        "oracle", "deploy", founderWallet.address,
-        "--config", config.configPath,
-        "--pretty-print",
-      ];
-      const cli = await h.cli(args);
-
-      oracleAddress = cli.data.oracleAddress as string;
-      assert.isAddress(oracleAddress, "oracle address is valid");
-      assert.equal(cli.data.action, "dac.oracle.deploy", "correct action");
-
-      return {cli, command: ["dac", ...args]};
-    });
-
-    // ── Step 2: Create existing-token DAC ─────────────────────────
-
-    // We need a mock ERC20 on local chain. On Hardhat, the deploy scripts
-    // should have deployed a test token. We'll look it up or skip if not available.
-    // For now, use the underlying token from the contracts deploy manifest.
-    const underlyingToken = await resolveUnderlyingToken(h);
+    const underlyingToken = resolveUnderlyingToken(h);
 
     // Mint underlying tokens for the founder — required for treasury-seed-amount
     await mintMockToken(h, {token: underlyingToken, to: founderWallet.address, amount: "10000000000000000000000"}); // 10k
@@ -76,7 +55,6 @@ export const existingTokenDacScenario: Scenario = {
         "--oracle-publish-deadline", "600",
         "--fallback-warmup-duration", "10",
         "--fallback-duration", "3600",
-        "--governance-oracle", oracleAddress!,
         "--auto-delegate",
         "--auto-approve",
         "--config", config.configPath,
@@ -260,44 +238,15 @@ export const existingTokenDacScenario: Scenario = {
 
 /**
  * Find an underlying ERC20 token address for testing.
- * On local chain: use the mock token from the contracts deploy.
  * On testnet: use a known stablecoin (USDC, EURC).
+ * On local chain: use the well-known mock token address.
  */
-async function resolveUnderlyingToken(h: Harness): Promise<string> {
-  // Check if there's a known test token in the manifest/deploy output
-  // For local Hardhat, the seed scripts deploy mock tokens.
-  // We'll try to read from the contracts deploy artifacts.
-  const contractsRoot = h.config.contractsRoot;
-  if (contractsRoot) {
-    try {
-      const {readFileSync} = await import("node:fs");
-      const broadcastDir = `${contractsRoot}/broadcast`;
-      // Look for the mock token in the latest deploy
-      const {readdirSync} = await import("node:fs");
-      // Try common locations
-      const mockTokenPaths = [
-        `${contractsRoot}/deployments/localhost/MockERC20.json`,
-        `${contractsRoot}/deployments/31337/MockERC20.json`,
-      ];
-      for (const p of mockTokenPaths) {
-        try {
-          const data = JSON.parse(readFileSync(p, "utf-8"));
-          if (data.address) return data.address;
-        } catch {
-          // continue
-        }
-      }
-    } catch {
-      // Fall through
-    }
-  }
-
-  // Fallback: well-known test tokens
+function resolveUnderlyingToken(h: Harness): string {
   if (h.config.chainId === 84532) {
     // Base Sepolia USDC
     return "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
   }
 
-  // MockERC20
+  // MockERC20 (local Hardhat)
   return "0x4A679253410272dd5232B3Ff7cF5dbB88f295319";
 }

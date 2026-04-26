@@ -26,12 +26,12 @@ export async function syncIndexer(config: QaConfig, opts?: {timeoutMs?: number})
   }
 
   // Get current chain block (includes the freshly mined boundary block)
-  const chainBlock = await getBlockNumber(config.rpcUrl);
+  const chainBlock = await getBlockNumber(config.localRpcUrl);
 
   // Try to poll indexer block height via its internal query
   while (Date.now() < deadline) {
     try {
-      const indexerBlock = await getIndexerBlockHeight(config.indexerUrl);
+      const indexerBlock = await getIndexerBlockHeight(config.localIndexerUrl);
       if (indexerBlock !== null && indexerBlock >= chainBlock) {
         return;
       }
