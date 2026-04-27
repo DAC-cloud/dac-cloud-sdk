@@ -47,8 +47,8 @@ export interface DacTransactionBuilder {
   voteProposal(args: {proposalAddress: Address; support: boolean}): TransactionRequest;
   executeDacProposal(args: {dacCell: Address; proposalId: bigint}): TransactionRequest;
   setGovernanceOraclePublisher(args: {governanceOracle: Address; publisher: Address; allowed: boolean}): TransactionRequest;
-  deactivateGovernanceOracle(governanceOracle: Address): TransactionRequest;
-  publishGovernanceOracleSnapshot(args: {governanceOracle: Address; proposalId: bigint; snapshotBlock: bigint; merkleRoot: Hex; totalUnderlyingVotingPower: bigint}): TransactionRequest;
+  deactivateGovernanceOracle(args: {governanceOracle: Address; dac: Address}): TransactionRequest;
+  publishGovernanceOracleSnapshot(args: {governanceOracle: Address; dac: Address; proposalId: bigint; snapshotBlock: bigint; merkleRoot: Hex; totalUnderlyingVotingPower: bigint}): TransactionRequest;
   activateHybridPrimaryVoting(proposalAddress: Address): TransactionRequest;
   beginHybridFallbackWarmup(proposalAddress: Address): TransactionRequest;
   triggerHybridEmergencyFallback(proposalAddress: Address): TransactionRequest;
@@ -143,12 +143,12 @@ export function createDacTransactionBuilder(options: DacTxBuilderOptions): DacTr
       return tx(governanceOracle, governanceOracleAbi, "setPublisher", [publisher, allowed]);
     },
 
-    deactivateGovernanceOracle(governanceOracle) {
-      return tx(governanceOracle, governanceOracleAbi, "deactivate");
+    deactivateGovernanceOracle({governanceOracle, dac}) {
+      return tx(governanceOracle, governanceOracleAbi, "deactivate", [dac]);
     },
 
-    publishGovernanceOracleSnapshot({governanceOracle, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower}) {
-      return tx(governanceOracle, governanceOracleAbi, "publishSnapshot", [proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower]);
+    publishGovernanceOracleSnapshot({governanceOracle, dac, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower}) {
+      return tx(governanceOracle, governanceOracleAbi, "publishSnapshot", [dac, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower]);
     },
 
     activateHybridPrimaryVoting(proposalAddress) {

@@ -249,6 +249,7 @@ export const oracleGovernanceScenario: Scenario = {
         merkleTree.root,
         String(merkleTree.totalVotingPower),
         "--governance-oracle", oracleAddress!,
+        "--dac", dacAddress!,
         "--config", config.configPath, "--pretty-print",
       ]);
       assert.defined(cli.data.txHash, "publish tx");
@@ -416,6 +417,7 @@ export const oracleGovernanceScenario: Scenario = {
         merkleTree2.root,
         String(merkleTree2.totalVotingPower),
         "--governance-oracle", oracleAddress!,
+        "--dac", dacAddress!,
         "--config", config.configPath, "--pretty-print",
       ]);
       assert.defined(cli.data.txHash, "publish tx");
@@ -549,6 +551,7 @@ export const oracleGovernanceScenario: Scenario = {
       await h.cli([
         "oracle", "publish", pId, pSnapshotBlock, tree.root, String(tree.totalVotingPower),
         "--governance-oracle", oracleAddress!,
+        "--dac", dacAddress!,
         "--config", config.configPath, "--pretty-print",
       ]);
 
@@ -749,6 +752,7 @@ export const oracleGovernanceScenario: Scenario = {
       await h.cli([
         "oracle", "publish", verifyProposalId, pSnapshotBlock, tree.root, String(tree.totalVotingPower),
         "--governance-oracle", newOracleAddress!,
+        "--dac", dacAddress!,
         "--config", config.configPath, "--pretty-print",
       ]);
 

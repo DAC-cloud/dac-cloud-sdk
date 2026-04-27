@@ -62,10 +62,10 @@ export const governanceOracleAbi = parseAbi([
   ...commonErrorSignatures,
   "function setPublisher(address publisher, bool allowed)",
   "function isPublisher(address publisher) view returns (bool)",
-  "function isActive() view returns (bool)",
-  "function deactivate()",
-  "function publishSnapshot(uint256 proposalId, uint256 snapshotBlock, bytes32 merkleRoot, uint256 totalUnderlyingVotingPower)",
-  "function getSnapshot(uint256 proposalId) view returns ((uint256 snapshotBlock, bytes32 merkleRoot, uint256 totalUnderlyingVotingPower, uint256 publishedAt))"
+  "function isActive(address dac) view returns (bool)",
+  "function deactivate(address dac)",
+  "function publishSnapshot(address dac, uint256 proposalId, uint256 snapshotBlock, bytes32 merkleRoot, uint256 totalUnderlyingVotingPower)",
+  "function getSnapshot(address dac, uint256 proposalId) view returns ((uint256 snapshotBlock, bytes32 merkleRoot, uint256 totalUnderlyingVotingPower, uint256 publishedAt))"
 ]);
 
 export const dealManagerAbi = parseAbi([

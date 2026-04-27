@@ -84,8 +84,8 @@ export interface DacCoreClient {
   voteProposal(args: {proposalAddress: Address; support: boolean}): Promise<Hex>;
   executeDacProposal(args: {dacCell: Address; proposalId: bigint}): Promise<Hex>;
   setGovernanceOraclePublisher(args: {governanceOracle: Address; publisher: Address; allowed: boolean}): Promise<Hex>;
-  deactivateGovernanceOracle(governanceOracle: Address): Promise<Hex>;
-  publishGovernanceOracleSnapshot(args: {governanceOracle: Address; proposalId: bigint; snapshotBlock: bigint; merkleRoot: Hex; totalUnderlyingVotingPower: bigint}): Promise<Hex>;
+  deactivateGovernanceOracle(args: {governanceOracle: Address; dac: Address}): Promise<Hex>;
+  publishGovernanceOracleSnapshot(args: {governanceOracle: Address; dac: Address; proposalId: bigint; snapshotBlock: bigint; merkleRoot: Hex; totalUnderlyingVotingPower: bigint}): Promise<Hex>;
   activateHybridPrimaryVoting(proposalAddress: Address): Promise<Hex>;
   beginHybridFallbackWarmup(proposalAddress: Address): Promise<Hex>;
   triggerHybridEmergencyFallback(proposalAddress: Address): Promise<Hex>;
@@ -468,7 +468,7 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       });
     },
 
-    async deactivateGovernanceOracle(governanceOracle) {
+    async deactivateGovernanceOracle({governanceOracle, dac}) {
       if (!walletClient || !walletClient.account) {
         throw new Error("Wallet client with account is required for deactivateGovernanceOracle");
       }
@@ -477,11 +477,12 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         address: governanceOracle,
         abi: governanceOracleAbi,
         functionName: "deactivate",
+        args: [dac],
         account: walletClient.account,
       });
     },
 
-    async publishGovernanceOracleSnapshot({governanceOracle, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower}) {
+    async publishGovernanceOracleSnapshot({governanceOracle, dac, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower}) {
       if (!walletClient || !walletClient.account) {
         throw new Error("Wallet client with account is required for publishGovernanceOracleSnapshot");
       }
@@ -490,7 +491,7 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         address: governanceOracle,
         abi: governanceOracleAbi,
         functionName: "publishSnapshot",
-        args: [proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower],
+        args: [dac, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower],
         account: walletClient.account,
       });
     },

@@ -962,34 +962,37 @@ async function cmdOraclePublish(
   const snapshotBlock = BigInt(snapshotBlockText);
   const merkleRoot = asBytes32(merkleRootText, "merkle root");
   const totalUnderlyingVotingPower = BigInt(totalVotingPowerText);
+  const dac = resolveDacAddressOrThrow(resolver);
 
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
     const governanceOracle = await resolveOracleAddress(resolver);
-    const transaction = ctx.txBuilder.publishGovernanceOracleSnapshot({governanceOracle, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower});
-    printJson({action: "dac.oracle.publish", dryRun: true, governanceOracle, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower, transaction});
+    const transaction = ctx.txBuilder.publishGovernanceOracleSnapshot({governanceOracle, dac, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower});
+    printJson({action: "dac.oracle.publish", dryRun: true, governanceOracle, dac, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower, transaction});
     return;
   }
 
   const {core} = await makeCoreContext(resolver);
   const governanceOracle = await resolveOracleAddress(resolver);
-  const txHash = await core.publishGovernanceOracleSnapshot({governanceOracle, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower});
-  printJson({action: "dac.oracle.publish", governanceOracle, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower, txHash});
+  const txHash = await core.publishGovernanceOracleSnapshot({governanceOracle, dac, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower});
+  printJson({action: "dac.oracle.publish", governanceOracle, dac, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower, txHash});
 }
 
 async function cmdOracleDeactivate(resolver: OptionResolver): Promise<void> {
+  const dac = resolveDacAddressOrThrow(resolver);
+
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
     const governanceOracle = await resolveOracleAddress(resolver);
-    const transaction = ctx.txBuilder.deactivateGovernanceOracle(governanceOracle);
-    printJson({action: "dac.oracle.deactivate", dryRun: true, governanceOracle, transaction});
+    const transaction = ctx.txBuilder.deactivateGovernanceOracle({governanceOracle, dac});
+    printJson({action: "dac.oracle.deactivate", dryRun: true, governanceOracle, dac, transaction});
     return;
   }
 
   const {core} = await makeCoreContext(resolver);
   const governanceOracle = await resolveOracleAddress(resolver);
-  const txHash = await core.deactivateGovernanceOracle(governanceOracle);
-  printJson({action: "dac.oracle.deactivate", governanceOracle, txHash});
+  const txHash = await core.deactivateGovernanceOracle({governanceOracle, dac});
+  printJson({action: "dac.oracle.deactivate", governanceOracle, dac, txHash});
 }
 
 async function cmdOracleStatus(resolver: OptionResolver): Promise<void> {
