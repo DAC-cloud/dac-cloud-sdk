@@ -98,3 +98,34 @@ export async function logout(apiUrl: string, token: string): Promise<void> {
 
   if (!response.ok) await handleErrorResponse(response);
 }
+
+export interface DiscoveredDac {
+  chainId: number;
+  address: string;
+  name: string | null;
+  mode: string | null;
+  roles: string[];
+  balances: {
+    main: string | null;
+    walletAgent: string | null;
+    stakedAgent: string | null;
+  };
+}
+
+export interface DiscoverResponse {
+  wallet: string;
+  chains: number[];
+  byChain: Record<string, DiscoveredDac[]>;
+  totalDacs: number;
+  errors?: Array<{chainId: number; reason: string}>;
+}
+
+export async function discover(apiUrl: string, token: string, chainId?: number): Promise<DiscoverResponse> {
+  const params = chainId !== undefined ? `?chainId=${chainId}` : "";
+  const response = await fetch(`${apiBase(apiUrl)}/discover${params}`, {
+    headers: {authorization: `Bearer ${token}`},
+  });
+
+  if (!response.ok) await handleErrorResponse(response);
+  return response.json() as Promise<DiscoverResponse>;
+}

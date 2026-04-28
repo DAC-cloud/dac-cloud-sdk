@@ -33,6 +33,54 @@ export const dealSingleAgentScenario: Scenario = {
       }],
     });
 
+    // ── Discover: guest JWT (outsider wallet never used in scenarios) ──
+
+    await step(h, "discover-guest", async () => {
+      const cli = await h.cliAs("outsider", [
+        "discover", "--chain-id", String(h.config.chainId),
+        "--config", h.config.configPath, "--pretty-print",
+      ]);
+      assert.equal(cli.data.action, "discover", "discover action");
+      // outsider has never interacted with any DAC — should see 0
+      assert.equal(cli.data.totalDacs, 0, "outsider wallet discovers 0 DACs");
+      h.log(`Guest discover: totalDacs=${cli.data.totalDacs}`);
+      return {cli, command: ["dac", "discover"]};
+    });
+
+    // ── Discover: member JWT (founder has main + staked-agent) ──
+
+    await step(h, "discover-member", async () => {
+      const cli = await h.cli([
+        "discover", "--chain-id", String(h.config.chainId),
+        "--config", h.config.configPath, "--pretty-print",
+      ]);
+      assert.equal(cli.data.action, "discover", "discover action");
+      assert.gte(Number(cli.data.totalDacs), 1, "founder discovers at least 1 DAC");
+
+      const byChain = cli.data.byChain as Record<string, Array<Record<string, unknown>>> | undefined;
+      assert.defined(byChain, "byChain present");
+
+      const chainDacs = byChain?.[String(h.config.chainId)];
+      assert.defined(chainDacs, "chain DACs present");
+      assert.gte(chainDacs?.length ?? 0, 1, "at least 1 DAC on chain");
+
+      // Find our DAC by address
+      const ourDac = chainDacs?.find(
+        (d) => String(d.address).toLowerCase() === ctx.dacAddress.toLowerCase(),
+      );
+      assert.defined(ourDac, "our DAC found in discover results");
+
+      if (ourDac) {
+        const roles = ourDac.roles as string[];
+        h.log(`Discover roles for founder: ${JSON.stringify(roles)}`);
+        assert.equal(roles.includes("main"), true, "founder has 'main' role");
+        // Founder staked all agent tokens → walletAgent=0, but staked-agent role if currentStakedAmount > 0
+        assert.equal(roles.includes("staked-agent"), true, "founder has 'staked-agent' role");
+      }
+
+      return {cli, command: ["dac", "discover"], indexerSnapshot: {byChain} as Record<string, unknown>};
+    });
+
     // ── Evaluate deal ────────────────────────────────────────────
 
     // Advance past milestone timestamp — use exact calculation to avoid timing flakiness

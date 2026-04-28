@@ -361,9 +361,92 @@ export const dealActiveStakingScenario: Scenario = {
       };
     });
 
-    // ═══════��═════════════════════════════════��════════════════════
+    // ══════════════════════════════════════════════════════════════
+    // DISCOVER: Verify wallet roles after all agents staked
+    // ══════════════════════════════════════════════════════════════
+
+    h.log("Discover: verifying wallet roles for all 3 agents...");
+
+    await step(h, "discover-founder", async () => {
+      const cli = await h.cli([
+        "discover", "--chain-id", String(h.config.chainId),
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      assert.equal(cli.data.action, "discover", "discover action");
+      assert.gte(Number(cli.data.totalDacs), 1, "founder discovers DACs");
+
+      const byChain = cli.data.byChain as Record<string, Array<Record<string, unknown>>> | undefined;
+      const chainDacs = byChain?.[String(h.config.chainId)];
+      const ourDac = chainDacs?.find(
+        (d) => String(d.address).toLowerCase() === ctx.dacAddress.toLowerCase(),
+      );
+      assert.defined(ourDac, "founder's DAC in discover");
+
+      if (ourDac) {
+        const roles = ourDac.roles as string[];
+        h.log(`Founder discover roles: ${JSON.stringify(roles)}`);
+        assert.equal(roles.includes("main"), true, "founder has 'main' role");
+        assert.equal(roles.includes("staked-agent"), true, "founder has 'staked-agent' role (10k staked)");
+      }
+
+      return {cli, command: ["dac", "discover"]};
+    });
+
+    await step(h, "discover-agent1", async () => {
+      const cli = await h.cliAs("agent1", [
+        "discover", "--chain-id", String(h.config.chainId),
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      assert.equal(cli.data.action, "discover", "discover action");
+      assert.gte(Number(cli.data.totalDacs), 1, "agent1 discovers DACs");
+
+      const byChain = cli.data.byChain as Record<string, Array<Record<string, unknown>>> | undefined;
+      const chainDacs = byChain?.[String(h.config.chainId)];
+      const ourDac = chainDacs?.find(
+        (d) => String(d.address).toLowerCase() === ctx.dacAddress.toLowerCase(),
+      );
+      assert.defined(ourDac, "agent1's DAC in discover");
+
+      if (ourDac) {
+        const roles = ourDac.roles as string[];
+        const balances = ourDac.balances as Record<string, string | null>;
+        h.log(`Agent1 discover roles: ${JSON.stringify(roles)}, balances: ${JSON.stringify(balances)}`);
+        // agent1 has agent tokens (minted 50k, staked 8k → wallet holds remainder)
+        assert.equal(roles.includes("agent"), true, "agent1 has 'agent' role (wallet agent tokens > 0)");
+        assert.equal(roles.includes("staked-agent"), true, "agent1 has 'staked-agent' role (8k staked)");
+      }
+
+      return {cli, command: ["dac", "discover"]};
+    });
+
+    await step(h, "discover-agent2", async () => {
+      const cli = await h.cliAs("agent2", [
+        "discover", "--chain-id", String(h.config.chainId),
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      assert.equal(cli.data.action, "discover", "discover action");
+      assert.gte(Number(cli.data.totalDacs), 1, "agent2 discovers DACs");
+
+      const byChain = cli.data.byChain as Record<string, Array<Record<string, unknown>>> | undefined;
+      const chainDacs = byChain?.[String(h.config.chainId)];
+      const ourDac = chainDacs?.find(
+        (d) => String(d.address).toLowerCase() === ctx.dacAddress.toLowerCase(),
+      );
+      assert.defined(ourDac, "agent2's DAC in discover");
+
+      if (ourDac) {
+        const roles = ourDac.roles as string[];
+        h.log(`Agent2 discover roles: ${JSON.stringify(roles)}`);
+        assert.equal(roles.includes("agent"), true, "agent2 has 'agent' role");
+        assert.equal(roles.includes("staked-agent"), true, "agent2 has 'staked-agent' role (4k staked)");
+      }
+
+      return {cli, command: ["dac", "discover"]};
+    });
+
+    // ══════════════════════════════════════════════════════════════
     // PHASE 4: EVALUATE WITH UPDATED STAKES
-    // ═════════════════��════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════
 
     h.log("Phase 4: evaluating deal with updated stake distribution...");
 

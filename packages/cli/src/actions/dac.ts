@@ -1,5 +1,6 @@
 import {resolve as resolvePath} from "node:path";
 import {
+  accountFromPrivateKey,
   DAC_PROPOSAL_TYPE,
   buildBurnMainTokensReserveProposal,
   buildCapitalCallProposal,
@@ -39,8 +40,10 @@ import {
 } from "./shared";
 import {addCommandHelp, applyOptions, type OptionKey} from "../cli/options";
 import type {OptionResolver} from "../runtime/config";
-import {makeCoreContext, makeDryRunContext, makeIndexer} from "../runtime/chain";
+import {makeCoreContext, makeDryRunContext, makeIndexer, resolveApiUrl} from "../runtime/chain";
 import {printJson, readJsonFile} from "../runtime/io";
+import {discover} from "../auth/api.js";
+import {resolveAuthToken} from "../auth/flows.js";
 
 function isDryRun(resolver: OptionResolver): boolean {
   return resolver.resolveBoolean("dry-run", false);
@@ -1352,6 +1355,27 @@ async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: stri
   printJson({action: "dac.view.wrapper-actions", dacId, count: wrapperActions.length, wrapperActions});
 }
 
+async function cmdDiscover(resolver: OptionResolver): Promise<void> {
+  const apiUrl = resolveApiUrl(resolver);
+  const chainId = resolver.resolveNumber("chain-id");
+  const privateKeyRaw = resolver.resolveString("private-key");
+  const account = privateKeyRaw
+    ? accountFromPrivateKey(privateKeyRaw as Hex)
+    : undefined;
+
+  const authToken = await resolveAuthToken({
+    configToken: resolver.resolveString("auth-token"),
+    configTokenExpires: resolver.resolveString("auth-expires"),
+    chainId: chainId ?? 31337,
+    account,
+    apiUrl,
+    dacs: [],
+  });
+
+  const result = await discover(apiUrl, authToken, chainId ?? undefined);
+  printJson({action: "discover", ...result});
+}
+
 export function registerDacCommands(program: Command, resolverFactory: (options: Record<string, unknown>) => Promise<OptionResolver>): void {
   const create = program.command("create").description("Deploy a native DACCell");
   applyOptions(create, [
@@ -1794,5 +1818,23 @@ Raw proposal (3rd party modules):
   view.action(async function handleView(resource: string | undefined, id: string | undefined) {
     const resolver = await resolverFactory(this.optsWithGlobals());
     await cmdView(resolver, resource, id);
+  });
+
+  const discoverCmd = program.command("discover").description("Discover DACs associated with the current wallet");
+  applyOptions(discoverCmd, ["config", "chain-id", "api-url", "private-key", "pretty-print"]);
+  addCommandHelp(discoverCmd, {
+    notes: [
+      "Lists all DACs where the wallet holds MainToken, AgentToken, or has staked positions.",
+      "If --chain-id is provided, only that chain is queried. Otherwise all supported chains are queried.",
+      "Works with both guest and member JWTs.",
+    ],
+    examples: [
+      "dac discover",
+      "dac discover --chain-id 31337",
+    ],
+  });
+  discoverCmd.action(async function handleDiscover() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdDiscover(resolver);
   });
 }

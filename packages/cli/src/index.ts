@@ -36,6 +36,9 @@ Authentication:
   dac auth challenge  Request SIWE message for external signing
   dac auth verify     Complete auth with externally-signed message
 
+Discovery:
+  dac discover        List DACs associated with the current wallet
+
 Dry-run mode:
   --dry-run --from <address>   Return unsigned tx data instead of broadcasting.
   Requires a valid auth token (run 'dac auth challenge' + 'dac auth verify').
