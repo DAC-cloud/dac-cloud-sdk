@@ -28,6 +28,8 @@ import {
   ListTreasuryHoldingsByDacDocument,
   ListTreasuryMovementsByDacDocument,
   ListWrapperActionsByDacDocument,
+  ListLegalWrapperMessagesByDacDocument,
+  ListLegalWrapperStatesByDacDocument,
   type GetAccountByAddressQuery,
   type GetAccountByAddressQueryVariables,
   type GetDacByAddressQuery,
@@ -82,6 +84,10 @@ import {
   type ListTreasuryMovementsByDacQueryVariables,
   type ListWrapperActionsByDacQuery,
   type ListWrapperActionsByDacQueryVariables,
+  type ListLegalWrapperMessagesByDacQuery,
+  type ListLegalWrapperMessagesByDacQueryVariables,
+  type ListLegalWrapperStatesByDacQuery,
+  type ListLegalWrapperStatesByDacQueryVariables,
 } from "./generated/graphql";
 
 function normalizeListArgs(args?: ListQueryArgs): {limit: number; offset: number} {
@@ -352,6 +358,26 @@ export function createIndexerClient(config: IndexerClientConfig) {
           {dacId, limit, offset},
         );
         return data.WrapperAction;
+      },
+    },
+
+    legalWrapper: {
+      async listMessagesByDac(dacId: string, args?: ListQueryArgs) {
+        const {limit, offset} = normalizeListArgs(args);
+        const data = await gql.request<ListLegalWrapperMessagesByDacQuery, ListLegalWrapperMessagesByDacQueryVariables>(
+          ListLegalWrapperMessagesByDacDocument,
+          {dacId, limit, offset},
+        );
+        return data.DacLegalWrapperMessage;
+      },
+
+      async listStatesByDac(dacId: string, args?: ListQueryArgs) {
+        const {limit, offset} = normalizeListArgs(args);
+        const data = await gql.request<ListLegalWrapperStatesByDacQuery, ListLegalWrapperStatesByDacQueryVariables>(
+          ListLegalWrapperStatesByDacDocument,
+          {dacId, limit, offset},
+        );
+        return data.DacLegalWrapperState;
       },
     },
   };

@@ -1,0 +1,45 @@
+fragment LegalWrapperMessageFields on DacLegalWrapperMessage {
+  id
+  chainId
+  dacId
+  wrapperAddress
+  messageKind
+  message
+  createdBlockNumber
+  createdBlockTimestamp
+  createdTransactionHash
+}
+
+fragment LegalWrapperStateFields on DacLegalWrapperState {
+  id
+  chainId
+  dacId
+  wrapperAddress
+  operatingAgreementIpfs
+  registeredAgent
+  data
+  updatedBlockNumber
+  updatedBlockTimestamp
+}
+
+query ListLegalWrapperMessagesByDac($dacId: String!, $limit: Int!, $offset: Int!) {
+  DacLegalWrapperMessage(
+    where: {dacId: {_eq: $dacId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{createdBlockNumber: desc}]
+  ) {
+    ...LegalWrapperMessageFields
+  }
+}
+
+query ListLegalWrapperStatesByDac($dacId: String!, $limit: Int!, $offset: Int!) {
+  DacLegalWrapperState(
+    where: {dacId: {_eq: $dacId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{updatedBlockNumber: desc}]
+  ) {
+    ...LegalWrapperStateFields
+  }
+}

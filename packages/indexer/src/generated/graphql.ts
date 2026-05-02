@@ -24,6 +24,7 @@ export type Account_Bool_Exp = {
   _not?: InputMaybe<Account_Bool_Exp>;
   _or?: InputMaybe<Array<Account_Bool_Exp>>;
   address?: InputMaybe<String_Comparison_Exp>;
+  agentDistributorRoles?: InputMaybe<AgentDistributor_Bool_Exp>;
   chainId?: InputMaybe<Int_Comparison_Exp>;
   createdBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
   dacAgents?: InputMaybe<DacAgent_Bool_Exp>;
@@ -33,12 +34,15 @@ export type Account_Bool_Exp = {
   id?: InputMaybe<String_Comparison_Exp>;
   mainTokenHoldings?: InputMaybe<MainTokenHolder_Bool_Exp>;
   proposalVotes?: InputMaybe<ProposalVote_Bool_Exp>;
+  receivedAgentDistributions?: InputMaybe<AgentDistribution_Bool_Exp>;
+  sentAgentDistributions?: InputMaybe<AgentDistribution_Bool_Exp>;
   updatedBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
 };
 
 /** Ordering options when selecting data from "Account". */
 export type Account_Order_By = {
   address?: InputMaybe<Order_By>;
+  agentDistributorRoles_aggregate?: InputMaybe<AgentDistributor_Aggregate_Order_By>;
   chainId?: InputMaybe<Order_By>;
   createdBlockNumber?: InputMaybe<Order_By>;
   dacAgents_aggregate?: InputMaybe<DacAgent_Aggregate_Order_By>;
@@ -48,6 +52,8 @@ export type Account_Order_By = {
   id?: InputMaybe<Order_By>;
   mainTokenHoldings_aggregate?: InputMaybe<MainTokenHolder_Aggregate_Order_By>;
   proposalVotes_aggregate?: InputMaybe<ProposalVote_Aggregate_Order_By>;
+  receivedAgentDistributions_aggregate?: InputMaybe<AgentDistribution_Aggregate_Order_By>;
+  sentAgentDistributions_aggregate?: InputMaybe<AgentDistribution_Aggregate_Order_By>;
   updatedBlockNumber?: InputMaybe<Order_By>;
 };
 
@@ -336,6 +342,513 @@ export type AgentAction_Variance_Order_By = {
   createdBlockNumber?: InputMaybe<Order_By>;
   createdBlockTimestamp?: InputMaybe<Order_By>;
   proposalNumericId?: InputMaybe<Order_By>;
+};
+
+/** order by aggregate values of table "AgentDistribution" */
+export type AgentDistribution_Aggregate_Order_By = {
+  avg?: InputMaybe<AgentDistribution_Avg_Order_By>;
+  count?: InputMaybe<Order_By>;
+  max?: InputMaybe<AgentDistribution_Max_Order_By>;
+  min?: InputMaybe<AgentDistribution_Min_Order_By>;
+  stddev?: InputMaybe<AgentDistribution_Stddev_Order_By>;
+  stddev_pop?: InputMaybe<AgentDistribution_Stddev_Pop_Order_By>;
+  stddev_samp?: InputMaybe<AgentDistribution_Stddev_Samp_Order_By>;
+  sum?: InputMaybe<AgentDistribution_Sum_Order_By>;
+  var_pop?: InputMaybe<AgentDistribution_Var_Pop_Order_By>;
+  var_samp?: InputMaybe<AgentDistribution_Var_Samp_Order_By>;
+  variance?: InputMaybe<AgentDistribution_Variance_Order_By>;
+};
+
+/** order by avg() on columns of table "AgentDistribution" */
+export type AgentDistribution_Avg_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** Boolean expression to filter rows from the table "AgentDistribution". All fields are combined with a logical 'AND'. */
+export type AgentDistribution_Bool_Exp = {
+  _and?: InputMaybe<Array<AgentDistribution_Bool_Exp>>;
+  _not?: InputMaybe<AgentDistribution_Bool_Exp>;
+  _or?: InputMaybe<Array<AgentDistribution_Bool_Exp>>;
+  amount?: InputMaybe<Numeric_Comparison_Exp>;
+  chainId?: InputMaybe<Int_Comparison_Exp>;
+  createdBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
+  createdBlockTimestamp?: InputMaybe<Numeric_Comparison_Exp>;
+  createdTransactionHash?: InputMaybe<String_Comparison_Exp>;
+  dac?: InputMaybe<Dac_Bool_Exp>;
+  dacId?: InputMaybe<String_Comparison_Exp>;
+  dac_id?: InputMaybe<String_Comparison_Exp>;
+  distributor?: InputMaybe<AgentDistributor_Bool_Exp>;
+  distributorAccount?: InputMaybe<Account_Bool_Exp>;
+  distributorAccountId?: InputMaybe<String_Comparison_Exp>;
+  distributorAccount_id?: InputMaybe<String_Comparison_Exp>;
+  distributorAddress?: InputMaybe<String_Comparison_Exp>;
+  distributorId?: InputMaybe<String_Comparison_Exp>;
+  distributor_id?: InputMaybe<String_Comparison_Exp>;
+  id?: InputMaybe<String_Comparison_Exp>;
+  recipientAccount?: InputMaybe<Account_Bool_Exp>;
+  recipientAccountId?: InputMaybe<String_Comparison_Exp>;
+  recipientAccount_id?: InputMaybe<String_Comparison_Exp>;
+  recipientAddress?: InputMaybe<String_Comparison_Exp>;
+};
+
+/** order by max() on columns of table "AgentDistribution" */
+export type AgentDistribution_Max_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+  createdTransactionHash?: InputMaybe<Order_By>;
+  dacId?: InputMaybe<Order_By>;
+  dac_id?: InputMaybe<Order_By>;
+  distributorAccountId?: InputMaybe<Order_By>;
+  distributorAccount_id?: InputMaybe<Order_By>;
+  distributorAddress?: InputMaybe<Order_By>;
+  distributorId?: InputMaybe<Order_By>;
+  distributor_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  recipientAccountId?: InputMaybe<Order_By>;
+  recipientAccount_id?: InputMaybe<Order_By>;
+  recipientAddress?: InputMaybe<Order_By>;
+};
+
+/** order by min() on columns of table "AgentDistribution" */
+export type AgentDistribution_Min_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+  createdTransactionHash?: InputMaybe<Order_By>;
+  dacId?: InputMaybe<Order_By>;
+  dac_id?: InputMaybe<Order_By>;
+  distributorAccountId?: InputMaybe<Order_By>;
+  distributorAccount_id?: InputMaybe<Order_By>;
+  distributorAddress?: InputMaybe<Order_By>;
+  distributorId?: InputMaybe<Order_By>;
+  distributor_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  recipientAccountId?: InputMaybe<Order_By>;
+  recipientAccount_id?: InputMaybe<Order_By>;
+  recipientAddress?: InputMaybe<Order_By>;
+};
+
+/** Ordering options when selecting data from "AgentDistribution". */
+export type AgentDistribution_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+  createdTransactionHash?: InputMaybe<Order_By>;
+  dac?: InputMaybe<Dac_Order_By>;
+  dacId?: InputMaybe<Order_By>;
+  dac_id?: InputMaybe<Order_By>;
+  distributor?: InputMaybe<AgentDistributor_Order_By>;
+  distributorAccount?: InputMaybe<Account_Order_By>;
+  distributorAccountId?: InputMaybe<Order_By>;
+  distributorAccount_id?: InputMaybe<Order_By>;
+  distributorAddress?: InputMaybe<Order_By>;
+  distributorId?: InputMaybe<Order_By>;
+  distributor_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  recipientAccount?: InputMaybe<Account_Order_By>;
+  recipientAccountId?: InputMaybe<Order_By>;
+  recipientAccount_id?: InputMaybe<Order_By>;
+  recipientAddress?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "AgentDistribution" */
+export type AgentDistribution_Select_Column =
+  /** column name */
+  | 'amount'
+  /** column name */
+  | 'chainId'
+  /** column name */
+  | 'createdBlockNumber'
+  /** column name */
+  | 'createdBlockTimestamp'
+  /** column name */
+  | 'createdTransactionHash'
+  /** column name */
+  | 'dacId'
+  /** column name */
+  | 'dac_id'
+  /** column name */
+  | 'distributorAccountId'
+  /** column name */
+  | 'distributorAccount_id'
+  /** column name */
+  | 'distributorAddress'
+  /** column name */
+  | 'distributorId'
+  /** column name */
+  | 'distributor_id'
+  /** column name */
+  | 'id'
+  /** column name */
+  | 'recipientAccountId'
+  /** column name */
+  | 'recipientAccount_id'
+  /** column name */
+  | 'recipientAddress';
+
+/** order by stddev() on columns of table "AgentDistribution" */
+export type AgentDistribution_Stddev_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** order by stddev_pop() on columns of table "AgentDistribution" */
+export type AgentDistribution_Stddev_Pop_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** order by stddev_samp() on columns of table "AgentDistribution" */
+export type AgentDistribution_Stddev_Samp_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** Streaming cursor of the table "AgentDistribution" */
+export type AgentDistribution_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: AgentDistribution_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type AgentDistribution_Stream_Cursor_Value_Input = {
+  amount?: InputMaybe<Scalars['numeric']['input']>;
+  chainId?: InputMaybe<Scalars['Int']['input']>;
+  createdBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
+  createdBlockTimestamp?: InputMaybe<Scalars['numeric']['input']>;
+  createdTransactionHash?: InputMaybe<Scalars['String']['input']>;
+  dacId?: InputMaybe<Scalars['String']['input']>;
+  dac_id?: InputMaybe<Scalars['String']['input']>;
+  distributorAccountId?: InputMaybe<Scalars['String']['input']>;
+  distributorAccount_id?: InputMaybe<Scalars['String']['input']>;
+  distributorAddress?: InputMaybe<Scalars['String']['input']>;
+  distributorId?: InputMaybe<Scalars['String']['input']>;
+  distributor_id?: InputMaybe<Scalars['String']['input']>;
+  id?: InputMaybe<Scalars['String']['input']>;
+  recipientAccountId?: InputMaybe<Scalars['String']['input']>;
+  recipientAccount_id?: InputMaybe<Scalars['String']['input']>;
+  recipientAddress?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** order by sum() on columns of table "AgentDistribution" */
+export type AgentDistribution_Sum_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** order by var_pop() on columns of table "AgentDistribution" */
+export type AgentDistribution_Var_Pop_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** order by var_samp() on columns of table "AgentDistribution" */
+export type AgentDistribution_Var_Samp_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** order by variance() on columns of table "AgentDistribution" */
+export type AgentDistribution_Variance_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** order by aggregate values of table "AgentDistributor" */
+export type AgentDistributor_Aggregate_Order_By = {
+  avg?: InputMaybe<AgentDistributor_Avg_Order_By>;
+  count?: InputMaybe<Order_By>;
+  max?: InputMaybe<AgentDistributor_Max_Order_By>;
+  min?: InputMaybe<AgentDistributor_Min_Order_By>;
+  stddev?: InputMaybe<AgentDistributor_Stddev_Order_By>;
+  stddev_pop?: InputMaybe<AgentDistributor_Stddev_Pop_Order_By>;
+  stddev_samp?: InputMaybe<AgentDistributor_Stddev_Samp_Order_By>;
+  sum?: InputMaybe<AgentDistributor_Sum_Order_By>;
+  var_pop?: InputMaybe<AgentDistributor_Var_Pop_Order_By>;
+  var_samp?: InputMaybe<AgentDistributor_Var_Samp_Order_By>;
+  variance?: InputMaybe<AgentDistributor_Variance_Order_By>;
+};
+
+/** order by avg() on columns of table "AgentDistributor" */
+export type AgentDistributor_Avg_Order_By = {
+  approvedCount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  currentAllowance?: InputMaybe<Order_By>;
+  inventoryBalance?: InputMaybe<Order_By>;
+  revokedCount?: InputMaybe<Order_By>;
+  totalApprovedAmount?: InputMaybe<Order_By>;
+  totalDistributedAmount?: InputMaybe<Order_By>;
+  updatedBlockNumber?: InputMaybe<Order_By>;
+};
+
+/** Boolean expression to filter rows from the table "AgentDistributor". All fields are combined with a logical 'AND'. */
+export type AgentDistributor_Bool_Exp = {
+  _and?: InputMaybe<Array<AgentDistributor_Bool_Exp>>;
+  _not?: InputMaybe<AgentDistributor_Bool_Exp>;
+  _or?: InputMaybe<Array<AgentDistributor_Bool_Exp>>;
+  account?: InputMaybe<Account_Bool_Exp>;
+  accountId?: InputMaybe<String_Comparison_Exp>;
+  account_id?: InputMaybe<String_Comparison_Exp>;
+  approvedCount?: InputMaybe<Numeric_Comparison_Exp>;
+  chainId?: InputMaybe<Int_Comparison_Exp>;
+  createdBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
+  currentAllowance?: InputMaybe<Numeric_Comparison_Exp>;
+  dac?: InputMaybe<Dac_Bool_Exp>;
+  dacId?: InputMaybe<String_Comparison_Exp>;
+  dac_id?: InputMaybe<String_Comparison_Exp>;
+  distributionEnabled?: InputMaybe<Boolean_Comparison_Exp>;
+  distributions?: InputMaybe<AgentDistribution_Bool_Exp>;
+  distributorAddress?: InputMaybe<String_Comparison_Exp>;
+  id?: InputMaybe<String_Comparison_Exp>;
+  inventoryBalance?: InputMaybe<Numeric_Comparison_Exp>;
+  isDistributor?: InputMaybe<Boolean_Comparison_Exp>;
+  revokedCount?: InputMaybe<Numeric_Comparison_Exp>;
+  totalApprovedAmount?: InputMaybe<Numeric_Comparison_Exp>;
+  totalDistributedAmount?: InputMaybe<Numeric_Comparison_Exp>;
+  updatedBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
+};
+
+/** order by max() on columns of table "AgentDistributor" */
+export type AgentDistributor_Max_Order_By = {
+  accountId?: InputMaybe<Order_By>;
+  account_id?: InputMaybe<Order_By>;
+  approvedCount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  currentAllowance?: InputMaybe<Order_By>;
+  dacId?: InputMaybe<Order_By>;
+  dac_id?: InputMaybe<Order_By>;
+  distributorAddress?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  inventoryBalance?: InputMaybe<Order_By>;
+  revokedCount?: InputMaybe<Order_By>;
+  totalApprovedAmount?: InputMaybe<Order_By>;
+  totalDistributedAmount?: InputMaybe<Order_By>;
+  updatedBlockNumber?: InputMaybe<Order_By>;
+};
+
+/** order by min() on columns of table "AgentDistributor" */
+export type AgentDistributor_Min_Order_By = {
+  accountId?: InputMaybe<Order_By>;
+  account_id?: InputMaybe<Order_By>;
+  approvedCount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  currentAllowance?: InputMaybe<Order_By>;
+  dacId?: InputMaybe<Order_By>;
+  dac_id?: InputMaybe<Order_By>;
+  distributorAddress?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  inventoryBalance?: InputMaybe<Order_By>;
+  revokedCount?: InputMaybe<Order_By>;
+  totalApprovedAmount?: InputMaybe<Order_By>;
+  totalDistributedAmount?: InputMaybe<Order_By>;
+  updatedBlockNumber?: InputMaybe<Order_By>;
+};
+
+/** Ordering options when selecting data from "AgentDistributor". */
+export type AgentDistributor_Order_By = {
+  account?: InputMaybe<Account_Order_By>;
+  accountId?: InputMaybe<Order_By>;
+  account_id?: InputMaybe<Order_By>;
+  approvedCount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  currentAllowance?: InputMaybe<Order_By>;
+  dac?: InputMaybe<Dac_Order_By>;
+  dacId?: InputMaybe<Order_By>;
+  dac_id?: InputMaybe<Order_By>;
+  distributionEnabled?: InputMaybe<Order_By>;
+  distributions_aggregate?: InputMaybe<AgentDistribution_Aggregate_Order_By>;
+  distributorAddress?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  inventoryBalance?: InputMaybe<Order_By>;
+  isDistributor?: InputMaybe<Order_By>;
+  revokedCount?: InputMaybe<Order_By>;
+  totalApprovedAmount?: InputMaybe<Order_By>;
+  totalDistributedAmount?: InputMaybe<Order_By>;
+  updatedBlockNumber?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "AgentDistributor" */
+export type AgentDistributor_Select_Column =
+  /** column name */
+  | 'accountId'
+  /** column name */
+  | 'account_id'
+  /** column name */
+  | 'approvedCount'
+  /** column name */
+  | 'chainId'
+  /** column name */
+  | 'createdBlockNumber'
+  /** column name */
+  | 'currentAllowance'
+  /** column name */
+  | 'dacId'
+  /** column name */
+  | 'dac_id'
+  /** column name */
+  | 'distributionEnabled'
+  /** column name */
+  | 'distributorAddress'
+  /** column name */
+  | 'id'
+  /** column name */
+  | 'inventoryBalance'
+  /** column name */
+  | 'isDistributor'
+  /** column name */
+  | 'revokedCount'
+  /** column name */
+  | 'totalApprovedAmount'
+  /** column name */
+  | 'totalDistributedAmount'
+  /** column name */
+  | 'updatedBlockNumber';
+
+/** order by stddev() on columns of table "AgentDistributor" */
+export type AgentDistributor_Stddev_Order_By = {
+  approvedCount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  currentAllowance?: InputMaybe<Order_By>;
+  inventoryBalance?: InputMaybe<Order_By>;
+  revokedCount?: InputMaybe<Order_By>;
+  totalApprovedAmount?: InputMaybe<Order_By>;
+  totalDistributedAmount?: InputMaybe<Order_By>;
+  updatedBlockNumber?: InputMaybe<Order_By>;
+};
+
+/** order by stddev_pop() on columns of table "AgentDistributor" */
+export type AgentDistributor_Stddev_Pop_Order_By = {
+  approvedCount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  currentAllowance?: InputMaybe<Order_By>;
+  inventoryBalance?: InputMaybe<Order_By>;
+  revokedCount?: InputMaybe<Order_By>;
+  totalApprovedAmount?: InputMaybe<Order_By>;
+  totalDistributedAmount?: InputMaybe<Order_By>;
+  updatedBlockNumber?: InputMaybe<Order_By>;
+};
+
+/** order by stddev_samp() on columns of table "AgentDistributor" */
+export type AgentDistributor_Stddev_Samp_Order_By = {
+  approvedCount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  currentAllowance?: InputMaybe<Order_By>;
+  inventoryBalance?: InputMaybe<Order_By>;
+  revokedCount?: InputMaybe<Order_By>;
+  totalApprovedAmount?: InputMaybe<Order_By>;
+  totalDistributedAmount?: InputMaybe<Order_By>;
+  updatedBlockNumber?: InputMaybe<Order_By>;
+};
+
+/** Streaming cursor of the table "AgentDistributor" */
+export type AgentDistributor_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: AgentDistributor_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type AgentDistributor_Stream_Cursor_Value_Input = {
+  accountId?: InputMaybe<Scalars['String']['input']>;
+  account_id?: InputMaybe<Scalars['String']['input']>;
+  approvedCount?: InputMaybe<Scalars['numeric']['input']>;
+  chainId?: InputMaybe<Scalars['Int']['input']>;
+  createdBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
+  currentAllowance?: InputMaybe<Scalars['numeric']['input']>;
+  dacId?: InputMaybe<Scalars['String']['input']>;
+  dac_id?: InputMaybe<Scalars['String']['input']>;
+  distributionEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  distributorAddress?: InputMaybe<Scalars['String']['input']>;
+  id?: InputMaybe<Scalars['String']['input']>;
+  inventoryBalance?: InputMaybe<Scalars['numeric']['input']>;
+  isDistributor?: InputMaybe<Scalars['Boolean']['input']>;
+  revokedCount?: InputMaybe<Scalars['numeric']['input']>;
+  totalApprovedAmount?: InputMaybe<Scalars['numeric']['input']>;
+  totalDistributedAmount?: InputMaybe<Scalars['numeric']['input']>;
+  updatedBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
+};
+
+/** order by sum() on columns of table "AgentDistributor" */
+export type AgentDistributor_Sum_Order_By = {
+  approvedCount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  currentAllowance?: InputMaybe<Order_By>;
+  inventoryBalance?: InputMaybe<Order_By>;
+  revokedCount?: InputMaybe<Order_By>;
+  totalApprovedAmount?: InputMaybe<Order_By>;
+  totalDistributedAmount?: InputMaybe<Order_By>;
+  updatedBlockNumber?: InputMaybe<Order_By>;
+};
+
+/** order by var_pop() on columns of table "AgentDistributor" */
+export type AgentDistributor_Var_Pop_Order_By = {
+  approvedCount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  currentAllowance?: InputMaybe<Order_By>;
+  inventoryBalance?: InputMaybe<Order_By>;
+  revokedCount?: InputMaybe<Order_By>;
+  totalApprovedAmount?: InputMaybe<Order_By>;
+  totalDistributedAmount?: InputMaybe<Order_By>;
+  updatedBlockNumber?: InputMaybe<Order_By>;
+};
+
+/** order by var_samp() on columns of table "AgentDistributor" */
+export type AgentDistributor_Var_Samp_Order_By = {
+  approvedCount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  currentAllowance?: InputMaybe<Order_By>;
+  inventoryBalance?: InputMaybe<Order_By>;
+  revokedCount?: InputMaybe<Order_By>;
+  totalApprovedAmount?: InputMaybe<Order_By>;
+  totalDistributedAmount?: InputMaybe<Order_By>;
+  updatedBlockNumber?: InputMaybe<Order_By>;
+};
+
+/** order by variance() on columns of table "AgentDistributor" */
+export type AgentDistributor_Variance_Order_By = {
+  approvedCount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  currentAllowance?: InputMaybe<Order_By>;
+  inventoryBalance?: InputMaybe<Order_By>;
+  revokedCount?: InputMaybe<Order_By>;
+  totalApprovedAmount?: InputMaybe<Order_By>;
+  totalDistributedAmount?: InputMaybe<Order_By>;
+  updatedBlockNumber?: InputMaybe<Order_By>;
 };
 
 /** Boolean expression to compare columns of type "Boolean". All fields are combined with logical 'AND'. */
@@ -689,6 +1202,7 @@ export type ChildDacDeal_Aggregate_Order_By = {
 export type ChildDacDeal_Avg_Order_By = {
   chainId?: InputMaybe<Order_By>;
   createdBlockNumber?: InputMaybe<Order_By>;
+  rootCapitalCallId?: InputMaybe<Order_By>;
   updatedBlockNumber?: InputMaybe<Order_By>;
 };
 
@@ -710,6 +1224,8 @@ export type ChildDacDeal_Bool_Exp = {
   dealId?: InputMaybe<String_Comparison_Exp>;
   deal_id?: InputMaybe<String_Comparison_Exp>;
   id?: InputMaybe<String_Comparison_Exp>;
+  rootCapitalCallHash?: InputMaybe<String_Comparison_Exp>;
+  rootCapitalCallId?: InputMaybe<Numeric_Comparison_Exp>;
   updatedBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
 };
 
@@ -725,6 +1241,8 @@ export type ChildDacDeal_Max_Order_By = {
   dealId?: InputMaybe<Order_By>;
   deal_id?: InputMaybe<Order_By>;
   id?: InputMaybe<Order_By>;
+  rootCapitalCallHash?: InputMaybe<Order_By>;
+  rootCapitalCallId?: InputMaybe<Order_By>;
   updatedBlockNumber?: InputMaybe<Order_By>;
 };
 
@@ -740,6 +1258,8 @@ export type ChildDacDeal_Min_Order_By = {
   dealId?: InputMaybe<Order_By>;
   deal_id?: InputMaybe<Order_By>;
   id?: InputMaybe<Order_By>;
+  rootCapitalCallHash?: InputMaybe<Order_By>;
+  rootCapitalCallId?: InputMaybe<Order_By>;
   updatedBlockNumber?: InputMaybe<Order_By>;
 };
 
@@ -758,6 +1278,8 @@ export type ChildDacDeal_Order_By = {
   dealId?: InputMaybe<Order_By>;
   deal_id?: InputMaybe<Order_By>;
   id?: InputMaybe<Order_By>;
+  rootCapitalCallHash?: InputMaybe<Order_By>;
+  rootCapitalCallId?: InputMaybe<Order_By>;
   updatedBlockNumber?: InputMaybe<Order_By>;
 };
 
@@ -784,12 +1306,17 @@ export type ChildDacDeal_Select_Column =
   /** column name */
   | 'id'
   /** column name */
+  | 'rootCapitalCallHash'
+  /** column name */
+  | 'rootCapitalCallId'
+  /** column name */
   | 'updatedBlockNumber';
 
 /** order by stddev() on columns of table "ChildDacDeal" */
 export type ChildDacDeal_Stddev_Order_By = {
   chainId?: InputMaybe<Order_By>;
   createdBlockNumber?: InputMaybe<Order_By>;
+  rootCapitalCallId?: InputMaybe<Order_By>;
   updatedBlockNumber?: InputMaybe<Order_By>;
 };
 
@@ -797,6 +1324,7 @@ export type ChildDacDeal_Stddev_Order_By = {
 export type ChildDacDeal_Stddev_Pop_Order_By = {
   chainId?: InputMaybe<Order_By>;
   createdBlockNumber?: InputMaybe<Order_By>;
+  rootCapitalCallId?: InputMaybe<Order_By>;
   updatedBlockNumber?: InputMaybe<Order_By>;
 };
 
@@ -804,6 +1332,7 @@ export type ChildDacDeal_Stddev_Pop_Order_By = {
 export type ChildDacDeal_Stddev_Samp_Order_By = {
   chainId?: InputMaybe<Order_By>;
   createdBlockNumber?: InputMaybe<Order_By>;
+  rootCapitalCallId?: InputMaybe<Order_By>;
   updatedBlockNumber?: InputMaybe<Order_By>;
 };
 
@@ -827,6 +1356,8 @@ export type ChildDacDeal_Stream_Cursor_Value_Input = {
   dealId?: InputMaybe<Scalars['String']['input']>;
   deal_id?: InputMaybe<Scalars['String']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
+  rootCapitalCallHash?: InputMaybe<Scalars['String']['input']>;
+  rootCapitalCallId?: InputMaybe<Scalars['numeric']['input']>;
   updatedBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
 };
 
@@ -834,6 +1365,7 @@ export type ChildDacDeal_Stream_Cursor_Value_Input = {
 export type ChildDacDeal_Sum_Order_By = {
   chainId?: InputMaybe<Order_By>;
   createdBlockNumber?: InputMaybe<Order_By>;
+  rootCapitalCallId?: InputMaybe<Order_By>;
   updatedBlockNumber?: InputMaybe<Order_By>;
 };
 
@@ -841,6 +1373,7 @@ export type ChildDacDeal_Sum_Order_By = {
 export type ChildDacDeal_Var_Pop_Order_By = {
   chainId?: InputMaybe<Order_By>;
   createdBlockNumber?: InputMaybe<Order_By>;
+  rootCapitalCallId?: InputMaybe<Order_By>;
   updatedBlockNumber?: InputMaybe<Order_By>;
 };
 
@@ -848,6 +1381,7 @@ export type ChildDacDeal_Var_Pop_Order_By = {
 export type ChildDacDeal_Var_Samp_Order_By = {
   chainId?: InputMaybe<Order_By>;
   createdBlockNumber?: InputMaybe<Order_By>;
+  rootCapitalCallId?: InputMaybe<Order_By>;
   updatedBlockNumber?: InputMaybe<Order_By>;
 };
 
@@ -855,6 +1389,7 @@ export type ChildDacDeal_Var_Samp_Order_By = {
 export type ChildDacDeal_Variance_Order_By = {
   chainId?: InputMaybe<Order_By>;
   createdBlockNumber?: InputMaybe<Order_By>;
+  rootCapitalCallId?: InputMaybe<Order_By>;
   updatedBlockNumber?: InputMaybe<Order_By>;
 };
 
@@ -1286,6 +1821,7 @@ export type DacAgent_Avg_Order_By = {
   createdBlockNumber?: InputMaybe<Order_By>;
   currentStakedAmount?: InputMaybe<Order_By>;
   lastActivityBlockNumber?: InputMaybe<Order_By>;
+  qualifiedWalletAgentTokenAmount?: InputMaybe<Order_By>;
   totalClaimedMainTokenAmount?: InputMaybe<Order_By>;
   totalMintedAmount?: InputMaybe<Order_By>;
   totalReleasedAmount?: InputMaybe<Order_By>;
@@ -1312,10 +1848,13 @@ export type DacAgent_Bool_Exp = {
   dac?: InputMaybe<Dac_Bool_Exp>;
   dacId?: InputMaybe<String_Comparison_Exp>;
   dac_id?: InputMaybe<String_Comparison_Exp>;
+  hasQualifiedAgentBalance?: InputMaybe<Boolean_Comparison_Exp>;
   id?: InputMaybe<String_Comparison_Exp>;
   isActive?: InputMaybe<Boolean_Comparison_Exp>;
+  isDistributor?: InputMaybe<Boolean_Comparison_Exp>;
   lastActivityBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
   positions?: InputMaybe<DealAgentPosition_Bool_Exp>;
+  qualifiedWalletAgentTokenAmount?: InputMaybe<Numeric_Comparison_Exp>;
   totalClaimedMainTokenAmount?: InputMaybe<Numeric_Comparison_Exp>;
   totalMintedAmount?: InputMaybe<Numeric_Comparison_Exp>;
   totalReleasedAmount?: InputMaybe<Numeric_Comparison_Exp>;
@@ -1338,6 +1877,7 @@ export type DacAgent_Max_Order_By = {
   dac_id?: InputMaybe<Order_By>;
   id?: InputMaybe<Order_By>;
   lastActivityBlockNumber?: InputMaybe<Order_By>;
+  qualifiedWalletAgentTokenAmount?: InputMaybe<Order_By>;
   totalClaimedMainTokenAmount?: InputMaybe<Order_By>;
   totalMintedAmount?: InputMaybe<Order_By>;
   totalReleasedAmount?: InputMaybe<Order_By>;
@@ -1360,6 +1900,7 @@ export type DacAgent_Min_Order_By = {
   dac_id?: InputMaybe<Order_By>;
   id?: InputMaybe<Order_By>;
   lastActivityBlockNumber?: InputMaybe<Order_By>;
+  qualifiedWalletAgentTokenAmount?: InputMaybe<Order_By>;
   totalClaimedMainTokenAmount?: InputMaybe<Order_By>;
   totalMintedAmount?: InputMaybe<Order_By>;
   totalReleasedAmount?: InputMaybe<Order_By>;
@@ -1383,10 +1924,13 @@ export type DacAgent_Order_By = {
   dac?: InputMaybe<Dac_Order_By>;
   dacId?: InputMaybe<Order_By>;
   dac_id?: InputMaybe<Order_By>;
+  hasQualifiedAgentBalance?: InputMaybe<Order_By>;
   id?: InputMaybe<Order_By>;
   isActive?: InputMaybe<Order_By>;
+  isDistributor?: InputMaybe<Order_By>;
   lastActivityBlockNumber?: InputMaybe<Order_By>;
   positions_aggregate?: InputMaybe<DealAgentPosition_Aggregate_Order_By>;
+  qualifiedWalletAgentTokenAmount?: InputMaybe<Order_By>;
   totalClaimedMainTokenAmount?: InputMaybe<Order_By>;
   totalMintedAmount?: InputMaybe<Order_By>;
   totalReleasedAmount?: InputMaybe<Order_By>;
@@ -1416,11 +1960,17 @@ export type DacAgent_Select_Column =
   /** column name */
   | 'dac_id'
   /** column name */
+  | 'hasQualifiedAgentBalance'
+  /** column name */
   | 'id'
   /** column name */
   | 'isActive'
   /** column name */
+  | 'isDistributor'
+  /** column name */
   | 'lastActivityBlockNumber'
+  /** column name */
+  | 'qualifiedWalletAgentTokenAmount'
   /** column name */
   | 'totalClaimedMainTokenAmount'
   /** column name */
@@ -1445,6 +1995,7 @@ export type DacAgent_Stddev_Order_By = {
   createdBlockNumber?: InputMaybe<Order_By>;
   currentStakedAmount?: InputMaybe<Order_By>;
   lastActivityBlockNumber?: InputMaybe<Order_By>;
+  qualifiedWalletAgentTokenAmount?: InputMaybe<Order_By>;
   totalClaimedMainTokenAmount?: InputMaybe<Order_By>;
   totalMintedAmount?: InputMaybe<Order_By>;
   totalReleasedAmount?: InputMaybe<Order_By>;
@@ -1462,6 +2013,7 @@ export type DacAgent_Stddev_Pop_Order_By = {
   createdBlockNumber?: InputMaybe<Order_By>;
   currentStakedAmount?: InputMaybe<Order_By>;
   lastActivityBlockNumber?: InputMaybe<Order_By>;
+  qualifiedWalletAgentTokenAmount?: InputMaybe<Order_By>;
   totalClaimedMainTokenAmount?: InputMaybe<Order_By>;
   totalMintedAmount?: InputMaybe<Order_By>;
   totalReleasedAmount?: InputMaybe<Order_By>;
@@ -1479,6 +2031,7 @@ export type DacAgent_Stddev_Samp_Order_By = {
   createdBlockNumber?: InputMaybe<Order_By>;
   currentStakedAmount?: InputMaybe<Order_By>;
   lastActivityBlockNumber?: InputMaybe<Order_By>;
+  qualifiedWalletAgentTokenAmount?: InputMaybe<Order_By>;
   totalClaimedMainTokenAmount?: InputMaybe<Order_By>;
   totalMintedAmount?: InputMaybe<Order_By>;
   totalReleasedAmount?: InputMaybe<Order_By>;
@@ -1507,9 +2060,12 @@ export type DacAgent_Stream_Cursor_Value_Input = {
   currentStakedAmount?: InputMaybe<Scalars['numeric']['input']>;
   dacId?: InputMaybe<Scalars['String']['input']>;
   dac_id?: InputMaybe<Scalars['String']['input']>;
+  hasQualifiedAgentBalance?: InputMaybe<Scalars['Boolean']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  isDistributor?: InputMaybe<Scalars['Boolean']['input']>;
   lastActivityBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
+  qualifiedWalletAgentTokenAmount?: InputMaybe<Scalars['numeric']['input']>;
   totalClaimedMainTokenAmount?: InputMaybe<Scalars['numeric']['input']>;
   totalMintedAmount?: InputMaybe<Scalars['numeric']['input']>;
   totalReleasedAmount?: InputMaybe<Scalars['numeric']['input']>;
@@ -1527,6 +2083,7 @@ export type DacAgent_Sum_Order_By = {
   createdBlockNumber?: InputMaybe<Order_By>;
   currentStakedAmount?: InputMaybe<Order_By>;
   lastActivityBlockNumber?: InputMaybe<Order_By>;
+  qualifiedWalletAgentTokenAmount?: InputMaybe<Order_By>;
   totalClaimedMainTokenAmount?: InputMaybe<Order_By>;
   totalMintedAmount?: InputMaybe<Order_By>;
   totalReleasedAmount?: InputMaybe<Order_By>;
@@ -1544,6 +2101,7 @@ export type DacAgent_Var_Pop_Order_By = {
   createdBlockNumber?: InputMaybe<Order_By>;
   currentStakedAmount?: InputMaybe<Order_By>;
   lastActivityBlockNumber?: InputMaybe<Order_By>;
+  qualifiedWalletAgentTokenAmount?: InputMaybe<Order_By>;
   totalClaimedMainTokenAmount?: InputMaybe<Order_By>;
   totalMintedAmount?: InputMaybe<Order_By>;
   totalReleasedAmount?: InputMaybe<Order_By>;
@@ -1561,6 +2119,7 @@ export type DacAgent_Var_Samp_Order_By = {
   createdBlockNumber?: InputMaybe<Order_By>;
   currentStakedAmount?: InputMaybe<Order_By>;
   lastActivityBlockNumber?: InputMaybe<Order_By>;
+  qualifiedWalletAgentTokenAmount?: InputMaybe<Order_By>;
   totalClaimedMainTokenAmount?: InputMaybe<Order_By>;
   totalMintedAmount?: InputMaybe<Order_By>;
   totalReleasedAmount?: InputMaybe<Order_By>;
@@ -1578,6 +2137,7 @@ export type DacAgent_Variance_Order_By = {
   createdBlockNumber?: InputMaybe<Order_By>;
   currentStakedAmount?: InputMaybe<Order_By>;
   lastActivityBlockNumber?: InputMaybe<Order_By>;
+  qualifiedWalletAgentTokenAmount?: InputMaybe<Order_By>;
   totalClaimedMainTokenAmount?: InputMaybe<Order_By>;
   totalMintedAmount?: InputMaybe<Order_By>;
   totalReleasedAmount?: InputMaybe<Order_By>;
@@ -1627,6 +2187,8 @@ export type DacConfigChange_Bool_Exp = {
   _and?: InputMaybe<Array<DacConfigChange_Bool_Exp>>;
   _not?: InputMaybe<DacConfigChange_Bool_Exp>;
   _or?: InputMaybe<Array<DacConfigChange_Bool_Exp>>;
+  blockingOnAllProposals?: InputMaybe<Boolean_Comparison_Exp>;
+  blockingOnHighQuorum?: InputMaybe<Boolean_Comparison_Exp>;
   chainId?: InputMaybe<Int_Comparison_Exp>;
   changeType?: InputMaybe<String_Comparison_Exp>;
   createdBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
@@ -1643,6 +2205,7 @@ export type DacConfigChange_Bool_Exp = {
   fallbackWarmupDuration?: InputMaybe<Numeric_Comparison_Exp>;
   governanceOracleAddress?: InputMaybe<String_Comparison_Exp>;
   id?: InputMaybe<String_Comparison_Exp>;
+  oraclePrimaryEnabled?: InputMaybe<Boolean_Comparison_Exp>;
   oraclePublishDeadline?: InputMaybe<Numeric_Comparison_Exp>;
   proposalNumericId?: InputMaybe<Numeric_Comparison_Exp>;
   votingBlockingPercent?: InputMaybe<Numeric_Comparison_Exp>;
@@ -1704,6 +2267,8 @@ export type DacConfigChange_Min_Order_By = {
 
 /** Ordering options when selecting data from "DacConfigChange". */
 export type DacConfigChange_Order_By = {
+  blockingOnAllProposals?: InputMaybe<Order_By>;
+  blockingOnHighQuorum?: InputMaybe<Order_By>;
   chainId?: InputMaybe<Order_By>;
   changeType?: InputMaybe<Order_By>;
   createdBlockNumber?: InputMaybe<Order_By>;
@@ -1720,6 +2285,7 @@ export type DacConfigChange_Order_By = {
   fallbackWarmupDuration?: InputMaybe<Order_By>;
   governanceOracleAddress?: InputMaybe<Order_By>;
   id?: InputMaybe<Order_By>;
+  oraclePrimaryEnabled?: InputMaybe<Order_By>;
   oraclePublishDeadline?: InputMaybe<Order_By>;
   proposalNumericId?: InputMaybe<Order_By>;
   votingBlockingPercent?: InputMaybe<Order_By>;
@@ -1731,6 +2297,10 @@ export type DacConfigChange_Order_By = {
 
 /** select columns of table "DacConfigChange" */
 export type DacConfigChange_Select_Column =
+  /** column name */
+  | 'blockingOnAllProposals'
+  /** column name */
+  | 'blockingOnHighQuorum'
   /** column name */
   | 'chainId'
   /** column name */
@@ -1761,6 +2331,8 @@ export type DacConfigChange_Select_Column =
   | 'governanceOracleAddress'
   /** column name */
   | 'id'
+  /** column name */
+  | 'oraclePrimaryEnabled'
   /** column name */
   | 'oraclePublishDeadline'
   /** column name */
@@ -1843,6 +2415,8 @@ export type DacConfigChange_Stream_Cursor_Input = {
 
 /** Initial value of the column from where the streaming should start */
 export type DacConfigChange_Stream_Cursor_Value_Input = {
+  blockingOnAllProposals?: InputMaybe<Scalars['Boolean']['input']>;
+  blockingOnHighQuorum?: InputMaybe<Scalars['Boolean']['input']>;
   chainId?: InputMaybe<Scalars['Int']['input']>;
   changeType?: InputMaybe<Scalars['String']['input']>;
   createdBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
@@ -1858,6 +2432,7 @@ export type DacConfigChange_Stream_Cursor_Value_Input = {
   fallbackWarmupDuration?: InputMaybe<Scalars['numeric']['input']>;
   governanceOracleAddress?: InputMaybe<Scalars['String']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
+  oraclePrimaryEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   oraclePublishDeadline?: InputMaybe<Scalars['numeric']['input']>;
   proposalNumericId?: InputMaybe<Scalars['numeric']['input']>;
   votingBlockingPercent?: InputMaybe<Scalars['numeric']['input']>;
@@ -3055,9 +3630,13 @@ export type Dac_Bool_Exp = {
   _or?: InputMaybe<Array<Dac_Bool_Exp>>;
   activeDealCount?: InputMaybe<Numeric_Comparison_Exp>;
   address?: InputMaybe<String_Comparison_Exp>;
+  agentDistributions?: InputMaybe<AgentDistribution_Bool_Exp>;
+  agentDistributors?: InputMaybe<AgentDistributor_Bool_Exp>;
   agentTokenAddress?: InputMaybe<String_Comparison_Exp>;
   agents?: InputMaybe<DacAgent_Bool_Exp>;
   assetControllerAddress?: InputMaybe<String_Comparison_Exp>;
+  blockingOnAllProposals?: InputMaybe<Boolean_Comparison_Exp>;
+  blockingOnHighQuorum?: InputMaybe<Boolean_Comparison_Exp>;
   capitalCallCount?: InputMaybe<Numeric_Comparison_Exp>;
   capitalCalls?: InputMaybe<CapitalCall_Bool_Exp>;
   chainId?: InputMaybe<Int_Comparison_Exp>;
@@ -3102,10 +3681,12 @@ export type Dac_Bool_Exp = {
   modules?: InputMaybe<DacModule_Bool_Exp>;
   name?: InputMaybe<String_Comparison_Exp>;
   offchainActionApprovals?: InputMaybe<OffchainActionApproval_Bool_Exp>;
+  oraclePrimaryEnabled?: InputMaybe<Boolean_Comparison_Exp>;
   oraclePublishDeadline?: InputMaybe<Numeric_Comparison_Exp>;
   proposalCount?: InputMaybe<Numeric_Comparison_Exp>;
   proposals?: InputMaybe<Proposal_Bool_Exp>;
   releasedMainTokenAmount?: InputMaybe<Numeric_Comparison_Exp>;
+  salt?: InputMaybe<String_Comparison_Exp>;
   started?: InputMaybe<Boolean_Comparison_Exp>;
   supportsBurn?: InputMaybe<Boolean_Comparison_Exp>;
   supportsCapitalCall?: InputMaybe<Boolean_Comparison_Exp>;
@@ -3133,9 +3714,13 @@ export type Dac_Bool_Exp = {
 export type Dac_Order_By = {
   activeDealCount?: InputMaybe<Order_By>;
   address?: InputMaybe<Order_By>;
+  agentDistributions_aggregate?: InputMaybe<AgentDistribution_Aggregate_Order_By>;
+  agentDistributors_aggregate?: InputMaybe<AgentDistributor_Aggregate_Order_By>;
   agentTokenAddress?: InputMaybe<Order_By>;
   agents_aggregate?: InputMaybe<DacAgent_Aggregate_Order_By>;
   assetControllerAddress?: InputMaybe<Order_By>;
+  blockingOnAllProposals?: InputMaybe<Order_By>;
+  blockingOnHighQuorum?: InputMaybe<Order_By>;
   capitalCallCount?: InputMaybe<Order_By>;
   capitalCalls_aggregate?: InputMaybe<CapitalCall_Aggregate_Order_By>;
   chainId?: InputMaybe<Order_By>;
@@ -3180,10 +3765,12 @@ export type Dac_Order_By = {
   modules_aggregate?: InputMaybe<DacModule_Aggregate_Order_By>;
   name?: InputMaybe<Order_By>;
   offchainActionApprovals_aggregate?: InputMaybe<OffchainActionApproval_Aggregate_Order_By>;
+  oraclePrimaryEnabled?: InputMaybe<Order_By>;
   oraclePublishDeadline?: InputMaybe<Order_By>;
   proposalCount?: InputMaybe<Order_By>;
   proposals_aggregate?: InputMaybe<Proposal_Aggregate_Order_By>;
   releasedMainTokenAmount?: InputMaybe<Order_By>;
+  salt?: InputMaybe<Order_By>;
   started?: InputMaybe<Order_By>;
   supportsBurn?: InputMaybe<Order_By>;
   supportsCapitalCall?: InputMaybe<Order_By>;
@@ -3217,6 +3804,10 @@ export type Dac_Select_Column =
   | 'agentTokenAddress'
   /** column name */
   | 'assetControllerAddress'
+  /** column name */
+  | 'blockingOnAllProposals'
+  /** column name */
+  | 'blockingOnHighQuorum'
   /** column name */
   | 'capitalCallCount'
   /** column name */
@@ -3280,11 +3871,15 @@ export type Dac_Select_Column =
   /** column name */
   | 'name'
   /** column name */
+  | 'oraclePrimaryEnabled'
+  /** column name */
   | 'oraclePublishDeadline'
   /** column name */
   | 'proposalCount'
   /** column name */
   | 'releasedMainTokenAmount'
+  /** column name */
+  | 'salt'
   /** column name */
   | 'started'
   /** column name */
@@ -3336,6 +3931,8 @@ export type Dac_Stream_Cursor_Value_Input = {
   address?: InputMaybe<Scalars['String']['input']>;
   agentTokenAddress?: InputMaybe<Scalars['String']['input']>;
   assetControllerAddress?: InputMaybe<Scalars['String']['input']>;
+  blockingOnAllProposals?: InputMaybe<Scalars['Boolean']['input']>;
+  blockingOnHighQuorum?: InputMaybe<Scalars['Boolean']['input']>;
   capitalCallCount?: InputMaybe<Scalars['numeric']['input']>;
   chainId?: InputMaybe<Scalars['Int']['input']>;
   coreModuleFactoryAddress?: InputMaybe<Scalars['String']['input']>;
@@ -3367,9 +3964,11 @@ export type Dac_Stream_Cursor_Value_Input = {
   moduleCount?: InputMaybe<Scalars['numeric']['input']>;
   moduleRegistryAddress?: InputMaybe<Scalars['String']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
+  oraclePrimaryEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   oraclePublishDeadline?: InputMaybe<Scalars['numeric']['input']>;
   proposalCount?: InputMaybe<Scalars['numeric']['input']>;
   releasedMainTokenAmount?: InputMaybe<Scalars['numeric']['input']>;
+  salt?: InputMaybe<Scalars['String']['input']>;
   started?: InputMaybe<Scalars['Boolean']['input']>;
   supportsBurn?: InputMaybe<Scalars['Boolean']['input']>;
   supportsCapitalCall?: InputMaybe<Scalars['Boolean']['input']>;
@@ -3497,6 +4096,7 @@ export type DealAgentPosition_Bool_Exp = {
   deal_id?: InputMaybe<String_Comparison_Exp>;
   id?: InputMaybe<String_Comparison_Exp>;
   isActive?: InputMaybe<Boolean_Comparison_Exp>;
+  isLiquidatorStake?: InputMaybe<Boolean_Comparison_Exp>;
   lastClaimedRewardBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
   lastReleasedBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
   lastSlashedBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
@@ -3578,6 +4178,7 @@ export type DealAgentPosition_Order_By = {
   deal_id?: InputMaybe<Order_By>;
   id?: InputMaybe<Order_By>;
   isActive?: InputMaybe<Order_By>;
+  isLiquidatorStake?: InputMaybe<Order_By>;
   lastClaimedRewardBlockNumber?: InputMaybe<Order_By>;
   lastReleasedBlockNumber?: InputMaybe<Order_By>;
   lastSlashedBlockNumber?: InputMaybe<Order_By>;
@@ -3617,6 +4218,8 @@ export type DealAgentPosition_Select_Column =
   | 'id'
   /** column name */
   | 'isActive'
+  /** column name */
+  | 'isLiquidatorStake'
   /** column name */
   | 'lastClaimedRewardBlockNumber'
   /** column name */
@@ -3707,6 +4310,7 @@ export type DealAgentPosition_Stream_Cursor_Value_Input = {
   deal_id?: InputMaybe<Scalars['String']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  isLiquidatorStake?: InputMaybe<Scalars['Boolean']['input']>;
   lastClaimedRewardBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
   lastReleasedBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
   lastSlashedBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
@@ -5504,6 +6108,200 @@ export type DealRelatedContract_Variance_Order_By = {
   createdBlockTimestamp?: InputMaybe<Order_By>;
 };
 
+/** order by aggregate values of table "DealRewardPoolMovement" */
+export type DealRewardPoolMovement_Aggregate_Order_By = {
+  avg?: InputMaybe<DealRewardPoolMovement_Avg_Order_By>;
+  count?: InputMaybe<Order_By>;
+  max?: InputMaybe<DealRewardPoolMovement_Max_Order_By>;
+  min?: InputMaybe<DealRewardPoolMovement_Min_Order_By>;
+  stddev?: InputMaybe<DealRewardPoolMovement_Stddev_Order_By>;
+  stddev_pop?: InputMaybe<DealRewardPoolMovement_Stddev_Pop_Order_By>;
+  stddev_samp?: InputMaybe<DealRewardPoolMovement_Stddev_Samp_Order_By>;
+  sum?: InputMaybe<DealRewardPoolMovement_Sum_Order_By>;
+  var_pop?: InputMaybe<DealRewardPoolMovement_Var_Pop_Order_By>;
+  var_samp?: InputMaybe<DealRewardPoolMovement_Var_Samp_Order_By>;
+  variance?: InputMaybe<DealRewardPoolMovement_Variance_Order_By>;
+};
+
+/** order by avg() on columns of table "DealRewardPoolMovement" */
+export type DealRewardPoolMovement_Avg_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** Boolean expression to filter rows from the table "DealRewardPoolMovement". All fields are combined with a logical 'AND'. */
+export type DealRewardPoolMovement_Bool_Exp = {
+  _and?: InputMaybe<Array<DealRewardPoolMovement_Bool_Exp>>;
+  _not?: InputMaybe<DealRewardPoolMovement_Bool_Exp>;
+  _or?: InputMaybe<Array<DealRewardPoolMovement_Bool_Exp>>;
+  amount?: InputMaybe<Numeric_Comparison_Exp>;
+  chainId?: InputMaybe<Int_Comparison_Exp>;
+  createdBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
+  createdBlockTimestamp?: InputMaybe<Numeric_Comparison_Exp>;
+  createdTransactionHash?: InputMaybe<String_Comparison_Exp>;
+  dac?: InputMaybe<Dac_Bool_Exp>;
+  dacId?: InputMaybe<String_Comparison_Exp>;
+  dac_id?: InputMaybe<String_Comparison_Exp>;
+  deal?: InputMaybe<Deal_Bool_Exp>;
+  dealId?: InputMaybe<String_Comparison_Exp>;
+  deal_id?: InputMaybe<String_Comparison_Exp>;
+  id?: InputMaybe<String_Comparison_Exp>;
+  movementType?: InputMaybe<String_Comparison_Exp>;
+};
+
+/** order by max() on columns of table "DealRewardPoolMovement" */
+export type DealRewardPoolMovement_Max_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+  createdTransactionHash?: InputMaybe<Order_By>;
+  dacId?: InputMaybe<Order_By>;
+  dac_id?: InputMaybe<Order_By>;
+  dealId?: InputMaybe<Order_By>;
+  deal_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  movementType?: InputMaybe<Order_By>;
+};
+
+/** order by min() on columns of table "DealRewardPoolMovement" */
+export type DealRewardPoolMovement_Min_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+  createdTransactionHash?: InputMaybe<Order_By>;
+  dacId?: InputMaybe<Order_By>;
+  dac_id?: InputMaybe<Order_By>;
+  dealId?: InputMaybe<Order_By>;
+  deal_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  movementType?: InputMaybe<Order_By>;
+};
+
+/** Ordering options when selecting data from "DealRewardPoolMovement". */
+export type DealRewardPoolMovement_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+  createdTransactionHash?: InputMaybe<Order_By>;
+  dac?: InputMaybe<Dac_Order_By>;
+  dacId?: InputMaybe<Order_By>;
+  dac_id?: InputMaybe<Order_By>;
+  deal?: InputMaybe<Deal_Order_By>;
+  dealId?: InputMaybe<Order_By>;
+  deal_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  movementType?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "DealRewardPoolMovement" */
+export type DealRewardPoolMovement_Select_Column =
+  /** column name */
+  | 'amount'
+  /** column name */
+  | 'chainId'
+  /** column name */
+  | 'createdBlockNumber'
+  /** column name */
+  | 'createdBlockTimestamp'
+  /** column name */
+  | 'createdTransactionHash'
+  /** column name */
+  | 'dacId'
+  /** column name */
+  | 'dac_id'
+  /** column name */
+  | 'dealId'
+  /** column name */
+  | 'deal_id'
+  /** column name */
+  | 'id'
+  /** column name */
+  | 'movementType';
+
+/** order by stddev() on columns of table "DealRewardPoolMovement" */
+export type DealRewardPoolMovement_Stddev_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** order by stddev_pop() on columns of table "DealRewardPoolMovement" */
+export type DealRewardPoolMovement_Stddev_Pop_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** order by stddev_samp() on columns of table "DealRewardPoolMovement" */
+export type DealRewardPoolMovement_Stddev_Samp_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** Streaming cursor of the table "DealRewardPoolMovement" */
+export type DealRewardPoolMovement_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: DealRewardPoolMovement_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type DealRewardPoolMovement_Stream_Cursor_Value_Input = {
+  amount?: InputMaybe<Scalars['numeric']['input']>;
+  chainId?: InputMaybe<Scalars['Int']['input']>;
+  createdBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
+  createdBlockTimestamp?: InputMaybe<Scalars['numeric']['input']>;
+  createdTransactionHash?: InputMaybe<Scalars['String']['input']>;
+  dacId?: InputMaybe<Scalars['String']['input']>;
+  dac_id?: InputMaybe<Scalars['String']['input']>;
+  dealId?: InputMaybe<Scalars['String']['input']>;
+  deal_id?: InputMaybe<Scalars['String']['input']>;
+  id?: InputMaybe<Scalars['String']['input']>;
+  movementType?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** order by sum() on columns of table "DealRewardPoolMovement" */
+export type DealRewardPoolMovement_Sum_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** order by var_pop() on columns of table "DealRewardPoolMovement" */
+export type DealRewardPoolMovement_Var_Pop_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** order by var_samp() on columns of table "DealRewardPoolMovement" */
+export type DealRewardPoolMovement_Var_Samp_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
+/** order by variance() on columns of table "DealRewardPoolMovement" */
+export type DealRewardPoolMovement_Variance_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  chainId?: InputMaybe<Order_By>;
+  createdBlockNumber?: InputMaybe<Order_By>;
+  createdBlockTimestamp?: InputMaybe<Order_By>;
+};
+
 /** order by aggregate values of table "DealVotingConfigChange" */
 export type DealVotingConfigChange_Aggregate_Order_By = {
   avg?: InputMaybe<DealVotingConfigChange_Avg_Order_By>;
@@ -5799,6 +6597,7 @@ export type Deal_Aggregate_Order_By = {
 /** order by avg() on columns of table "Deal" */
 export type Deal_Avg_Order_By = {
   activatedBlockNumber?: InputMaybe<Order_By>;
+  agentsLimit?: InputMaybe<Order_By>;
   approveDeadline?: InputMaybe<Order_By>;
   chainId?: InputMaybe<Order_By>;
   closedBlockNumber?: InputMaybe<Order_By>;
@@ -5807,11 +6606,13 @@ export type Deal_Avg_Order_By = {
   currentStakedAmount?: InputMaybe<Order_By>;
   dealDeadline?: InputMaybe<Order_By>;
   dealNumericId?: InputMaybe<Order_By>;
+  dealRewardPoolPercent?: InputMaybe<Order_By>;
   evaluationDeadline?: InputMaybe<Order_By>;
   evaluatorCount?: InputMaybe<Order_By>;
   executedProposalCount?: InputMaybe<Order_By>;
   executionValidityDuration?: InputMaybe<Order_By>;
   lastEvaluatedBlockNumber?: InputMaybe<Order_By>;
+  minimalStake?: InputMaybe<Order_By>;
   proposalCount?: InputMaybe<Order_By>;
   proposalNumericId?: InputMaybe<Order_By>;
   recoveredBlockNumber?: InputMaybe<Order_By>;
@@ -5820,6 +6621,8 @@ export type Deal_Avg_Order_By = {
   rewardsLimit?: InputMaybe<Order_By>;
   stakerCount?: InputMaybe<Order_By>;
   totalAgentTokens?: InputMaybe<Order_By>;
+  totalDealRewardPoolAllocatedAmount?: InputMaybe<Order_By>;
+  totalDealRewardPoolClaimedAmount?: InputMaybe<Order_By>;
   totalEvaluationCount?: InputMaybe<Order_By>;
   totalReleasedStakeAmount?: InputMaybe<Order_By>;
   totalRewardAllocatedAmount?: InputMaybe<Order_By>;
@@ -5842,10 +6645,12 @@ export type Deal_Bool_Exp = {
   _or?: InputMaybe<Array<Deal_Bool_Exp>>;
   activatedBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
   active?: InputMaybe<Boolean_Comparison_Exp>;
+  agentsLimit?: InputMaybe<Numeric_Comparison_Exp>;
   approveDeadline?: InputMaybe<Numeric_Comparison_Exp>;
   capitalMovements?: InputMaybe<DealCapitalMovement_Bool_Exp>;
   cellAddress?: InputMaybe<String_Comparison_Exp>;
   chainId?: InputMaybe<Int_Comparison_Exp>;
+  challengePassed?: InputMaybe<Boolean_Comparison_Exp>;
   childAgentTokenAddress?: InputMaybe<String_Comparison_Exp>;
   childDac?: InputMaybe<Dac_Bool_Exp>;
   childDacAddress?: InputMaybe<String_Comparison_Exp>;
@@ -5869,6 +6674,7 @@ export type Deal_Bool_Exp = {
   dealDeadline?: InputMaybe<Numeric_Comparison_Exp>;
   dealNumericId?: InputMaybe<Numeric_Comparison_Exp>;
   dealProposals?: InputMaybe<DealProposal_Bool_Exp>;
+  dealRewardPoolPercent?: InputMaybe<Numeric_Comparison_Exp>;
   dealTargetAddress?: InputMaybe<String_Comparison_Exp>;
   description?: InputMaybe<String_Comparison_Exp>;
   earlyReturnsEnabled?: InputMaybe<Boolean_Comparison_Exp>;
@@ -5876,6 +6682,7 @@ export type Deal_Bool_Exp = {
   evaluations?: InputMaybe<Evaluation_Bool_Exp>;
   evaluatorConfig?: InputMaybe<String_Comparison_Exp>;
   evaluatorCount?: InputMaybe<Numeric_Comparison_Exp>;
+  evaluatorModuleFactoryAddress?: InputMaybe<String_Comparison_Exp>;
   evaluatorSelector?: InputMaybe<String_Comparison_Exp>;
   evaluators?: InputMaybe<Evaluator_Bool_Exp>;
   executedProposalCount?: InputMaybe<Numeric_Comparison_Exp>;
@@ -5891,6 +6698,7 @@ export type Deal_Bool_Exp = {
   mainTokenHoldings?: InputMaybe<MainTokenHolder_Bool_Exp>;
   managedTreasuryAddress?: InputMaybe<String_Comparison_Exp>;
   messages?: InputMaybe<DealMessage_Bool_Exp>;
+  minimalStake?: InputMaybe<Numeric_Comparison_Exp>;
   moduleFactory?: InputMaybe<ModuleFactory_Bool_Exp>;
   moduleFactoryAddress?: InputMaybe<String_Comparison_Exp>;
   moduleFactory_id?: InputMaybe<String_Comparison_Exp>;
@@ -5904,12 +6712,16 @@ export type Deal_Bool_Exp = {
   recoveredBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
   relatedContractCount?: InputMaybe<Numeric_Comparison_Exp>;
   relatedContracts?: InputMaybe<DealRelatedContract_Bool_Exp>;
+  rewardPoolMovements?: InputMaybe<DealRewardPoolMovement_Bool_Exp>;
+  rewardPoolSupported?: InputMaybe<Boolean_Comparison_Exp>;
   rewardsAllocated?: InputMaybe<Numeric_Comparison_Exp>;
   rewardsLimit?: InputMaybe<Numeric_Comparison_Exp>;
   stakePositions?: InputMaybe<DealAgentPosition_Bool_Exp>;
   stakeTokenAddress?: InputMaybe<String_Comparison_Exp>;
   stakerCount?: InputMaybe<Numeric_Comparison_Exp>;
   totalAgentTokens?: InputMaybe<Numeric_Comparison_Exp>;
+  totalDealRewardPoolAllocatedAmount?: InputMaybe<Numeric_Comparison_Exp>;
+  totalDealRewardPoolClaimedAmount?: InputMaybe<Numeric_Comparison_Exp>;
   totalEvaluationCount?: InputMaybe<Numeric_Comparison_Exp>;
   totalReleasedStakeAmount?: InputMaybe<Numeric_Comparison_Exp>;
   totalRewardAllocatedAmount?: InputMaybe<Numeric_Comparison_Exp>;
@@ -5933,6 +6745,7 @@ export type Deal_Bool_Exp = {
 /** order by max() on columns of table "Deal" */
 export type Deal_Max_Order_By = {
   activatedBlockNumber?: InputMaybe<Order_By>;
+  agentsLimit?: InputMaybe<Order_By>;
   approveDeadline?: InputMaybe<Order_By>;
   cellAddress?: InputMaybe<Order_By>;
   chainId?: InputMaybe<Order_By>;
@@ -5953,11 +6766,13 @@ export type Deal_Max_Order_By = {
   dealConfig?: InputMaybe<Order_By>;
   dealDeadline?: InputMaybe<Order_By>;
   dealNumericId?: InputMaybe<Order_By>;
+  dealRewardPoolPercent?: InputMaybe<Order_By>;
   dealTargetAddress?: InputMaybe<Order_By>;
   description?: InputMaybe<Order_By>;
   evaluationDeadline?: InputMaybe<Order_By>;
   evaluatorConfig?: InputMaybe<Order_By>;
   evaluatorCount?: InputMaybe<Order_By>;
+  evaluatorModuleFactoryAddress?: InputMaybe<Order_By>;
   evaluatorSelector?: InputMaybe<Order_By>;
   executedProposalCount?: InputMaybe<Order_By>;
   executionValidityDuration?: InputMaybe<Order_By>;
@@ -5967,6 +6782,7 @@ export type Deal_Max_Order_By = {
   lastEvaluatedBlockNumber?: InputMaybe<Order_By>;
   linkHash?: InputMaybe<Order_By>;
   managedTreasuryAddress?: InputMaybe<Order_By>;
+  minimalStake?: InputMaybe<Order_By>;
   moduleFactoryAddress?: InputMaybe<Order_By>;
   moduleFactory_id?: InputMaybe<Order_By>;
   name?: InputMaybe<Order_By>;
@@ -5980,6 +6796,8 @@ export type Deal_Max_Order_By = {
   stakeTokenAddress?: InputMaybe<Order_By>;
   stakerCount?: InputMaybe<Order_By>;
   totalAgentTokens?: InputMaybe<Order_By>;
+  totalDealRewardPoolAllocatedAmount?: InputMaybe<Order_By>;
+  totalDealRewardPoolClaimedAmount?: InputMaybe<Order_By>;
   totalEvaluationCount?: InputMaybe<Order_By>;
   totalReleasedStakeAmount?: InputMaybe<Order_By>;
   totalRewardAllocatedAmount?: InputMaybe<Order_By>;
@@ -5998,6 +6816,7 @@ export type Deal_Max_Order_By = {
 /** order by min() on columns of table "Deal" */
 export type Deal_Min_Order_By = {
   activatedBlockNumber?: InputMaybe<Order_By>;
+  agentsLimit?: InputMaybe<Order_By>;
   approveDeadline?: InputMaybe<Order_By>;
   cellAddress?: InputMaybe<Order_By>;
   chainId?: InputMaybe<Order_By>;
@@ -6018,11 +6837,13 @@ export type Deal_Min_Order_By = {
   dealConfig?: InputMaybe<Order_By>;
   dealDeadline?: InputMaybe<Order_By>;
   dealNumericId?: InputMaybe<Order_By>;
+  dealRewardPoolPercent?: InputMaybe<Order_By>;
   dealTargetAddress?: InputMaybe<Order_By>;
   description?: InputMaybe<Order_By>;
   evaluationDeadline?: InputMaybe<Order_By>;
   evaluatorConfig?: InputMaybe<Order_By>;
   evaluatorCount?: InputMaybe<Order_By>;
+  evaluatorModuleFactoryAddress?: InputMaybe<Order_By>;
   evaluatorSelector?: InputMaybe<Order_By>;
   executedProposalCount?: InputMaybe<Order_By>;
   executionValidityDuration?: InputMaybe<Order_By>;
@@ -6032,6 +6853,7 @@ export type Deal_Min_Order_By = {
   lastEvaluatedBlockNumber?: InputMaybe<Order_By>;
   linkHash?: InputMaybe<Order_By>;
   managedTreasuryAddress?: InputMaybe<Order_By>;
+  minimalStake?: InputMaybe<Order_By>;
   moduleFactoryAddress?: InputMaybe<Order_By>;
   moduleFactory_id?: InputMaybe<Order_By>;
   name?: InputMaybe<Order_By>;
@@ -6045,6 +6867,8 @@ export type Deal_Min_Order_By = {
   stakeTokenAddress?: InputMaybe<Order_By>;
   stakerCount?: InputMaybe<Order_By>;
   totalAgentTokens?: InputMaybe<Order_By>;
+  totalDealRewardPoolAllocatedAmount?: InputMaybe<Order_By>;
+  totalDealRewardPoolClaimedAmount?: InputMaybe<Order_By>;
   totalEvaluationCount?: InputMaybe<Order_By>;
   totalReleasedStakeAmount?: InputMaybe<Order_By>;
   totalRewardAllocatedAmount?: InputMaybe<Order_By>;
@@ -6064,10 +6888,12 @@ export type Deal_Min_Order_By = {
 export type Deal_Order_By = {
   activatedBlockNumber?: InputMaybe<Order_By>;
   active?: InputMaybe<Order_By>;
+  agentsLimit?: InputMaybe<Order_By>;
   approveDeadline?: InputMaybe<Order_By>;
   capitalMovements_aggregate?: InputMaybe<DealCapitalMovement_Aggregate_Order_By>;
   cellAddress?: InputMaybe<Order_By>;
   chainId?: InputMaybe<Order_By>;
+  challengePassed?: InputMaybe<Order_By>;
   childAgentTokenAddress?: InputMaybe<Order_By>;
   childDac?: InputMaybe<Dac_Order_By>;
   childDacAddress?: InputMaybe<Order_By>;
@@ -6091,6 +6917,7 @@ export type Deal_Order_By = {
   dealDeadline?: InputMaybe<Order_By>;
   dealNumericId?: InputMaybe<Order_By>;
   dealProposals_aggregate?: InputMaybe<DealProposal_Aggregate_Order_By>;
+  dealRewardPoolPercent?: InputMaybe<Order_By>;
   dealTargetAddress?: InputMaybe<Order_By>;
   description?: InputMaybe<Order_By>;
   earlyReturnsEnabled?: InputMaybe<Order_By>;
@@ -6098,6 +6925,7 @@ export type Deal_Order_By = {
   evaluations_aggregate?: InputMaybe<Evaluation_Aggregate_Order_By>;
   evaluatorConfig?: InputMaybe<Order_By>;
   evaluatorCount?: InputMaybe<Order_By>;
+  evaluatorModuleFactoryAddress?: InputMaybe<Order_By>;
   evaluatorSelector?: InputMaybe<Order_By>;
   evaluators_aggregate?: InputMaybe<Evaluator_Aggregate_Order_By>;
   executedProposalCount?: InputMaybe<Order_By>;
@@ -6113,6 +6941,7 @@ export type Deal_Order_By = {
   mainTokenHoldings_aggregate?: InputMaybe<MainTokenHolder_Aggregate_Order_By>;
   managedTreasuryAddress?: InputMaybe<Order_By>;
   messages_aggregate?: InputMaybe<DealMessage_Aggregate_Order_By>;
+  minimalStake?: InputMaybe<Order_By>;
   moduleFactory?: InputMaybe<ModuleFactory_Order_By>;
   moduleFactoryAddress?: InputMaybe<Order_By>;
   moduleFactory_id?: InputMaybe<Order_By>;
@@ -6126,12 +6955,16 @@ export type Deal_Order_By = {
   recoveredBlockNumber?: InputMaybe<Order_By>;
   relatedContractCount?: InputMaybe<Order_By>;
   relatedContracts_aggregate?: InputMaybe<DealRelatedContract_Aggregate_Order_By>;
+  rewardPoolMovements_aggregate?: InputMaybe<DealRewardPoolMovement_Aggregate_Order_By>;
+  rewardPoolSupported?: InputMaybe<Order_By>;
   rewardsAllocated?: InputMaybe<Order_By>;
   rewardsLimit?: InputMaybe<Order_By>;
   stakePositions_aggregate?: InputMaybe<DealAgentPosition_Aggregate_Order_By>;
   stakeTokenAddress?: InputMaybe<Order_By>;
   stakerCount?: InputMaybe<Order_By>;
   totalAgentTokens?: InputMaybe<Order_By>;
+  totalDealRewardPoolAllocatedAmount?: InputMaybe<Order_By>;
+  totalDealRewardPoolClaimedAmount?: InputMaybe<Order_By>;
   totalEvaluationCount?: InputMaybe<Order_By>;
   totalReleasedStakeAmount?: InputMaybe<Order_By>;
   totalRewardAllocatedAmount?: InputMaybe<Order_By>;
@@ -6159,11 +6992,15 @@ export type Deal_Select_Column =
   /** column name */
   | 'active'
   /** column name */
+  | 'agentsLimit'
+  /** column name */
   | 'approveDeadline'
   /** column name */
   | 'cellAddress'
   /** column name */
   | 'chainId'
+  /** column name */
+  | 'challengePassed'
   /** column name */
   | 'childAgentTokenAddress'
   /** column name */
@@ -6203,6 +7040,8 @@ export type Deal_Select_Column =
   /** column name */
   | 'dealNumericId'
   /** column name */
+  | 'dealRewardPoolPercent'
+  /** column name */
   | 'dealTargetAddress'
   /** column name */
   | 'description'
@@ -6214,6 +7053,8 @@ export type Deal_Select_Column =
   | 'evaluatorConfig'
   /** column name */
   | 'evaluatorCount'
+  /** column name */
+  | 'evaluatorModuleFactoryAddress'
   /** column name */
   | 'evaluatorSelector'
   /** column name */
@@ -6233,6 +7074,8 @@ export type Deal_Select_Column =
   /** column name */
   | 'managedTreasuryAddress'
   /** column name */
+  | 'minimalStake'
+  /** column name */
   | 'moduleFactoryAddress'
   /** column name */
   | 'moduleFactory_id'
@@ -6251,6 +7094,8 @@ export type Deal_Select_Column =
   /** column name */
   | 'relatedContractCount'
   /** column name */
+  | 'rewardPoolSupported'
+  /** column name */
   | 'rewardsAllocated'
   /** column name */
   | 'rewardsLimit'
@@ -6260,6 +7105,10 @@ export type Deal_Select_Column =
   | 'stakerCount'
   /** column name */
   | 'totalAgentTokens'
+  /** column name */
+  | 'totalDealRewardPoolAllocatedAmount'
+  /** column name */
+  | 'totalDealRewardPoolClaimedAmount'
   /** column name */
   | 'totalEvaluationCount'
   /** column name */
@@ -6294,6 +7143,7 @@ export type Deal_Select_Column =
 /** order by stddev() on columns of table "Deal" */
 export type Deal_Stddev_Order_By = {
   activatedBlockNumber?: InputMaybe<Order_By>;
+  agentsLimit?: InputMaybe<Order_By>;
   approveDeadline?: InputMaybe<Order_By>;
   chainId?: InputMaybe<Order_By>;
   closedBlockNumber?: InputMaybe<Order_By>;
@@ -6302,11 +7152,13 @@ export type Deal_Stddev_Order_By = {
   currentStakedAmount?: InputMaybe<Order_By>;
   dealDeadline?: InputMaybe<Order_By>;
   dealNumericId?: InputMaybe<Order_By>;
+  dealRewardPoolPercent?: InputMaybe<Order_By>;
   evaluationDeadline?: InputMaybe<Order_By>;
   evaluatorCount?: InputMaybe<Order_By>;
   executedProposalCount?: InputMaybe<Order_By>;
   executionValidityDuration?: InputMaybe<Order_By>;
   lastEvaluatedBlockNumber?: InputMaybe<Order_By>;
+  minimalStake?: InputMaybe<Order_By>;
   proposalCount?: InputMaybe<Order_By>;
   proposalNumericId?: InputMaybe<Order_By>;
   recoveredBlockNumber?: InputMaybe<Order_By>;
@@ -6315,6 +7167,8 @@ export type Deal_Stddev_Order_By = {
   rewardsLimit?: InputMaybe<Order_By>;
   stakerCount?: InputMaybe<Order_By>;
   totalAgentTokens?: InputMaybe<Order_By>;
+  totalDealRewardPoolAllocatedAmount?: InputMaybe<Order_By>;
+  totalDealRewardPoolClaimedAmount?: InputMaybe<Order_By>;
   totalEvaluationCount?: InputMaybe<Order_By>;
   totalReleasedStakeAmount?: InputMaybe<Order_By>;
   totalRewardAllocatedAmount?: InputMaybe<Order_By>;
@@ -6333,6 +7187,7 @@ export type Deal_Stddev_Order_By = {
 /** order by stddev_pop() on columns of table "Deal" */
 export type Deal_Stddev_Pop_Order_By = {
   activatedBlockNumber?: InputMaybe<Order_By>;
+  agentsLimit?: InputMaybe<Order_By>;
   approveDeadline?: InputMaybe<Order_By>;
   chainId?: InputMaybe<Order_By>;
   closedBlockNumber?: InputMaybe<Order_By>;
@@ -6341,11 +7196,13 @@ export type Deal_Stddev_Pop_Order_By = {
   currentStakedAmount?: InputMaybe<Order_By>;
   dealDeadline?: InputMaybe<Order_By>;
   dealNumericId?: InputMaybe<Order_By>;
+  dealRewardPoolPercent?: InputMaybe<Order_By>;
   evaluationDeadline?: InputMaybe<Order_By>;
   evaluatorCount?: InputMaybe<Order_By>;
   executedProposalCount?: InputMaybe<Order_By>;
   executionValidityDuration?: InputMaybe<Order_By>;
   lastEvaluatedBlockNumber?: InputMaybe<Order_By>;
+  minimalStake?: InputMaybe<Order_By>;
   proposalCount?: InputMaybe<Order_By>;
   proposalNumericId?: InputMaybe<Order_By>;
   recoveredBlockNumber?: InputMaybe<Order_By>;
@@ -6354,6 +7211,8 @@ export type Deal_Stddev_Pop_Order_By = {
   rewardsLimit?: InputMaybe<Order_By>;
   stakerCount?: InputMaybe<Order_By>;
   totalAgentTokens?: InputMaybe<Order_By>;
+  totalDealRewardPoolAllocatedAmount?: InputMaybe<Order_By>;
+  totalDealRewardPoolClaimedAmount?: InputMaybe<Order_By>;
   totalEvaluationCount?: InputMaybe<Order_By>;
   totalReleasedStakeAmount?: InputMaybe<Order_By>;
   totalRewardAllocatedAmount?: InputMaybe<Order_By>;
@@ -6372,6 +7231,7 @@ export type Deal_Stddev_Pop_Order_By = {
 /** order by stddev_samp() on columns of table "Deal" */
 export type Deal_Stddev_Samp_Order_By = {
   activatedBlockNumber?: InputMaybe<Order_By>;
+  agentsLimit?: InputMaybe<Order_By>;
   approveDeadline?: InputMaybe<Order_By>;
   chainId?: InputMaybe<Order_By>;
   closedBlockNumber?: InputMaybe<Order_By>;
@@ -6380,11 +7240,13 @@ export type Deal_Stddev_Samp_Order_By = {
   currentStakedAmount?: InputMaybe<Order_By>;
   dealDeadline?: InputMaybe<Order_By>;
   dealNumericId?: InputMaybe<Order_By>;
+  dealRewardPoolPercent?: InputMaybe<Order_By>;
   evaluationDeadline?: InputMaybe<Order_By>;
   evaluatorCount?: InputMaybe<Order_By>;
   executedProposalCount?: InputMaybe<Order_By>;
   executionValidityDuration?: InputMaybe<Order_By>;
   lastEvaluatedBlockNumber?: InputMaybe<Order_By>;
+  minimalStake?: InputMaybe<Order_By>;
   proposalCount?: InputMaybe<Order_By>;
   proposalNumericId?: InputMaybe<Order_By>;
   recoveredBlockNumber?: InputMaybe<Order_By>;
@@ -6393,6 +7255,8 @@ export type Deal_Stddev_Samp_Order_By = {
   rewardsLimit?: InputMaybe<Order_By>;
   stakerCount?: InputMaybe<Order_By>;
   totalAgentTokens?: InputMaybe<Order_By>;
+  totalDealRewardPoolAllocatedAmount?: InputMaybe<Order_By>;
+  totalDealRewardPoolClaimedAmount?: InputMaybe<Order_By>;
   totalEvaluationCount?: InputMaybe<Order_By>;
   totalReleasedStakeAmount?: InputMaybe<Order_By>;
   totalRewardAllocatedAmount?: InputMaybe<Order_By>;
@@ -6420,9 +7284,11 @@ export type Deal_Stream_Cursor_Input = {
 export type Deal_Stream_Cursor_Value_Input = {
   activatedBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
   active?: InputMaybe<Scalars['Boolean']['input']>;
+  agentsLimit?: InputMaybe<Scalars['numeric']['input']>;
   approveDeadline?: InputMaybe<Scalars['numeric']['input']>;
   cellAddress?: InputMaybe<Scalars['String']['input']>;
   chainId?: InputMaybe<Scalars['Int']['input']>;
+  challengePassed?: InputMaybe<Scalars['Boolean']['input']>;
   childAgentTokenAddress?: InputMaybe<Scalars['String']['input']>;
   childDacAddress?: InputMaybe<Scalars['String']['input']>;
   childDacId?: InputMaybe<Scalars['String']['input']>;
@@ -6442,12 +7308,14 @@ export type Deal_Stream_Cursor_Value_Input = {
   dealConfig?: InputMaybe<Scalars['String']['input']>;
   dealDeadline?: InputMaybe<Scalars['numeric']['input']>;
   dealNumericId?: InputMaybe<Scalars['numeric']['input']>;
+  dealRewardPoolPercent?: InputMaybe<Scalars['numeric']['input']>;
   dealTargetAddress?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   earlyReturnsEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   evaluationDeadline?: InputMaybe<Scalars['numeric']['input']>;
   evaluatorConfig?: InputMaybe<Scalars['String']['input']>;
   evaluatorCount?: InputMaybe<Scalars['numeric']['input']>;
+  evaluatorModuleFactoryAddress?: InputMaybe<Scalars['String']['input']>;
   evaluatorSelector?: InputMaybe<Scalars['String']['input']>;
   executedProposalCount?: InputMaybe<Scalars['numeric']['input']>;
   executionValidityDuration?: InputMaybe<Scalars['numeric']['input']>;
@@ -6457,6 +7325,7 @@ export type Deal_Stream_Cursor_Value_Input = {
   lastEvaluatedBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
   linkHash?: InputMaybe<Scalars['String']['input']>;
   managedTreasuryAddress?: InputMaybe<Scalars['String']['input']>;
+  minimalStake?: InputMaybe<Scalars['numeric']['input']>;
   moduleFactoryAddress?: InputMaybe<Scalars['String']['input']>;
   moduleFactory_id?: InputMaybe<Scalars['String']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
@@ -6466,11 +7335,14 @@ export type Deal_Stream_Cursor_Value_Input = {
   recovered?: InputMaybe<Scalars['Boolean']['input']>;
   recoveredBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
   relatedContractCount?: InputMaybe<Scalars['numeric']['input']>;
+  rewardPoolSupported?: InputMaybe<Scalars['Boolean']['input']>;
   rewardsAllocated?: InputMaybe<Scalars['numeric']['input']>;
   rewardsLimit?: InputMaybe<Scalars['numeric']['input']>;
   stakeTokenAddress?: InputMaybe<Scalars['String']['input']>;
   stakerCount?: InputMaybe<Scalars['numeric']['input']>;
   totalAgentTokens?: InputMaybe<Scalars['numeric']['input']>;
+  totalDealRewardPoolAllocatedAmount?: InputMaybe<Scalars['numeric']['input']>;
+  totalDealRewardPoolClaimedAmount?: InputMaybe<Scalars['numeric']['input']>;
   totalEvaluationCount?: InputMaybe<Scalars['numeric']['input']>;
   totalReleasedStakeAmount?: InputMaybe<Scalars['numeric']['input']>;
   totalRewardAllocatedAmount?: InputMaybe<Scalars['numeric']['input']>;
@@ -6491,6 +7363,7 @@ export type Deal_Stream_Cursor_Value_Input = {
 /** order by sum() on columns of table "Deal" */
 export type Deal_Sum_Order_By = {
   activatedBlockNumber?: InputMaybe<Order_By>;
+  agentsLimit?: InputMaybe<Order_By>;
   approveDeadline?: InputMaybe<Order_By>;
   chainId?: InputMaybe<Order_By>;
   closedBlockNumber?: InputMaybe<Order_By>;
@@ -6499,11 +7372,13 @@ export type Deal_Sum_Order_By = {
   currentStakedAmount?: InputMaybe<Order_By>;
   dealDeadline?: InputMaybe<Order_By>;
   dealNumericId?: InputMaybe<Order_By>;
+  dealRewardPoolPercent?: InputMaybe<Order_By>;
   evaluationDeadline?: InputMaybe<Order_By>;
   evaluatorCount?: InputMaybe<Order_By>;
   executedProposalCount?: InputMaybe<Order_By>;
   executionValidityDuration?: InputMaybe<Order_By>;
   lastEvaluatedBlockNumber?: InputMaybe<Order_By>;
+  minimalStake?: InputMaybe<Order_By>;
   proposalCount?: InputMaybe<Order_By>;
   proposalNumericId?: InputMaybe<Order_By>;
   recoveredBlockNumber?: InputMaybe<Order_By>;
@@ -6512,6 +7387,8 @@ export type Deal_Sum_Order_By = {
   rewardsLimit?: InputMaybe<Order_By>;
   stakerCount?: InputMaybe<Order_By>;
   totalAgentTokens?: InputMaybe<Order_By>;
+  totalDealRewardPoolAllocatedAmount?: InputMaybe<Order_By>;
+  totalDealRewardPoolClaimedAmount?: InputMaybe<Order_By>;
   totalEvaluationCount?: InputMaybe<Order_By>;
   totalReleasedStakeAmount?: InputMaybe<Order_By>;
   totalRewardAllocatedAmount?: InputMaybe<Order_By>;
@@ -6530,6 +7407,7 @@ export type Deal_Sum_Order_By = {
 /** order by var_pop() on columns of table "Deal" */
 export type Deal_Var_Pop_Order_By = {
   activatedBlockNumber?: InputMaybe<Order_By>;
+  agentsLimit?: InputMaybe<Order_By>;
   approveDeadline?: InputMaybe<Order_By>;
   chainId?: InputMaybe<Order_By>;
   closedBlockNumber?: InputMaybe<Order_By>;
@@ -6538,11 +7416,13 @@ export type Deal_Var_Pop_Order_By = {
   currentStakedAmount?: InputMaybe<Order_By>;
   dealDeadline?: InputMaybe<Order_By>;
   dealNumericId?: InputMaybe<Order_By>;
+  dealRewardPoolPercent?: InputMaybe<Order_By>;
   evaluationDeadline?: InputMaybe<Order_By>;
   evaluatorCount?: InputMaybe<Order_By>;
   executedProposalCount?: InputMaybe<Order_By>;
   executionValidityDuration?: InputMaybe<Order_By>;
   lastEvaluatedBlockNumber?: InputMaybe<Order_By>;
+  minimalStake?: InputMaybe<Order_By>;
   proposalCount?: InputMaybe<Order_By>;
   proposalNumericId?: InputMaybe<Order_By>;
   recoveredBlockNumber?: InputMaybe<Order_By>;
@@ -6551,6 +7431,8 @@ export type Deal_Var_Pop_Order_By = {
   rewardsLimit?: InputMaybe<Order_By>;
   stakerCount?: InputMaybe<Order_By>;
   totalAgentTokens?: InputMaybe<Order_By>;
+  totalDealRewardPoolAllocatedAmount?: InputMaybe<Order_By>;
+  totalDealRewardPoolClaimedAmount?: InputMaybe<Order_By>;
   totalEvaluationCount?: InputMaybe<Order_By>;
   totalReleasedStakeAmount?: InputMaybe<Order_By>;
   totalRewardAllocatedAmount?: InputMaybe<Order_By>;
@@ -6569,6 +7451,7 @@ export type Deal_Var_Pop_Order_By = {
 /** order by var_samp() on columns of table "Deal" */
 export type Deal_Var_Samp_Order_By = {
   activatedBlockNumber?: InputMaybe<Order_By>;
+  agentsLimit?: InputMaybe<Order_By>;
   approveDeadline?: InputMaybe<Order_By>;
   chainId?: InputMaybe<Order_By>;
   closedBlockNumber?: InputMaybe<Order_By>;
@@ -6577,11 +7460,13 @@ export type Deal_Var_Samp_Order_By = {
   currentStakedAmount?: InputMaybe<Order_By>;
   dealDeadline?: InputMaybe<Order_By>;
   dealNumericId?: InputMaybe<Order_By>;
+  dealRewardPoolPercent?: InputMaybe<Order_By>;
   evaluationDeadline?: InputMaybe<Order_By>;
   evaluatorCount?: InputMaybe<Order_By>;
   executedProposalCount?: InputMaybe<Order_By>;
   executionValidityDuration?: InputMaybe<Order_By>;
   lastEvaluatedBlockNumber?: InputMaybe<Order_By>;
+  minimalStake?: InputMaybe<Order_By>;
   proposalCount?: InputMaybe<Order_By>;
   proposalNumericId?: InputMaybe<Order_By>;
   recoveredBlockNumber?: InputMaybe<Order_By>;
@@ -6590,6 +7475,8 @@ export type Deal_Var_Samp_Order_By = {
   rewardsLimit?: InputMaybe<Order_By>;
   stakerCount?: InputMaybe<Order_By>;
   totalAgentTokens?: InputMaybe<Order_By>;
+  totalDealRewardPoolAllocatedAmount?: InputMaybe<Order_By>;
+  totalDealRewardPoolClaimedAmount?: InputMaybe<Order_By>;
   totalEvaluationCount?: InputMaybe<Order_By>;
   totalReleasedStakeAmount?: InputMaybe<Order_By>;
   totalRewardAllocatedAmount?: InputMaybe<Order_By>;
@@ -6608,6 +7495,7 @@ export type Deal_Var_Samp_Order_By = {
 /** order by variance() on columns of table "Deal" */
 export type Deal_Variance_Order_By = {
   activatedBlockNumber?: InputMaybe<Order_By>;
+  agentsLimit?: InputMaybe<Order_By>;
   approveDeadline?: InputMaybe<Order_By>;
   chainId?: InputMaybe<Order_By>;
   closedBlockNumber?: InputMaybe<Order_By>;
@@ -6616,11 +7504,13 @@ export type Deal_Variance_Order_By = {
   currentStakedAmount?: InputMaybe<Order_By>;
   dealDeadline?: InputMaybe<Order_By>;
   dealNumericId?: InputMaybe<Order_By>;
+  dealRewardPoolPercent?: InputMaybe<Order_By>;
   evaluationDeadline?: InputMaybe<Order_By>;
   evaluatorCount?: InputMaybe<Order_By>;
   executedProposalCount?: InputMaybe<Order_By>;
   executionValidityDuration?: InputMaybe<Order_By>;
   lastEvaluatedBlockNumber?: InputMaybe<Order_By>;
+  minimalStake?: InputMaybe<Order_By>;
   proposalCount?: InputMaybe<Order_By>;
   proposalNumericId?: InputMaybe<Order_By>;
   recoveredBlockNumber?: InputMaybe<Order_By>;
@@ -6629,6 +7519,8 @@ export type Deal_Variance_Order_By = {
   rewardsLimit?: InputMaybe<Order_By>;
   stakerCount?: InputMaybe<Order_By>;
   totalAgentTokens?: InputMaybe<Order_By>;
+  totalDealRewardPoolAllocatedAmount?: InputMaybe<Order_By>;
+  totalDealRewardPoolClaimedAmount?: InputMaybe<Order_By>;
   totalEvaluationCount?: InputMaybe<Order_By>;
   totalReleasedStakeAmount?: InputMaybe<Order_By>;
   totalRewardAllocatedAmount?: InputMaybe<Order_By>;
@@ -9189,6 +10081,7 @@ export type Proposal_Bool_Exp = {
   _or?: InputMaybe<Array<Proposal_Bool_Exp>>;
   blockingQuorum?: InputMaybe<Numeric_Comparison_Exp>;
   chainId?: InputMaybe<Int_Comparison_Exp>;
+  challenged?: InputMaybe<Boolean_Comparison_Exp>;
   createdBlockNumber?: InputMaybe<Numeric_Comparison_Exp>;
   createdBlockTimestamp?: InputMaybe<Numeric_Comparison_Exp>;
   createdTransactionHash?: InputMaybe<String_Comparison_Exp>;
@@ -9325,6 +10218,7 @@ export type Proposal_Min_Order_By = {
 export type Proposal_Order_By = {
   blockingQuorum?: InputMaybe<Order_By>;
   chainId?: InputMaybe<Order_By>;
+  challenged?: InputMaybe<Order_By>;
   createdBlockNumber?: InputMaybe<Order_By>;
   createdBlockTimestamp?: InputMaybe<Order_By>;
   createdTransactionHash?: InputMaybe<Order_By>;
@@ -9377,6 +10271,8 @@ export type Proposal_Select_Column =
   | 'blockingQuorum'
   /** column name */
   | 'chainId'
+  /** column name */
+  | 'challenged'
   /** column name */
   | 'createdBlockNumber'
   /** column name */
@@ -9550,6 +10446,7 @@ export type Proposal_Stream_Cursor_Input = {
 export type Proposal_Stream_Cursor_Value_Input = {
   blockingQuorum?: InputMaybe<Scalars['numeric']['input']>;
   chainId?: InputMaybe<Scalars['Int']['input']>;
+  challenged?: InputMaybe<Scalars['Boolean']['input']>;
   createdBlockNumber?: InputMaybe<Scalars['numeric']['input']>;
   createdBlockTimestamp?: InputMaybe<Scalars['numeric']['input']>;
   createdTransactionHash?: InputMaybe<Scalars['String']['input']>;
@@ -12445,21 +13342,21 @@ export type GetAccountByAddressQueryVariables = Exact<{
 
 export type GetAccountByAddressQuery = { __typename?: 'query_root', Account: Array<{ __typename?: 'Account', id: string, chainId: number, address: string, createdBlockNumber: string, updatedBlockNumber: string, mainTokenHoldings: Array<{ __typename?: 'MainTokenHolder', id: string, chainId: number, dacId: string, dealId?: string | null, accountId: string, balance: string, totalReceivedAmount: string, totalSentAmount: string, isHolder: boolean, createdBlockNumber: string, updatedBlockNumber: string, lastTransferBlockNumber?: string | null }>, dacGovernanceAccounts: Array<{ __typename?: 'DacGovernanceAccount', id: string, chainId: number, dacId: string, accountId: string, delegateAddress?: string | null, currentVotingPower: string, hasVotingPower: boolean, createdBlockNumber: string, updatedBlockNumber: string }>, dacAgents: Array<{ __typename?: 'DacAgent', id: string, chainId: number, dacId: string, accountId: string, walletAgentTokenAmount: string, totalMintedAmount: string, totalRevokedAmount: string, currentStakedAmount: string, totalStakedAmount: string, totalReleasedAmount: string, totalSlashedAmount: string, totalClaimedMainTokenAmount: string, activeDealCount: string, isActive: boolean, createdBlockNumber: string, updatedBlockNumber: string, lastActivityBlockNumber?: string | null }>, dealAgentPositions: Array<{ __typename?: 'DealAgentPosition', id: string, chainId: number, dacId: string, dealId: string, dacAgentId: string, accountId: string, currentStakedAmount: string, totalStakedAmount: string, totalReleasedAmount: string, totalSlashedAmount: string, totalClaimedMainTokenAmount: string, isActive: boolean, createdBlockNumber: string, updatedBlockNumber: string, lastStakedBlockNumber?: string | null, lastReleasedBlockNumber?: string | null, lastSlashedBlockNumber?: string | null, lastClaimedRewardBlockNumber?: string | null }>, dealGovernanceAccounts: Array<{ __typename?: 'DealGovernanceAccount', id: string, chainId: number, dacId: string, dealId: string, accountId: string, delegateAddress?: string | null, currentVotingPower: string, hasVotingPower: boolean, createdBlockNumber: string, updatedBlockNumber: string }> }> };
 
-export type DacViewFieldsFragment = { __typename?: 'Dac', id: string, chainId: number, address: string, mode: string, name?: string | null, description?: string | null, creator?: string | null, mainTokenAddress?: string | null, wrappedMainTokenAddress?: string | null, underlyingTokenAddress?: string | null, agentTokenAddress?: string | null, dealManagerAddress?: string | null, moduleRegistryAddress?: string | null, assetControllerAddress?: string | null, governanceSchemaAddress?: string | null, governanceOracleAddress?: string | null, treasuryHolderAddress?: string | null, treasurySeedAmount?: string | null, legalWrapperAddress?: string | null, legalWrapperOperatingAgreementIpfs?: string | null, legalWrapperRegisteredAgent?: string | null, coreModuleFactoryAddress?: string | null, started: boolean, dividendsEnabled: boolean, votingQuorumPercent?: string | null, votingBlockingPercent?: string | null, votingHighQuorumPercent?: string | null, votingDuration?: string | null, votingQualification?: string | null, executionValidityDuration?: string | null, dealCreationMinAgentBalance?: string | null, dealCreationMinInitialAgentStake?: string | null, oraclePublishDeadline?: string | null, fallbackWarmupDuration?: string | null, fallbackDuration?: string | null, blockingOnAllProposals: boolean, blockingOnHighQuorum: boolean, oraclePrimaryEnabled: boolean, supportsMint: boolean, supportsBurn: boolean, supportsCapitalCall: boolean, supportsWrap: boolean, supportsUnwrap: boolean, supportsReserveBackedClaims: boolean, proposalCount: string, executedProposalCount: string, dealCount: string, activeDealCount: string, moduleCount: string, capitalCallCount: string, mainTokenHolderCount: string, releasedMainTokenAmount: string, mainTokenObligations: string, createdBlockNumber: string, createdBlockTimestamp?: string | null, createdTransactionHash?: string | null, updatedBlockNumber: string, updatedBlockTimestamp?: string | null };
+export type DacViewFieldsFragment = { __typename?: 'Dac', id: string, chainId: number, address: string, mode: string, name?: string | null, description?: string | null, creator?: string | null, mainTokenAddress?: string | null, wrappedMainTokenAddress?: string | null, underlyingTokenAddress?: string | null, agentTokenAddress?: string | null, dealManagerAddress?: string | null, moduleRegistryAddress?: string | null, assetControllerAddress?: string | null, governanceSchemaAddress?: string | null, governanceOracleAddress?: string | null, treasuryHolderAddress?: string | null, treasurySeedAmount?: string | null, legalWrapperAddress?: string | null, legalWrapperOperatingAgreementIpfs?: string | null, legalWrapperRegisteredAgent?: string | null, coreModuleFactoryAddress?: string | null, started: boolean, dividendsEnabled: boolean, votingQuorumPercent?: string | null, votingBlockingPercent?: string | null, votingHighQuorumPercent?: string | null, votingDuration?: string | null, votingQualification?: string | null, executionValidityDuration?: string | null, dealCreationMinAgentBalance?: string | null, dealCreationMinInitialAgentStake?: string | null, oraclePublishDeadline?: string | null, fallbackWarmupDuration?: string | null, fallbackDuration?: string | null, blockingOnAllProposals: boolean, blockingOnHighQuorum: boolean, oraclePrimaryEnabled: boolean, supportsMint: boolean, supportsBurn: boolean, supportsCapitalCall: boolean, supportsWrap: boolean, supportsUnwrap: boolean, supportsReserveBackedClaims: boolean, proposalCount: string, executedProposalCount: string, dealCount: string, activeDealCount: string, moduleCount: string, capitalCallCount: string, mainTokenHolderCount: string, releasedMainTokenAmount: string, mainTokenObligations: string, salt?: string | null, createdBlockNumber: string, createdBlockTimestamp?: string | null, createdTransactionHash?: string | null, updatedBlockNumber: string, updatedBlockTimestamp?: string | null };
 
 export type GetDacByIdQueryVariables = Exact<{
   id: Scalars['String']['input'];
 }>;
 
 
-export type GetDacByIdQuery = { __typename?: 'query_root', Dac: Array<{ __typename?: 'Dac', id: string, chainId: number, address: string, mode: string, name?: string | null, description?: string | null, creator?: string | null, mainTokenAddress?: string | null, wrappedMainTokenAddress?: string | null, underlyingTokenAddress?: string | null, agentTokenAddress?: string | null, dealManagerAddress?: string | null, moduleRegistryAddress?: string | null, assetControllerAddress?: string | null, governanceSchemaAddress?: string | null, governanceOracleAddress?: string | null, treasuryHolderAddress?: string | null, treasurySeedAmount?: string | null, legalWrapperAddress?: string | null, legalWrapperOperatingAgreementIpfs?: string | null, legalWrapperRegisteredAgent?: string | null, coreModuleFactoryAddress?: string | null, started: boolean, dividendsEnabled: boolean, votingQuorumPercent?: string | null, votingBlockingPercent?: string | null, votingHighQuorumPercent?: string | null, votingDuration?: string | null, votingQualification?: string | null, executionValidityDuration?: string | null, dealCreationMinAgentBalance?: string | null, dealCreationMinInitialAgentStake?: string | null, oraclePublishDeadline?: string | null, fallbackWarmupDuration?: string | null, fallbackDuration?: string | null, blockingOnAllProposals: boolean, blockingOnHighQuorum: boolean, oraclePrimaryEnabled: boolean, supportsMint: boolean, supportsBurn: boolean, supportsCapitalCall: boolean, supportsWrap: boolean, supportsUnwrap: boolean, supportsReserveBackedClaims: boolean, proposalCount: string, executedProposalCount: string, dealCount: string, activeDealCount: string, moduleCount: string, capitalCallCount: string, mainTokenHolderCount: string, releasedMainTokenAmount: string, mainTokenObligations: string, createdBlockNumber: string, createdBlockTimestamp?: string | null, createdTransactionHash?: string | null, updatedBlockNumber: string, updatedBlockTimestamp?: string | null }> };
+export type GetDacByIdQuery = { __typename?: 'query_root', Dac: Array<{ __typename?: 'Dac', id: string, chainId: number, address: string, mode: string, name?: string | null, description?: string | null, creator?: string | null, mainTokenAddress?: string | null, wrappedMainTokenAddress?: string | null, underlyingTokenAddress?: string | null, agentTokenAddress?: string | null, dealManagerAddress?: string | null, moduleRegistryAddress?: string | null, assetControllerAddress?: string | null, governanceSchemaAddress?: string | null, governanceOracleAddress?: string | null, treasuryHolderAddress?: string | null, treasurySeedAmount?: string | null, legalWrapperAddress?: string | null, legalWrapperOperatingAgreementIpfs?: string | null, legalWrapperRegisteredAgent?: string | null, coreModuleFactoryAddress?: string | null, started: boolean, dividendsEnabled: boolean, votingQuorumPercent?: string | null, votingBlockingPercent?: string | null, votingHighQuorumPercent?: string | null, votingDuration?: string | null, votingQualification?: string | null, executionValidityDuration?: string | null, dealCreationMinAgentBalance?: string | null, dealCreationMinInitialAgentStake?: string | null, oraclePublishDeadline?: string | null, fallbackWarmupDuration?: string | null, fallbackDuration?: string | null, blockingOnAllProposals: boolean, blockingOnHighQuorum: boolean, oraclePrimaryEnabled: boolean, supportsMint: boolean, supportsBurn: boolean, supportsCapitalCall: boolean, supportsWrap: boolean, supportsUnwrap: boolean, supportsReserveBackedClaims: boolean, proposalCount: string, executedProposalCount: string, dealCount: string, activeDealCount: string, moduleCount: string, capitalCallCount: string, mainTokenHolderCount: string, releasedMainTokenAmount: string, mainTokenObligations: string, salt?: string | null, createdBlockNumber: string, createdBlockTimestamp?: string | null, createdTransactionHash?: string | null, updatedBlockNumber: string, updatedBlockTimestamp?: string | null }> };
 
 export type GetDacByAddressQueryVariables = Exact<{
   address: Scalars['String']['input'];
 }>;
 
 
-export type GetDacByAddressQuery = { __typename?: 'query_root', Dac: Array<{ __typename?: 'Dac', id: string, chainId: number, address: string, mode: string, name?: string | null, description?: string | null, creator?: string | null, mainTokenAddress?: string | null, wrappedMainTokenAddress?: string | null, underlyingTokenAddress?: string | null, agentTokenAddress?: string | null, dealManagerAddress?: string | null, moduleRegistryAddress?: string | null, assetControllerAddress?: string | null, governanceSchemaAddress?: string | null, governanceOracleAddress?: string | null, treasuryHolderAddress?: string | null, treasurySeedAmount?: string | null, legalWrapperAddress?: string | null, legalWrapperOperatingAgreementIpfs?: string | null, legalWrapperRegisteredAgent?: string | null, coreModuleFactoryAddress?: string | null, started: boolean, dividendsEnabled: boolean, votingQuorumPercent?: string | null, votingBlockingPercent?: string | null, votingHighQuorumPercent?: string | null, votingDuration?: string | null, votingQualification?: string | null, executionValidityDuration?: string | null, dealCreationMinAgentBalance?: string | null, dealCreationMinInitialAgentStake?: string | null, oraclePublishDeadline?: string | null, fallbackWarmupDuration?: string | null, fallbackDuration?: string | null, blockingOnAllProposals: boolean, blockingOnHighQuorum: boolean, oraclePrimaryEnabled: boolean, supportsMint: boolean, supportsBurn: boolean, supportsCapitalCall: boolean, supportsWrap: boolean, supportsUnwrap: boolean, supportsReserveBackedClaims: boolean, proposalCount: string, executedProposalCount: string, dealCount: string, activeDealCount: string, moduleCount: string, capitalCallCount: string, mainTokenHolderCount: string, releasedMainTokenAmount: string, mainTokenObligations: string, createdBlockNumber: string, createdBlockTimestamp?: string | null, createdTransactionHash?: string | null, updatedBlockNumber: string, updatedBlockTimestamp?: string | null }> };
+export type GetDacByAddressQuery = { __typename?: 'query_root', Dac: Array<{ __typename?: 'Dac', id: string, chainId: number, address: string, mode: string, name?: string | null, description?: string | null, creator?: string | null, mainTokenAddress?: string | null, wrappedMainTokenAddress?: string | null, underlyingTokenAddress?: string | null, agentTokenAddress?: string | null, dealManagerAddress?: string | null, moduleRegistryAddress?: string | null, assetControllerAddress?: string | null, governanceSchemaAddress?: string | null, governanceOracleAddress?: string | null, treasuryHolderAddress?: string | null, treasurySeedAmount?: string | null, legalWrapperAddress?: string | null, legalWrapperOperatingAgreementIpfs?: string | null, legalWrapperRegisteredAgent?: string | null, coreModuleFactoryAddress?: string | null, started: boolean, dividendsEnabled: boolean, votingQuorumPercent?: string | null, votingBlockingPercent?: string | null, votingHighQuorumPercent?: string | null, votingDuration?: string | null, votingQualification?: string | null, executionValidityDuration?: string | null, dealCreationMinAgentBalance?: string | null, dealCreationMinInitialAgentStake?: string | null, oraclePublishDeadline?: string | null, fallbackWarmupDuration?: string | null, fallbackDuration?: string | null, blockingOnAllProposals: boolean, blockingOnHighQuorum: boolean, oraclePrimaryEnabled: boolean, supportsMint: boolean, supportsBurn: boolean, supportsCapitalCall: boolean, supportsWrap: boolean, supportsUnwrap: boolean, supportsReserveBackedClaims: boolean, proposalCount: string, executedProposalCount: string, dealCount: string, activeDealCount: string, moduleCount: string, capitalCallCount: string, mainTokenHolderCount: string, releasedMainTokenAmount: string, mainTokenObligations: string, salt?: string | null, createdBlockNumber: string, createdBlockTimestamp?: string | null, createdTransactionHash?: string | null, updatedBlockNumber: string, updatedBlockTimestamp?: string | null }> };
 
 export type ListDacsQueryVariables = Exact<{
   limit: Scalars['Int']['input'];
@@ -12467,7 +13364,7 @@ export type ListDacsQueryVariables = Exact<{
 }>;
 
 
-export type ListDacsQuery = { __typename?: 'query_root', Dac: Array<{ __typename?: 'Dac', id: string, chainId: number, address: string, mode: string, name?: string | null, description?: string | null, creator?: string | null, mainTokenAddress?: string | null, wrappedMainTokenAddress?: string | null, underlyingTokenAddress?: string | null, agentTokenAddress?: string | null, dealManagerAddress?: string | null, moduleRegistryAddress?: string | null, assetControllerAddress?: string | null, governanceSchemaAddress?: string | null, governanceOracleAddress?: string | null, treasuryHolderAddress?: string | null, treasurySeedAmount?: string | null, legalWrapperAddress?: string | null, legalWrapperOperatingAgreementIpfs?: string | null, legalWrapperRegisteredAgent?: string | null, coreModuleFactoryAddress?: string | null, started: boolean, dividendsEnabled: boolean, votingQuorumPercent?: string | null, votingBlockingPercent?: string | null, votingHighQuorumPercent?: string | null, votingDuration?: string | null, votingQualification?: string | null, executionValidityDuration?: string | null, dealCreationMinAgentBalance?: string | null, dealCreationMinInitialAgentStake?: string | null, oraclePublishDeadline?: string | null, fallbackWarmupDuration?: string | null, fallbackDuration?: string | null, blockingOnAllProposals: boolean, blockingOnHighQuorum: boolean, oraclePrimaryEnabled: boolean, supportsMint: boolean, supportsBurn: boolean, supportsCapitalCall: boolean, supportsWrap: boolean, supportsUnwrap: boolean, supportsReserveBackedClaims: boolean, proposalCount: string, executedProposalCount: string, dealCount: string, activeDealCount: string, moduleCount: string, capitalCallCount: string, mainTokenHolderCount: string, releasedMainTokenAmount: string, mainTokenObligations: string, createdBlockNumber: string, createdBlockTimestamp?: string | null, createdTransactionHash?: string | null, updatedBlockNumber: string, updatedBlockTimestamp?: string | null }> };
+export type ListDacsQuery = { __typename?: 'query_root', Dac: Array<{ __typename?: 'Dac', id: string, chainId: number, address: string, mode: string, name?: string | null, description?: string | null, creator?: string | null, mainTokenAddress?: string | null, wrappedMainTokenAddress?: string | null, underlyingTokenAddress?: string | null, agentTokenAddress?: string | null, dealManagerAddress?: string | null, moduleRegistryAddress?: string | null, assetControllerAddress?: string | null, governanceSchemaAddress?: string | null, governanceOracleAddress?: string | null, treasuryHolderAddress?: string | null, treasurySeedAmount?: string | null, legalWrapperAddress?: string | null, legalWrapperOperatingAgreementIpfs?: string | null, legalWrapperRegisteredAgent?: string | null, coreModuleFactoryAddress?: string | null, started: boolean, dividendsEnabled: boolean, votingQuorumPercent?: string | null, votingBlockingPercent?: string | null, votingHighQuorumPercent?: string | null, votingDuration?: string | null, votingQualification?: string | null, executionValidityDuration?: string | null, dealCreationMinAgentBalance?: string | null, dealCreationMinInitialAgentStake?: string | null, oraclePublishDeadline?: string | null, fallbackWarmupDuration?: string | null, fallbackDuration?: string | null, blockingOnAllProposals: boolean, blockingOnHighQuorum: boolean, oraclePrimaryEnabled: boolean, supportsMint: boolean, supportsBurn: boolean, supportsCapitalCall: boolean, supportsWrap: boolean, supportsUnwrap: boolean, supportsReserveBackedClaims: boolean, proposalCount: string, executedProposalCount: string, dealCount: string, activeDealCount: string, moduleCount: string, capitalCallCount: string, mainTokenHolderCount: string, releasedMainTokenAmount: string, mainTokenObligations: string, salt?: string | null, createdBlockNumber: string, createdBlockTimestamp?: string | null, createdTransactionHash?: string | null, updatedBlockNumber: string, updatedBlockTimestamp?: string | null }> };
 
 export type DealViewFieldsFragment = { __typename?: 'Deal', id: string, chainId: number, dacId: string, dealNumericId: string, proposalNumericId?: string | null, creator?: string | null, kindSelector?: string | null, cellAddress: string, dealAddress?: string | null, moduleFactoryAddress?: string | null, governanceFactoryAddress?: string | null, dealTargetAddress?: string | null, proposer?: string | null, vetoEnabled?: boolean | null, earlyReturnsEnabled: boolean, whitelistOnly: boolean, dealChallengeEnabled: boolean, votingQuorumPercent?: string | null, votingBlockingPercent?: string | null, votingHighQuorumPercent?: string | null, votingDuration?: string | null, votingQualification?: string | null, executionValidityDuration?: string | null, name?: string | null, description?: string | null, linkHash?: string | null, evaluatorSelector?: string | null, evaluatorModuleFactoryAddress?: string | null, agentsLimit: string, minimalStake: string, stakeTokenAddress?: string | null, managedTreasuryAddress?: string | null, childDacAddress?: string | null, childDacId?: string | null, childMainTokenAddress?: string | null, childAgentTokenAddress?: string | null, active: boolean, closed: boolean, recovered: boolean, proposalCount: string, executedProposalCount: string, totalAgentTokens?: string | null, stakerCount: string, currentStakedAmount: string, totalStakedAmount: string, totalReleasedStakeAmount: string, totalSlashedStakeAmount: string, totalRewardAllocatedAmount: string, totalRewardClaimedAmount: string, rewardsLimit: string, rewardsAllocated: string, dealRewardPoolPercent: string, rewardPoolSupported: boolean, totalDealRewardPoolAllocatedAmount: string, totalDealRewardPoolClaimedAmount: string, approveDeadline?: string | null, evaluationDeadline?: string | null, dealDeadline?: string | null, trancheCount: string, evaluatorCount: string, relatedContractCount: string, lastEvaluatedBlockNumber?: string | null, totalEvaluationCount: string, createdBlockNumber: string, createdBlockTimestamp?: string | null, createdTransactionHash?: string | null, activatedBlockNumber?: string | null, closedBlockNumber?: string | null, recoveredBlockNumber?: string | null, updatedBlockNumber: string };
 
@@ -12618,6 +13515,28 @@ export type ListDealProposalsByDealQueryVariables = Exact<{
 
 export type ListDealProposalsByDealQuery = { __typename?: 'query_root', DealProposal: Array<{ __typename?: 'DealProposal', id: string, chainId: number, proposalId: string, dacId: string, dealId: string, challengeable: boolean, challenged: boolean, challengeCount: string, createdBlockNumber: string, proposal?: { __typename?: 'Proposal', id: string, chainId: number, proposalAddress: string, scope?: string | null, dacId?: string | null, dealId?: string | null, proposalNumericId?: string | null, kindSelector?: string | null, kindName?: string | null, targetAddress?: string | null, data1?: string | null, data2?: string | null, tokenAddress?: string | null, totalVotingPower?: string | null, quorum?: string | null, blockingQuorum?: string | null, snapshotReference?: string | null, snapshotReferenceKind?: string | null, snapshotTime?: string | null, endTime?: string | null, proposalVariant: string, voteCount: string, merkleVoteCount: string, yesVotes: string, noVotes: string, resolved: boolean, passed?: boolean | null, executed: boolean, executionValidityDuration?: string | null, resolutionTime?: string | null, executionDeadline?: string | null, executionExpired: boolean, currentPhase?: string | null, phaseStartTime?: string | null, phaseEndTime?: string | null, currentPhaseSnapshotBlock?: string | null, createdBlockNumber: string, createdBlockTimestamp?: string | null, createdTransactionHash?: string | null, resolvedBlockNumber?: string | null, executedBlockNumber?: string | null } | null, challenges: Array<{ __typename?: 'DealProposalChallenge', id: string, chainId: number, dealId: string, dealProposalId: string, dacProposalId: string, proposalNumericId: string, createdBlockNumber: string, createdBlockTimestamp?: string | null, createdTransactionHash?: string | null }> }> };
 
+export type LegalWrapperMessageFieldsFragment = { __typename?: 'DacLegalWrapperMessage', id: string, chainId: number, dacId: string, wrapperAddress?: string | null, messageKind: string, message?: string | null, createdBlockNumber: string, createdBlockTimestamp?: string | null, createdTransactionHash?: string | null };
+
+export type LegalWrapperStateFieldsFragment = { __typename?: 'DacLegalWrapperState', id: string, chainId: number, dacId: string, wrapperAddress?: string | null, operatingAgreementIpfs?: string | null, registeredAgent?: string | null, data?: string | null, updatedBlockNumber: string, updatedBlockTimestamp?: string | null };
+
+export type ListLegalWrapperMessagesByDacQueryVariables = Exact<{
+  dacId: Scalars['String']['input'];
+  limit: Scalars['Int']['input'];
+  offset: Scalars['Int']['input'];
+}>;
+
+
+export type ListLegalWrapperMessagesByDacQuery = { __typename?: 'query_root', DacLegalWrapperMessage: Array<{ __typename?: 'DacLegalWrapperMessage', id: string, chainId: number, dacId: string, wrapperAddress?: string | null, messageKind: string, message?: string | null, createdBlockNumber: string, createdBlockTimestamp?: string | null, createdTransactionHash?: string | null }> };
+
+export type ListLegalWrapperStatesByDacQueryVariables = Exact<{
+  dacId: Scalars['String']['input'];
+  limit: Scalars['Int']['input'];
+  offset: Scalars['Int']['input'];
+}>;
+
+
+export type ListLegalWrapperStatesByDacQuery = { __typename?: 'query_root', DacLegalWrapperState: Array<{ __typename?: 'DacLegalWrapperState', id: string, chainId: number, dacId: string, wrapperAddress?: string | null, operatingAgreementIpfs?: string | null, registeredAgent?: string | null, data?: string | null, updatedBlockNumber: string, updatedBlockTimestamp?: string | null }> };
+
 export type GovernanceOraclePublisherViewFieldsFragment = { __typename?: 'GovernanceOraclePublisher', id: string, chainId: number, governanceOracleId: string, publisherAddress: string, allowed: boolean, updatedBlockNumber: string };
 
 export type GovernanceOracleViewFieldsFragment = { __typename?: 'GovernanceOracle', id: string, chainId: number, dacId: string, address: string, active: boolean, createdBlockNumber: string, updatedBlockNumber: string, publishers: Array<{ __typename?: 'GovernanceOraclePublisher', id: string, chainId: number, governanceOracleId: string, publisherAddress: string, allowed: boolean, updatedBlockNumber: string }> };
@@ -12702,7 +13621,7 @@ export const DacAgentViewFieldsFragmentDoc = {"kind":"Document","definitions":[{
 export const DealAgentPositionViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealAgentPositionViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DealAgentPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"dacAgentId"}},{"kind":"Field","name":{"kind":"Name","value":"accountId"}},{"kind":"Field","name":{"kind":"Name","value":"currentStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalReleasedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalSlashedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalClaimedMainTokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"lastStakedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"lastReleasedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"lastSlashedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"lastClaimedRewardBlockNumber"}}]}}]} as unknown as DocumentNode<DealAgentPositionViewFieldsFragment, unknown>;
 export const DacGovernanceAccountViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacGovernanceAccountViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DacGovernanceAccount"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"accountId"}},{"kind":"Field","name":{"kind":"Name","value":"delegateAddress"}},{"kind":"Field","name":{"kind":"Name","value":"currentVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"hasVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}}]}}]} as unknown as DocumentNode<DacGovernanceAccountViewFieldsFragment, unknown>;
 export const DealGovernanceAccountViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealGovernanceAccountViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DealGovernanceAccount"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"accountId"}},{"kind":"Field","name":{"kind":"Name","value":"delegateAddress"}},{"kind":"Field","name":{"kind":"Name","value":"currentVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"hasVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}}]}}]} as unknown as DocumentNode<DealGovernanceAccountViewFieldsFragment, unknown>;
-export const DacViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Dac"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"mode"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"creator"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"wrappedMainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"underlyingTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"agentTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealManagerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"moduleRegistryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"assetControllerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceSchemaAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceOracleAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasuryHolderAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasurySeedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperAddress"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperOperatingAgreementIpfs"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperRegisteredAgent"}},{"kind":"Field","name":{"kind":"Name","value":"coreModuleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"started"}},{"kind":"Field","name":{"kind":"Name","value":"dividendsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"votingQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingBlockingPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingHighQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingDuration"}},{"kind":"Field","name":{"kind":"Name","value":"votingQualification"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinAgentBalance"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinInitialAgentStake"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePublishDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackWarmupDuration"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackDuration"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnAllProposals"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnHighQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePrimaryEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"supportsMint"}},{"kind":"Field","name":{"kind":"Name","value":"supportsBurn"}},{"kind":"Field","name":{"kind":"Name","value":"supportsCapitalCall"}},{"kind":"Field","name":{"kind":"Name","value":"supportsWrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsUnwrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsReserveBackedClaims"}},{"kind":"Field","name":{"kind":"Name","value":"proposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"executedProposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"dealCount"}},{"kind":"Field","name":{"kind":"Name","value":"activeDealCount"}},{"kind":"Field","name":{"kind":"Name","value":"moduleCount"}},{"kind":"Field","name":{"kind":"Name","value":"capitalCallCount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenHolderCount"}},{"kind":"Field","name":{"kind":"Name","value":"releasedMainTokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenObligations"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockTimestamp"}}]}}]} as unknown as DocumentNode<DacViewFieldsFragment, unknown>;
+export const DacViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Dac"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"mode"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"creator"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"wrappedMainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"underlyingTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"agentTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealManagerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"moduleRegistryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"assetControllerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceSchemaAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceOracleAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasuryHolderAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasurySeedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperAddress"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperOperatingAgreementIpfs"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperRegisteredAgent"}},{"kind":"Field","name":{"kind":"Name","value":"coreModuleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"started"}},{"kind":"Field","name":{"kind":"Name","value":"dividendsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"votingQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingBlockingPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingHighQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingDuration"}},{"kind":"Field","name":{"kind":"Name","value":"votingQualification"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinAgentBalance"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinInitialAgentStake"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePublishDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackWarmupDuration"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackDuration"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnAllProposals"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnHighQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePrimaryEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"supportsMint"}},{"kind":"Field","name":{"kind":"Name","value":"supportsBurn"}},{"kind":"Field","name":{"kind":"Name","value":"supportsCapitalCall"}},{"kind":"Field","name":{"kind":"Name","value":"supportsWrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsUnwrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsReserveBackedClaims"}},{"kind":"Field","name":{"kind":"Name","value":"proposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"executedProposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"dealCount"}},{"kind":"Field","name":{"kind":"Name","value":"activeDealCount"}},{"kind":"Field","name":{"kind":"Name","value":"moduleCount"}},{"kind":"Field","name":{"kind":"Name","value":"capitalCallCount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenHolderCount"}},{"kind":"Field","name":{"kind":"Name","value":"releasedMainTokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenObligations"}},{"kind":"Field","name":{"kind":"Name","value":"salt"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockTimestamp"}}]}}]} as unknown as DocumentNode<DacViewFieldsFragment, unknown>;
 export const DealViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Deal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"creator"}},{"kind":"Field","name":{"kind":"Name","value":"kindSelector"}},{"kind":"Field","name":{"kind":"Name","value":"cellAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealAddress"}},{"kind":"Field","name":{"kind":"Name","value":"moduleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealTargetAddress"}},{"kind":"Field","name":{"kind":"Name","value":"proposer"}},{"kind":"Field","name":{"kind":"Name","value":"vetoEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"earlyReturnsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"whitelistOnly"}},{"kind":"Field","name":{"kind":"Name","value":"dealChallengeEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"votingQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingBlockingPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingHighQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingDuration"}},{"kind":"Field","name":{"kind":"Name","value":"votingQualification"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"linkHash"}},{"kind":"Field","name":{"kind":"Name","value":"evaluatorSelector"}},{"kind":"Field","name":{"kind":"Name","value":"evaluatorModuleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"agentsLimit"}},{"kind":"Field","name":{"kind":"Name","value":"minimalStake"}},{"kind":"Field","name":{"kind":"Name","value":"stakeTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"managedTreasuryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"childDacAddress"}},{"kind":"Field","name":{"kind":"Name","value":"childDacId"}},{"kind":"Field","name":{"kind":"Name","value":"childMainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"childAgentTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"recovered"}},{"kind":"Field","name":{"kind":"Name","value":"proposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"executedProposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"totalAgentTokens"}},{"kind":"Field","name":{"kind":"Name","value":"stakerCount"}},{"kind":"Field","name":{"kind":"Name","value":"currentStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalReleasedStakeAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalSlashedStakeAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalRewardAllocatedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalRewardClaimedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"rewardsLimit"}},{"kind":"Field","name":{"kind":"Name","value":"rewardsAllocated"}},{"kind":"Field","name":{"kind":"Name","value":"dealRewardPoolPercent"}},{"kind":"Field","name":{"kind":"Name","value":"rewardPoolSupported"}},{"kind":"Field","name":{"kind":"Name","value":"totalDealRewardPoolAllocatedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalDealRewardPoolClaimedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"approveDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"evaluationDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"dealDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"trancheCount"}},{"kind":"Field","name":{"kind":"Name","value":"evaluatorCount"}},{"kind":"Field","name":{"kind":"Name","value":"relatedContractCount"}},{"kind":"Field","name":{"kind":"Name","value":"lastEvaluatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"totalEvaluationCount"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"activatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"closedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"recoveredBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}}]}}]} as unknown as DocumentNode<DealViewFieldsFragment, unknown>;
 export const DealRelatedContractViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealRelatedContractViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DealRelatedContract"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealCellAddress"}},{"kind":"Field","name":{"kind":"Name","value":"relatedContractAddress"}},{"kind":"Field","name":{"kind":"Name","value":"roleHex"}},{"kind":"Field","name":{"kind":"Name","value":"roleText"}},{"kind":"Field","name":{"kind":"Name","value":"controlled"}},{"kind":"Field","name":{"kind":"Name","value":"managed"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}}]} as unknown as DocumentNode<DealRelatedContractViewFieldsFragment, unknown>;
 export const ProposalBaseFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ProposalBaseFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Proposal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalAddress"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"kindSelector"}},{"kind":"Field","name":{"kind":"Name","value":"kindName"}},{"kind":"Field","name":{"kind":"Name","value":"targetAddress"}},{"kind":"Field","name":{"kind":"Name","value":"data1"}},{"kind":"Field","name":{"kind":"Name","value":"data2"}},{"kind":"Field","name":{"kind":"Name","value":"tokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"totalVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"quorum"}},{"kind":"Field","name":{"kind":"Name","value":"blockingQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotReference"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotReferenceKind"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotTime"}},{"kind":"Field","name":{"kind":"Name","value":"endTime"}},{"kind":"Field","name":{"kind":"Name","value":"proposalVariant"}},{"kind":"Field","name":{"kind":"Name","value":"voteCount"}},{"kind":"Field","name":{"kind":"Name","value":"merkleVoteCount"}},{"kind":"Field","name":{"kind":"Name","value":"yesVotes"}},{"kind":"Field","name":{"kind":"Name","value":"noVotes"}},{"kind":"Field","name":{"kind":"Name","value":"resolved"}},{"kind":"Field","name":{"kind":"Name","value":"passed"}},{"kind":"Field","name":{"kind":"Name","value":"executed"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"resolutionTime"}},{"kind":"Field","name":{"kind":"Name","value":"executionDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"executionExpired"}},{"kind":"Field","name":{"kind":"Name","value":"currentPhase"}},{"kind":"Field","name":{"kind":"Name","value":"phaseStartTime"}},{"kind":"Field","name":{"kind":"Name","value":"phaseEndTime"}},{"kind":"Field","name":{"kind":"Name","value":"currentPhaseSnapshotBlock"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"resolvedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"executedBlockNumber"}}]}}]} as unknown as DocumentNode<ProposalBaseFieldsFragment, unknown>;
@@ -12712,6 +13631,8 @@ export const MerkleVoteViewFieldsFragmentDoc = {"kind":"Document","definitions":
 export const DealProposalChallengeViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealProposalChallengeViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DealProposalChallenge"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"dealProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"dacProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}}]} as unknown as DocumentNode<DealProposalChallengeViewFieldsFragment, unknown>;
 export const DacProposalViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacProposalViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DacProposal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"governanceType"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"proposal"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ProposalBaseFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"phaseEvents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"asc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ProposalPhaseEventViewFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"oracleSnapshots"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"asc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OracleSnapshotViewFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"merkleVotes"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"asc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"MerkleVoteViewFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"challengedDeals"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"asc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DealProposalChallengeViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ProposalBaseFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Proposal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalAddress"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"kindSelector"}},{"kind":"Field","name":{"kind":"Name","value":"kindName"}},{"kind":"Field","name":{"kind":"Name","value":"targetAddress"}},{"kind":"Field","name":{"kind":"Name","value":"data1"}},{"kind":"Field","name":{"kind":"Name","value":"data2"}},{"kind":"Field","name":{"kind":"Name","value":"tokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"totalVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"quorum"}},{"kind":"Field","name":{"kind":"Name","value":"blockingQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotReference"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotReferenceKind"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotTime"}},{"kind":"Field","name":{"kind":"Name","value":"endTime"}},{"kind":"Field","name":{"kind":"Name","value":"proposalVariant"}},{"kind":"Field","name":{"kind":"Name","value":"voteCount"}},{"kind":"Field","name":{"kind":"Name","value":"merkleVoteCount"}},{"kind":"Field","name":{"kind":"Name","value":"yesVotes"}},{"kind":"Field","name":{"kind":"Name","value":"noVotes"}},{"kind":"Field","name":{"kind":"Name","value":"resolved"}},{"kind":"Field","name":{"kind":"Name","value":"passed"}},{"kind":"Field","name":{"kind":"Name","value":"executed"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"resolutionTime"}},{"kind":"Field","name":{"kind":"Name","value":"executionDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"executionExpired"}},{"kind":"Field","name":{"kind":"Name","value":"currentPhase"}},{"kind":"Field","name":{"kind":"Name","value":"phaseStartTime"}},{"kind":"Field","name":{"kind":"Name","value":"phaseEndTime"}},{"kind":"Field","name":{"kind":"Name","value":"currentPhaseSnapshotBlock"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"resolvedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"executedBlockNumber"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ProposalPhaseEventViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ProposalPhaseEvent"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"phase"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotBlock"}},{"kind":"Field","name":{"kind":"Name","value":"startTime"}},{"kind":"Field","name":{"kind":"Name","value":"endTime"}},{"kind":"Field","name":{"kind":"Name","value":"totalVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"quorum"}},{"kind":"Field","name":{"kind":"Name","value":"blockingQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OracleSnapshotViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OracleSnapshot"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dacProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"governanceOracleId"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotBlock"}},{"kind":"Field","name":{"kind":"Name","value":"merkleRoot"}},{"kind":"Field","name":{"kind":"Name","value":"totalUnderlyingVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"MerkleVoteViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MerkleVote"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"accountId"}},{"kind":"Field","name":{"kind":"Name","value":"voter"}},{"kind":"Field","name":{"kind":"Name","value":"support"}},{"kind":"Field","name":{"kind":"Name","value":"weight"}},{"kind":"Field","name":{"kind":"Name","value":"merkleIndex"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealProposalChallengeViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DealProposalChallenge"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"dealProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"dacProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}}]} as unknown as DocumentNode<DacProposalViewFieldsFragment, unknown>;
 export const DealProposalViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealProposalViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DealProposal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"challengeable"}},{"kind":"Field","name":{"kind":"Name","value":"challenged"}},{"kind":"Field","name":{"kind":"Name","value":"challengeCount"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"proposal"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ProposalBaseFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"challenges"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"asc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DealProposalChallengeViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ProposalBaseFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Proposal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalAddress"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"kindSelector"}},{"kind":"Field","name":{"kind":"Name","value":"kindName"}},{"kind":"Field","name":{"kind":"Name","value":"targetAddress"}},{"kind":"Field","name":{"kind":"Name","value":"data1"}},{"kind":"Field","name":{"kind":"Name","value":"data2"}},{"kind":"Field","name":{"kind":"Name","value":"tokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"totalVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"quorum"}},{"kind":"Field","name":{"kind":"Name","value":"blockingQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotReference"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotReferenceKind"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotTime"}},{"kind":"Field","name":{"kind":"Name","value":"endTime"}},{"kind":"Field","name":{"kind":"Name","value":"proposalVariant"}},{"kind":"Field","name":{"kind":"Name","value":"voteCount"}},{"kind":"Field","name":{"kind":"Name","value":"merkleVoteCount"}},{"kind":"Field","name":{"kind":"Name","value":"yesVotes"}},{"kind":"Field","name":{"kind":"Name","value":"noVotes"}},{"kind":"Field","name":{"kind":"Name","value":"resolved"}},{"kind":"Field","name":{"kind":"Name","value":"passed"}},{"kind":"Field","name":{"kind":"Name","value":"executed"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"resolutionTime"}},{"kind":"Field","name":{"kind":"Name","value":"executionDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"executionExpired"}},{"kind":"Field","name":{"kind":"Name","value":"currentPhase"}},{"kind":"Field","name":{"kind":"Name","value":"phaseStartTime"}},{"kind":"Field","name":{"kind":"Name","value":"phaseEndTime"}},{"kind":"Field","name":{"kind":"Name","value":"currentPhaseSnapshotBlock"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"resolvedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"executedBlockNumber"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealProposalChallengeViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DealProposalChallenge"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"dealProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"dacProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}}]} as unknown as DocumentNode<DealProposalViewFieldsFragment, unknown>;
+export const LegalWrapperMessageFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LegalWrapperMessageFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DacLegalWrapperMessage"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"wrapperAddress"}},{"kind":"Field","name":{"kind":"Name","value":"messageKind"}},{"kind":"Field","name":{"kind":"Name","value":"message"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}}]} as unknown as DocumentNode<LegalWrapperMessageFieldsFragment, unknown>;
+export const LegalWrapperStateFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LegalWrapperStateFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DacLegalWrapperState"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"wrapperAddress"}},{"kind":"Field","name":{"kind":"Name","value":"operatingAgreementIpfs"}},{"kind":"Field","name":{"kind":"Name","value":"registeredAgent"}},{"kind":"Field","name":{"kind":"Name","value":"data"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockTimestamp"}}]}}]} as unknown as DocumentNode<LegalWrapperStateFieldsFragment, unknown>;
 export const GovernanceOraclePublisherViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"GovernanceOraclePublisherViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"GovernanceOraclePublisher"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"governanceOracleId"}},{"kind":"Field","name":{"kind":"Name","value":"publisherAddress"}},{"kind":"Field","name":{"kind":"Name","value":"allowed"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}}]}}]} as unknown as DocumentNode<GovernanceOraclePublisherViewFieldsFragment, unknown>;
 export const GovernanceOracleViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"GovernanceOracleViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"GovernanceOracle"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"publishers"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"updatedBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"GovernanceOraclePublisherViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"GovernanceOraclePublisherViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"GovernanceOraclePublisher"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"governanceOracleId"}},{"kind":"Field","name":{"kind":"Name","value":"publisherAddress"}},{"kind":"Field","name":{"kind":"Name","value":"allowed"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}}]}}]} as unknown as DocumentNode<GovernanceOracleViewFieldsFragment, unknown>;
 export const WrapperActionViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"WrapperActionViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WrapperAction"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"tokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"caller"}},{"kind":"Field","name":{"kind":"Name","value":"recipient"}},{"kind":"Field","name":{"kind":"Name","value":"actionType"}},{"kind":"Field","name":{"kind":"Name","value":"amount"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}}]} as unknown as DocumentNode<WrapperActionViewFieldsFragment, unknown>;
@@ -12721,9 +13642,9 @@ export const TreasuryMovementViewFieldsFragmentDoc = {"kind":"Document","definit
 export const DacTreasuryDelegationViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacTreasuryDelegationViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DacTreasuryDelegation"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"assetControllerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasuryHolderAddress"}},{"kind":"Field","name":{"kind":"Name","value":"delegatedTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"delegateeAddress"}},{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}}]}}]} as unknown as DocumentNode<DacTreasuryDelegationViewFieldsFragment, unknown>;
 export const TreasuryActionViewFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"TreasuryActionViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TreasuryAction"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"treasuryDealId"}},{"kind":"Field","name":{"kind":"Name","value":"treasuryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"actionType"}},{"kind":"Field","name":{"kind":"Name","value":"tokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"agent"}},{"kind":"Field","name":{"kind":"Name","value":"counterpartyAddress"}},{"kind":"Field","name":{"kind":"Name","value":"sourceAddress"}},{"kind":"Field","name":{"kind":"Name","value":"destinationAddress"}},{"kind":"Field","name":{"kind":"Name","value":"amount"}},{"kind":"Field","name":{"kind":"Name","value":"dealSize"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}}]} as unknown as DocumentNode<TreasuryActionViewFieldsFragment, unknown>;
 export const GetAccountByAddressDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAccountByAddress"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"address"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"Account"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"address"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"address"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"1"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenHoldings"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"updatedBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"MainTokenHolderViewFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dacGovernanceAccounts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"currentVotingPower"},"value":{"kind":"EnumValue","value":"desc"}}]},{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"updatedBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DacGovernanceAccountViewFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dacAgents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"updatedBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DacAgentViewFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dealAgentPositions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"updatedBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DealAgentPositionViewFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dealGovernanceAccounts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"currentVotingPower"},"value":{"kind":"EnumValue","value":"desc"}}]},{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"updatedBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DealGovernanceAccountViewFields"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"MainTokenHolderViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MainTokenHolder"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"accountId"}},{"kind":"Field","name":{"kind":"Name","value":"balance"}},{"kind":"Field","name":{"kind":"Name","value":"totalReceivedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalSentAmount"}},{"kind":"Field","name":{"kind":"Name","value":"isHolder"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"lastTransferBlockNumber"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacGovernanceAccountViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DacGovernanceAccount"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"accountId"}},{"kind":"Field","name":{"kind":"Name","value":"delegateAddress"}},{"kind":"Field","name":{"kind":"Name","value":"currentVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"hasVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacAgentViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DacAgent"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"accountId"}},{"kind":"Field","name":{"kind":"Name","value":"walletAgentTokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalMintedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalRevokedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"currentStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalReleasedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalSlashedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalClaimedMainTokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"activeDealCount"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"lastActivityBlockNumber"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealAgentPositionViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DealAgentPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"dacAgentId"}},{"kind":"Field","name":{"kind":"Name","value":"accountId"}},{"kind":"Field","name":{"kind":"Name","value":"currentStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalReleasedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalSlashedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalClaimedMainTokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"lastStakedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"lastReleasedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"lastSlashedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"lastClaimedRewardBlockNumber"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealGovernanceAccountViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DealGovernanceAccount"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"accountId"}},{"kind":"Field","name":{"kind":"Name","value":"delegateAddress"}},{"kind":"Field","name":{"kind":"Name","value":"currentVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"hasVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}}]}}]} as unknown as DocumentNode<GetAccountByAddressQuery, GetAccountByAddressQueryVariables>;
-export const GetDacByIdDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDacById"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"Dac"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"1"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DacViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Dac"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"mode"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"creator"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"wrappedMainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"underlyingTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"agentTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealManagerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"moduleRegistryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"assetControllerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceSchemaAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceOracleAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasuryHolderAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasurySeedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperAddress"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperOperatingAgreementIpfs"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperRegisteredAgent"}},{"kind":"Field","name":{"kind":"Name","value":"coreModuleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"started"}},{"kind":"Field","name":{"kind":"Name","value":"dividendsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"votingQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingBlockingPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingHighQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingDuration"}},{"kind":"Field","name":{"kind":"Name","value":"votingQualification"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinAgentBalance"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinInitialAgentStake"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePublishDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackWarmupDuration"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackDuration"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnAllProposals"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnHighQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePrimaryEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"supportsMint"}},{"kind":"Field","name":{"kind":"Name","value":"supportsBurn"}},{"kind":"Field","name":{"kind":"Name","value":"supportsCapitalCall"}},{"kind":"Field","name":{"kind":"Name","value":"supportsWrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsUnwrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsReserveBackedClaims"}},{"kind":"Field","name":{"kind":"Name","value":"proposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"executedProposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"dealCount"}},{"kind":"Field","name":{"kind":"Name","value":"activeDealCount"}},{"kind":"Field","name":{"kind":"Name","value":"moduleCount"}},{"kind":"Field","name":{"kind":"Name","value":"capitalCallCount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenHolderCount"}},{"kind":"Field","name":{"kind":"Name","value":"releasedMainTokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenObligations"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockTimestamp"}}]}}]} as unknown as DocumentNode<GetDacByIdQuery, GetDacByIdQueryVariables>;
-export const GetDacByAddressDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDacByAddress"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"address"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"Dac"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"address"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"address"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"1"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DacViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Dac"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"mode"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"creator"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"wrappedMainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"underlyingTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"agentTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealManagerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"moduleRegistryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"assetControllerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceSchemaAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceOracleAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasuryHolderAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasurySeedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperAddress"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperOperatingAgreementIpfs"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperRegisteredAgent"}},{"kind":"Field","name":{"kind":"Name","value":"coreModuleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"started"}},{"kind":"Field","name":{"kind":"Name","value":"dividendsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"votingQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingBlockingPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingHighQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingDuration"}},{"kind":"Field","name":{"kind":"Name","value":"votingQualification"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinAgentBalance"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinInitialAgentStake"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePublishDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackWarmupDuration"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackDuration"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnAllProposals"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnHighQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePrimaryEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"supportsMint"}},{"kind":"Field","name":{"kind":"Name","value":"supportsBurn"}},{"kind":"Field","name":{"kind":"Name","value":"supportsCapitalCall"}},{"kind":"Field","name":{"kind":"Name","value":"supportsWrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsUnwrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsReserveBackedClaims"}},{"kind":"Field","name":{"kind":"Name","value":"proposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"executedProposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"dealCount"}},{"kind":"Field","name":{"kind":"Name","value":"activeDealCount"}},{"kind":"Field","name":{"kind":"Name","value":"moduleCount"}},{"kind":"Field","name":{"kind":"Name","value":"capitalCallCount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenHolderCount"}},{"kind":"Field","name":{"kind":"Name","value":"releasedMainTokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenObligations"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockTimestamp"}}]}}]} as unknown as DocumentNode<GetDacByAddressQuery, GetDacByAddressQueryVariables>;
-export const ListDacsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListDacs"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"Dac"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DacViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Dac"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"mode"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"creator"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"wrappedMainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"underlyingTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"agentTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealManagerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"moduleRegistryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"assetControllerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceSchemaAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceOracleAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasuryHolderAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasurySeedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperAddress"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperOperatingAgreementIpfs"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperRegisteredAgent"}},{"kind":"Field","name":{"kind":"Name","value":"coreModuleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"started"}},{"kind":"Field","name":{"kind":"Name","value":"dividendsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"votingQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingBlockingPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingHighQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingDuration"}},{"kind":"Field","name":{"kind":"Name","value":"votingQualification"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinAgentBalance"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinInitialAgentStake"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePublishDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackWarmupDuration"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackDuration"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnAllProposals"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnHighQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePrimaryEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"supportsMint"}},{"kind":"Field","name":{"kind":"Name","value":"supportsBurn"}},{"kind":"Field","name":{"kind":"Name","value":"supportsCapitalCall"}},{"kind":"Field","name":{"kind":"Name","value":"supportsWrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsUnwrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsReserveBackedClaims"}},{"kind":"Field","name":{"kind":"Name","value":"proposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"executedProposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"dealCount"}},{"kind":"Field","name":{"kind":"Name","value":"activeDealCount"}},{"kind":"Field","name":{"kind":"Name","value":"moduleCount"}},{"kind":"Field","name":{"kind":"Name","value":"capitalCallCount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenHolderCount"}},{"kind":"Field","name":{"kind":"Name","value":"releasedMainTokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenObligations"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockTimestamp"}}]}}]} as unknown as DocumentNode<ListDacsQuery, ListDacsQueryVariables>;
+export const GetDacByIdDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDacById"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"Dac"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"1"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DacViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Dac"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"mode"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"creator"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"wrappedMainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"underlyingTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"agentTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealManagerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"moduleRegistryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"assetControllerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceSchemaAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceOracleAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasuryHolderAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasurySeedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperAddress"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperOperatingAgreementIpfs"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperRegisteredAgent"}},{"kind":"Field","name":{"kind":"Name","value":"coreModuleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"started"}},{"kind":"Field","name":{"kind":"Name","value":"dividendsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"votingQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingBlockingPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingHighQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingDuration"}},{"kind":"Field","name":{"kind":"Name","value":"votingQualification"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinAgentBalance"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinInitialAgentStake"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePublishDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackWarmupDuration"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackDuration"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnAllProposals"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnHighQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePrimaryEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"supportsMint"}},{"kind":"Field","name":{"kind":"Name","value":"supportsBurn"}},{"kind":"Field","name":{"kind":"Name","value":"supportsCapitalCall"}},{"kind":"Field","name":{"kind":"Name","value":"supportsWrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsUnwrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsReserveBackedClaims"}},{"kind":"Field","name":{"kind":"Name","value":"proposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"executedProposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"dealCount"}},{"kind":"Field","name":{"kind":"Name","value":"activeDealCount"}},{"kind":"Field","name":{"kind":"Name","value":"moduleCount"}},{"kind":"Field","name":{"kind":"Name","value":"capitalCallCount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenHolderCount"}},{"kind":"Field","name":{"kind":"Name","value":"releasedMainTokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenObligations"}},{"kind":"Field","name":{"kind":"Name","value":"salt"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockTimestamp"}}]}}]} as unknown as DocumentNode<GetDacByIdQuery, GetDacByIdQueryVariables>;
+export const GetDacByAddressDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDacByAddress"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"address"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"Dac"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"address"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"address"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"1"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DacViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Dac"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"mode"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"creator"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"wrappedMainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"underlyingTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"agentTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealManagerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"moduleRegistryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"assetControllerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceSchemaAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceOracleAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasuryHolderAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasurySeedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperAddress"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperOperatingAgreementIpfs"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperRegisteredAgent"}},{"kind":"Field","name":{"kind":"Name","value":"coreModuleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"started"}},{"kind":"Field","name":{"kind":"Name","value":"dividendsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"votingQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingBlockingPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingHighQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingDuration"}},{"kind":"Field","name":{"kind":"Name","value":"votingQualification"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinAgentBalance"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinInitialAgentStake"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePublishDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackWarmupDuration"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackDuration"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnAllProposals"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnHighQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePrimaryEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"supportsMint"}},{"kind":"Field","name":{"kind":"Name","value":"supportsBurn"}},{"kind":"Field","name":{"kind":"Name","value":"supportsCapitalCall"}},{"kind":"Field","name":{"kind":"Name","value":"supportsWrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsUnwrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsReserveBackedClaims"}},{"kind":"Field","name":{"kind":"Name","value":"proposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"executedProposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"dealCount"}},{"kind":"Field","name":{"kind":"Name","value":"activeDealCount"}},{"kind":"Field","name":{"kind":"Name","value":"moduleCount"}},{"kind":"Field","name":{"kind":"Name","value":"capitalCallCount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenHolderCount"}},{"kind":"Field","name":{"kind":"Name","value":"releasedMainTokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenObligations"}},{"kind":"Field","name":{"kind":"Name","value":"salt"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockTimestamp"}}]}}]} as unknown as DocumentNode<GetDacByAddressQuery, GetDacByAddressQueryVariables>;
+export const ListDacsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListDacs"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"Dac"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DacViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Dac"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"mode"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"creator"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"wrappedMainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"underlyingTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"agentTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealManagerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"moduleRegistryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"assetControllerAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceSchemaAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceOracleAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasuryHolderAddress"}},{"kind":"Field","name":{"kind":"Name","value":"treasurySeedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperAddress"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperOperatingAgreementIpfs"}},{"kind":"Field","name":{"kind":"Name","value":"legalWrapperRegisteredAgent"}},{"kind":"Field","name":{"kind":"Name","value":"coreModuleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"started"}},{"kind":"Field","name":{"kind":"Name","value":"dividendsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"votingQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingBlockingPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingHighQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingDuration"}},{"kind":"Field","name":{"kind":"Name","value":"votingQualification"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinAgentBalance"}},{"kind":"Field","name":{"kind":"Name","value":"dealCreationMinInitialAgentStake"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePublishDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackWarmupDuration"}},{"kind":"Field","name":{"kind":"Name","value":"fallbackDuration"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnAllProposals"}},{"kind":"Field","name":{"kind":"Name","value":"blockingOnHighQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"oraclePrimaryEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"supportsMint"}},{"kind":"Field","name":{"kind":"Name","value":"supportsBurn"}},{"kind":"Field","name":{"kind":"Name","value":"supportsCapitalCall"}},{"kind":"Field","name":{"kind":"Name","value":"supportsWrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsUnwrap"}},{"kind":"Field","name":{"kind":"Name","value":"supportsReserveBackedClaims"}},{"kind":"Field","name":{"kind":"Name","value":"proposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"executedProposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"dealCount"}},{"kind":"Field","name":{"kind":"Name","value":"activeDealCount"}},{"kind":"Field","name":{"kind":"Name","value":"moduleCount"}},{"kind":"Field","name":{"kind":"Name","value":"capitalCallCount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenHolderCount"}},{"kind":"Field","name":{"kind":"Name","value":"releasedMainTokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"mainTokenObligations"}},{"kind":"Field","name":{"kind":"Name","value":"salt"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockTimestamp"}}]}}]} as unknown as DocumentNode<ListDacsQuery, ListDacsQueryVariables>;
 export const GetDealByIdDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDealById"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"Deal"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"1"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DealViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Deal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"creator"}},{"kind":"Field","name":{"kind":"Name","value":"kindSelector"}},{"kind":"Field","name":{"kind":"Name","value":"cellAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealAddress"}},{"kind":"Field","name":{"kind":"Name","value":"moduleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealTargetAddress"}},{"kind":"Field","name":{"kind":"Name","value":"proposer"}},{"kind":"Field","name":{"kind":"Name","value":"vetoEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"earlyReturnsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"whitelistOnly"}},{"kind":"Field","name":{"kind":"Name","value":"dealChallengeEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"votingQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingBlockingPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingHighQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingDuration"}},{"kind":"Field","name":{"kind":"Name","value":"votingQualification"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"linkHash"}},{"kind":"Field","name":{"kind":"Name","value":"evaluatorSelector"}},{"kind":"Field","name":{"kind":"Name","value":"evaluatorModuleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"agentsLimit"}},{"kind":"Field","name":{"kind":"Name","value":"minimalStake"}},{"kind":"Field","name":{"kind":"Name","value":"stakeTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"managedTreasuryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"childDacAddress"}},{"kind":"Field","name":{"kind":"Name","value":"childDacId"}},{"kind":"Field","name":{"kind":"Name","value":"childMainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"childAgentTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"recovered"}},{"kind":"Field","name":{"kind":"Name","value":"proposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"executedProposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"totalAgentTokens"}},{"kind":"Field","name":{"kind":"Name","value":"stakerCount"}},{"kind":"Field","name":{"kind":"Name","value":"currentStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalReleasedStakeAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalSlashedStakeAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalRewardAllocatedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalRewardClaimedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"rewardsLimit"}},{"kind":"Field","name":{"kind":"Name","value":"rewardsAllocated"}},{"kind":"Field","name":{"kind":"Name","value":"dealRewardPoolPercent"}},{"kind":"Field","name":{"kind":"Name","value":"rewardPoolSupported"}},{"kind":"Field","name":{"kind":"Name","value":"totalDealRewardPoolAllocatedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalDealRewardPoolClaimedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"approveDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"evaluationDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"dealDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"trancheCount"}},{"kind":"Field","name":{"kind":"Name","value":"evaluatorCount"}},{"kind":"Field","name":{"kind":"Name","value":"relatedContractCount"}},{"kind":"Field","name":{"kind":"Name","value":"lastEvaluatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"totalEvaluationCount"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"activatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"closedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"recoveredBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}}]}}]} as unknown as DocumentNode<GetDealByIdQuery, GetDealByIdQueryVariables>;
 export const GetDealByAddressDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDealByAddress"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"dealAddress"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"cellAddress"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"byDealAddress"},"name":{"kind":"Name","value":"Deal"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"dealAddress"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"dealAddress"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"1"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DealViewFields"}}]}},{"kind":"Field","alias":{"kind":"Name","value":"byCellAddress"},"name":{"kind":"Name","value":"Deal"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"cellAddress"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cellAddress"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"1"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DealViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Deal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"creator"}},{"kind":"Field","name":{"kind":"Name","value":"kindSelector"}},{"kind":"Field","name":{"kind":"Name","value":"cellAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealAddress"}},{"kind":"Field","name":{"kind":"Name","value":"moduleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealTargetAddress"}},{"kind":"Field","name":{"kind":"Name","value":"proposer"}},{"kind":"Field","name":{"kind":"Name","value":"vetoEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"earlyReturnsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"whitelistOnly"}},{"kind":"Field","name":{"kind":"Name","value":"dealChallengeEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"votingQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingBlockingPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingHighQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingDuration"}},{"kind":"Field","name":{"kind":"Name","value":"votingQualification"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"linkHash"}},{"kind":"Field","name":{"kind":"Name","value":"evaluatorSelector"}},{"kind":"Field","name":{"kind":"Name","value":"evaluatorModuleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"agentsLimit"}},{"kind":"Field","name":{"kind":"Name","value":"minimalStake"}},{"kind":"Field","name":{"kind":"Name","value":"stakeTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"managedTreasuryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"childDacAddress"}},{"kind":"Field","name":{"kind":"Name","value":"childDacId"}},{"kind":"Field","name":{"kind":"Name","value":"childMainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"childAgentTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"recovered"}},{"kind":"Field","name":{"kind":"Name","value":"proposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"executedProposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"totalAgentTokens"}},{"kind":"Field","name":{"kind":"Name","value":"stakerCount"}},{"kind":"Field","name":{"kind":"Name","value":"currentStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalReleasedStakeAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalSlashedStakeAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalRewardAllocatedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalRewardClaimedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"rewardsLimit"}},{"kind":"Field","name":{"kind":"Name","value":"rewardsAllocated"}},{"kind":"Field","name":{"kind":"Name","value":"dealRewardPoolPercent"}},{"kind":"Field","name":{"kind":"Name","value":"rewardPoolSupported"}},{"kind":"Field","name":{"kind":"Name","value":"totalDealRewardPoolAllocatedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalDealRewardPoolClaimedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"approveDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"evaluationDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"dealDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"trancheCount"}},{"kind":"Field","name":{"kind":"Name","value":"evaluatorCount"}},{"kind":"Field","name":{"kind":"Name","value":"relatedContractCount"}},{"kind":"Field","name":{"kind":"Name","value":"lastEvaluatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"totalEvaluationCount"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"activatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"closedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"recoveredBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}}]}}]} as unknown as DocumentNode<GetDealByAddressQuery, GetDealByAddressQueryVariables>;
 export const ListDealsByDacDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListDealsByDac"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"Deal"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"dacId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"dealNumericId"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DealViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Deal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"creator"}},{"kind":"Field","name":{"kind":"Name","value":"kindSelector"}},{"kind":"Field","name":{"kind":"Name","value":"cellAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealAddress"}},{"kind":"Field","name":{"kind":"Name","value":"moduleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"governanceFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"dealTargetAddress"}},{"kind":"Field","name":{"kind":"Name","value":"proposer"}},{"kind":"Field","name":{"kind":"Name","value":"vetoEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"earlyReturnsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"whitelistOnly"}},{"kind":"Field","name":{"kind":"Name","value":"dealChallengeEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"votingQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingBlockingPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingHighQuorumPercent"}},{"kind":"Field","name":{"kind":"Name","value":"votingDuration"}},{"kind":"Field","name":{"kind":"Name","value":"votingQualification"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"linkHash"}},{"kind":"Field","name":{"kind":"Name","value":"evaluatorSelector"}},{"kind":"Field","name":{"kind":"Name","value":"evaluatorModuleFactoryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"agentsLimit"}},{"kind":"Field","name":{"kind":"Name","value":"minimalStake"}},{"kind":"Field","name":{"kind":"Name","value":"stakeTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"managedTreasuryAddress"}},{"kind":"Field","name":{"kind":"Name","value":"childDacAddress"}},{"kind":"Field","name":{"kind":"Name","value":"childDacId"}},{"kind":"Field","name":{"kind":"Name","value":"childMainTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"childAgentTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"recovered"}},{"kind":"Field","name":{"kind":"Name","value":"proposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"executedProposalCount"}},{"kind":"Field","name":{"kind":"Name","value":"totalAgentTokens"}},{"kind":"Field","name":{"kind":"Name","value":"stakerCount"}},{"kind":"Field","name":{"kind":"Name","value":"currentStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalStakedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalReleasedStakeAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalSlashedStakeAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalRewardAllocatedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalRewardClaimedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"rewardsLimit"}},{"kind":"Field","name":{"kind":"Name","value":"rewardsAllocated"}},{"kind":"Field","name":{"kind":"Name","value":"dealRewardPoolPercent"}},{"kind":"Field","name":{"kind":"Name","value":"rewardPoolSupported"}},{"kind":"Field","name":{"kind":"Name","value":"totalDealRewardPoolAllocatedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalDealRewardPoolClaimedAmount"}},{"kind":"Field","name":{"kind":"Name","value":"approveDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"evaluationDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"dealDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"trancheCount"}},{"kind":"Field","name":{"kind":"Name","value":"evaluatorCount"}},{"kind":"Field","name":{"kind":"Name","value":"relatedContractCount"}},{"kind":"Field","name":{"kind":"Name","value":"lastEvaluatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"totalEvaluationCount"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"activatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"closedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"recoveredBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}}]}}]} as unknown as DocumentNode<ListDealsByDacQuery, ListDealsByDacQueryVariables>;
@@ -12740,6 +13661,8 @@ export const ListProposalsByDacDocument = {"kind":"Document","definitions":[{"ki
 export const ListProposalsByDealDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListProposalsByDeal"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"dealId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"Proposal"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"dealId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"dealId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"proposalNumericId"},"value":{"kind":"EnumValue","value":"desc"}}]},{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ProposalBaseFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ProposalBaseFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Proposal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalAddress"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"kindSelector"}},{"kind":"Field","name":{"kind":"Name","value":"kindName"}},{"kind":"Field","name":{"kind":"Name","value":"targetAddress"}},{"kind":"Field","name":{"kind":"Name","value":"data1"}},{"kind":"Field","name":{"kind":"Name","value":"data2"}},{"kind":"Field","name":{"kind":"Name","value":"tokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"totalVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"quorum"}},{"kind":"Field","name":{"kind":"Name","value":"blockingQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotReference"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotReferenceKind"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotTime"}},{"kind":"Field","name":{"kind":"Name","value":"endTime"}},{"kind":"Field","name":{"kind":"Name","value":"proposalVariant"}},{"kind":"Field","name":{"kind":"Name","value":"voteCount"}},{"kind":"Field","name":{"kind":"Name","value":"merkleVoteCount"}},{"kind":"Field","name":{"kind":"Name","value":"yesVotes"}},{"kind":"Field","name":{"kind":"Name","value":"noVotes"}},{"kind":"Field","name":{"kind":"Name","value":"resolved"}},{"kind":"Field","name":{"kind":"Name","value":"passed"}},{"kind":"Field","name":{"kind":"Name","value":"executed"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"resolutionTime"}},{"kind":"Field","name":{"kind":"Name","value":"executionDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"executionExpired"}},{"kind":"Field","name":{"kind":"Name","value":"currentPhase"}},{"kind":"Field","name":{"kind":"Name","value":"phaseStartTime"}},{"kind":"Field","name":{"kind":"Name","value":"phaseEndTime"}},{"kind":"Field","name":{"kind":"Name","value":"currentPhaseSnapshotBlock"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"resolvedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"executedBlockNumber"}}]}}]} as unknown as DocumentNode<ListProposalsByDealQuery, ListProposalsByDealQueryVariables>;
 export const ListDacProposalsByDacDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListDacProposalsByDac"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"DacProposal"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"dacId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DacProposalViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ProposalBaseFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Proposal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalAddress"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"kindSelector"}},{"kind":"Field","name":{"kind":"Name","value":"kindName"}},{"kind":"Field","name":{"kind":"Name","value":"targetAddress"}},{"kind":"Field","name":{"kind":"Name","value":"data1"}},{"kind":"Field","name":{"kind":"Name","value":"data2"}},{"kind":"Field","name":{"kind":"Name","value":"tokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"totalVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"quorum"}},{"kind":"Field","name":{"kind":"Name","value":"blockingQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotReference"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotReferenceKind"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotTime"}},{"kind":"Field","name":{"kind":"Name","value":"endTime"}},{"kind":"Field","name":{"kind":"Name","value":"proposalVariant"}},{"kind":"Field","name":{"kind":"Name","value":"voteCount"}},{"kind":"Field","name":{"kind":"Name","value":"merkleVoteCount"}},{"kind":"Field","name":{"kind":"Name","value":"yesVotes"}},{"kind":"Field","name":{"kind":"Name","value":"noVotes"}},{"kind":"Field","name":{"kind":"Name","value":"resolved"}},{"kind":"Field","name":{"kind":"Name","value":"passed"}},{"kind":"Field","name":{"kind":"Name","value":"executed"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"resolutionTime"}},{"kind":"Field","name":{"kind":"Name","value":"executionDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"executionExpired"}},{"kind":"Field","name":{"kind":"Name","value":"currentPhase"}},{"kind":"Field","name":{"kind":"Name","value":"phaseStartTime"}},{"kind":"Field","name":{"kind":"Name","value":"phaseEndTime"}},{"kind":"Field","name":{"kind":"Name","value":"currentPhaseSnapshotBlock"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"resolvedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"executedBlockNumber"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ProposalPhaseEventViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ProposalPhaseEvent"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"phase"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotBlock"}},{"kind":"Field","name":{"kind":"Name","value":"startTime"}},{"kind":"Field","name":{"kind":"Name","value":"endTime"}},{"kind":"Field","name":{"kind":"Name","value":"totalVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"quorum"}},{"kind":"Field","name":{"kind":"Name","value":"blockingQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OracleSnapshotViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OracleSnapshot"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dacProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"governanceOracleId"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotBlock"}},{"kind":"Field","name":{"kind":"Name","value":"merkleRoot"}},{"kind":"Field","name":{"kind":"Name","value":"totalUnderlyingVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"MerkleVoteViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MerkleVote"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"accountId"}},{"kind":"Field","name":{"kind":"Name","value":"voter"}},{"kind":"Field","name":{"kind":"Name","value":"support"}},{"kind":"Field","name":{"kind":"Name","value":"weight"}},{"kind":"Field","name":{"kind":"Name","value":"merkleIndex"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealProposalChallengeViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DealProposalChallenge"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"dealProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"dacProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DacProposalViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DacProposal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"governanceType"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"proposal"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ProposalBaseFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"phaseEvents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"asc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ProposalPhaseEventViewFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"oracleSnapshots"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"asc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OracleSnapshotViewFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"merkleVotes"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"asc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"MerkleVoteViewFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"challengedDeals"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"asc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DealProposalChallengeViewFields"}}]}}]}}]} as unknown as DocumentNode<ListDacProposalsByDacQuery, ListDacProposalsByDacQueryVariables>;
 export const ListDealProposalsByDealDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListDealProposalsByDeal"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"dealId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"DealProposal"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"dealId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"dealId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DealProposalViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ProposalBaseFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Proposal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalAddress"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"kindSelector"}},{"kind":"Field","name":{"kind":"Name","value":"kindName"}},{"kind":"Field","name":{"kind":"Name","value":"targetAddress"}},{"kind":"Field","name":{"kind":"Name","value":"data1"}},{"kind":"Field","name":{"kind":"Name","value":"data2"}},{"kind":"Field","name":{"kind":"Name","value":"tokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"totalVotingPower"}},{"kind":"Field","name":{"kind":"Name","value":"quorum"}},{"kind":"Field","name":{"kind":"Name","value":"blockingQuorum"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotReference"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotReferenceKind"}},{"kind":"Field","name":{"kind":"Name","value":"snapshotTime"}},{"kind":"Field","name":{"kind":"Name","value":"endTime"}},{"kind":"Field","name":{"kind":"Name","value":"proposalVariant"}},{"kind":"Field","name":{"kind":"Name","value":"voteCount"}},{"kind":"Field","name":{"kind":"Name","value":"merkleVoteCount"}},{"kind":"Field","name":{"kind":"Name","value":"yesVotes"}},{"kind":"Field","name":{"kind":"Name","value":"noVotes"}},{"kind":"Field","name":{"kind":"Name","value":"resolved"}},{"kind":"Field","name":{"kind":"Name","value":"passed"}},{"kind":"Field","name":{"kind":"Name","value":"executed"}},{"kind":"Field","name":{"kind":"Name","value":"executionValidityDuration"}},{"kind":"Field","name":{"kind":"Name","value":"resolutionTime"}},{"kind":"Field","name":{"kind":"Name","value":"executionDeadline"}},{"kind":"Field","name":{"kind":"Name","value":"executionExpired"}},{"kind":"Field","name":{"kind":"Name","value":"currentPhase"}},{"kind":"Field","name":{"kind":"Name","value":"phaseStartTime"}},{"kind":"Field","name":{"kind":"Name","value":"phaseEndTime"}},{"kind":"Field","name":{"kind":"Name","value":"currentPhaseSnapshotBlock"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}},{"kind":"Field","name":{"kind":"Name","value":"resolvedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"executedBlockNumber"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealProposalChallengeViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DealProposalChallenge"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"dealProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"dacProposalId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DealProposalViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DealProposal"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"proposalId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dealId"}},{"kind":"Field","name":{"kind":"Name","value":"challengeable"}},{"kind":"Field","name":{"kind":"Name","value":"challenged"}},{"kind":"Field","name":{"kind":"Name","value":"challengeCount"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"proposal"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ProposalBaseFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"challenges"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"asc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DealProposalChallengeViewFields"}}]}}]}}]} as unknown as DocumentNode<ListDealProposalsByDealQuery, ListDealProposalsByDealQueryVariables>;
+export const ListLegalWrapperMessagesByDacDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListLegalWrapperMessagesByDac"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"DacLegalWrapperMessage"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"dacId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LegalWrapperMessageFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LegalWrapperMessageFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DacLegalWrapperMessage"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"wrapperAddress"}},{"kind":"Field","name":{"kind":"Name","value":"messageKind"}},{"kind":"Field","name":{"kind":"Name","value":"message"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}}]} as unknown as DocumentNode<ListLegalWrapperMessagesByDacQuery, ListLegalWrapperMessagesByDacQueryVariables>;
+export const ListLegalWrapperStatesByDacDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListLegalWrapperStatesByDac"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"DacLegalWrapperState"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"dacId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"updatedBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LegalWrapperStateFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LegalWrapperStateFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DacLegalWrapperState"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"wrapperAddress"}},{"kind":"Field","name":{"kind":"Name","value":"operatingAgreementIpfs"}},{"kind":"Field","name":{"kind":"Name","value":"registeredAgent"}},{"kind":"Field","name":{"kind":"Name","value":"data"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockTimestamp"}}]}}]} as unknown as DocumentNode<ListLegalWrapperStatesByDacQuery, ListLegalWrapperStatesByDacQueryVariables>;
 export const ListGovernanceOraclesByDacDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListGovernanceOraclesByDac"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"GovernanceOracle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"dacId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"updatedBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"GovernanceOracleViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"GovernanceOraclePublisherViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"GovernanceOraclePublisher"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"governanceOracleId"}},{"kind":"Field","name":{"kind":"Name","value":"publisherAddress"}},{"kind":"Field","name":{"kind":"Name","value":"allowed"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"GovernanceOracleViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"GovernanceOracle"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"publishers"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"updatedBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"GovernanceOraclePublisherViewFields"}}]}}]}}]} as unknown as DocumentNode<ListGovernanceOraclesByDacQuery, ListGovernanceOraclesByDacQueryVariables>;
 export const ListWrapperActionsByDacDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListWrapperActionsByDac"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"WrapperAction"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"dacId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"WrapperActionViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"WrapperActionViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WrapperAction"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"tokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"caller"}},{"kind":"Field","name":{"kind":"Name","value":"recipient"}},{"kind":"Field","name":{"kind":"Name","value":"actionType"}},{"kind":"Field","name":{"kind":"Name","value":"amount"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"createdTransactionHash"}}]}}]} as unknown as DocumentNode<ListWrapperActionsByDacQuery, ListWrapperActionsByDacQueryVariables>;
 export const ListCapitalCallsByDacDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListCapitalCallsByDac"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"CapitalCall"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"dacId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"_eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"dacId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"order_by"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"proposalNumericId"},"value":{"kind":"EnumValue","value":"desc"}}]},{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdBlockNumber"},"value":{"kind":"EnumValue","value":"desc"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CapitalCallViewFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CapitalCallViewFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CapitalCall"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chainId"}},{"kind":"Field","name":{"kind":"Name","value":"dacId"}},{"kind":"Field","name":{"kind":"Name","value":"dacAddress"}},{"kind":"Field","name":{"kind":"Name","value":"proposalNumericId"}},{"kind":"Field","name":{"kind":"Name","value":"callHash"}},{"kind":"Field","name":{"kind":"Name","value":"recipient"}},{"kind":"Field","name":{"kind":"Name","value":"treasuryTokenAddress"}},{"kind":"Field","name":{"kind":"Name","value":"tokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"cashAmount"}},{"kind":"Field","name":{"kind":"Name","value":"nonce"}},{"kind":"Field","name":{"kind":"Name","value":"fulfillmentCount"}},{"kind":"Field","name":{"kind":"Name","value":"totalFulfilledTokenAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalFulfilledCashAmount"}},{"kind":"Field","name":{"kind":"Name","value":"lastPayer"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"createdBlockTimestamp"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledBlockNumber"}},{"kind":"Field","name":{"kind":"Name","value":"updatedBlockNumber"}}]}}]} as unknown as DocumentNode<ListCapitalCallsByDacQuery, ListCapitalCallsByDacQueryVariables>;

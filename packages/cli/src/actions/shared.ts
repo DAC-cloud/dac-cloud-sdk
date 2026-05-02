@@ -1,11 +1,14 @@
-import type {Address} from "viem";
+import {getAddress, type Address} from "viem";
 import {z} from "zod";
 import type {OptionResolver} from "../runtime/config";
 import {listQueryPage, makeIndexer} from "../runtime/chain";
 
 export function asAddress(value: string, label: string): Address {
   const schema = z.string().regex(/^0x[a-fA-F0-9]{40}$/, `${label} must be a 20-byte hex address`);
-  return schema.parse(value) as Address;
+  schema.parse(value);
+  // Normalize through lowercase to avoid EIP-55 checksum mismatches,
+  // then return the properly checksummed form.
+  return getAddress(value.toLowerCase());
 }
 
 export function asBytes4(value: string, label: string): `0x${string}` {

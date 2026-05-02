@@ -1232,6 +1232,8 @@ async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: stri
     "treasury-delegations",
     "governance-oracles",
     "wrapper-actions",
+    "legal-wrapper-messages",
+    "legal-wrapper-state",
     "account",
   ]).catch("dac").parse(resourceRaw ?? "dac");
 
@@ -1351,8 +1353,20 @@ async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: stri
     return;
   }
 
-  const wrapperActions = await client.wrapper.listByDac(dacId, page);
-  printJson({action: "dac.view.wrapper-actions", dacId, count: wrapperActions.length, wrapperActions});
+  if (resource === "wrapper-actions") {
+    const wrapperActions = await client.wrapper.listByDac(dacId, page);
+    printJson({action: "dac.view.wrapper-actions", dacId, count: wrapperActions.length, wrapperActions});
+    return;
+  }
+
+  if (resource === "legal-wrapper-messages") {
+    const messages = await client.legalWrapper.listMessagesByDac(dacId, page);
+    printJson({action: "dac.view.legal-wrapper-messages", dacId, count: messages.length, messages});
+    return;
+  }
+
+  const states = await client.legalWrapper.listStatesByDac(dacId, page);
+  printJson({action: "dac.view.legal-wrapper-state", dacId, count: states.length, states});
 }
 
 async function cmdDiscover(resolver: OptionResolver): Promise<void> {
@@ -1809,7 +1823,7 @@ Raw proposal (3rd party modules):
   applyOptions(view, ["dac-id", "id", "cell-address", "dac-address", "dac", "address", "query-limit", "query-offset", "limit", "offset"]);
   addCommandHelp(view, {
     notes: [
-      "Resources: dac, dacs, proposal, dac-proposal, proposals, dac-proposals, deals, capital-calls, treasury-holdings, treasury-movements, treasury-delegations, governance-oracles, wrapper-actions, account.",
+      "Resources: dac, dacs, proposal, dac-proposal, proposals, dac-proposals, deals, capital-calls, treasury-holdings, treasury-movements, treasury-delegations, governance-oracles, wrapper-actions, legal-wrapper-messages, legal-wrapper-state, account.",
       "For resource=dac, provide DAC id/address using positional [id], --dac-id, --cell-address, --dac-address, --dac, or --address.",
       "For DAC-scoped list resources, DAC id is resolved from --dac-id or DAC address options.",
       "For resource=account, [id] is treated as wallet address and can be replaced by --address.",
