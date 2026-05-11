@@ -160,12 +160,16 @@ export const dealAbi = parseAbi([
   "event DealManagementProposalCreated(address indexed cell,address indexed prop,uint256 id,bytes4 indexed typ,address target,bytes32 data1,bytes data2)",
   "event ChildVoteCreated(uint256 indexed childProposalId, uint256 proposalId)",
   "event ChildVoteCasted(uint256 indexed childProposalId, bool support)",
+  "event VenueVersionApproved(bytes32 indexed venueId, string version, bool allowed)",
+  "event ExternalVoteApproved(bytes32 indexed venueId, bytes32 indexed finalHash, uint64 expiry)",
   "function createStakedAgentProposal((bytes4 typ,address target,bytes32 i,bytes data) params) returns (uint256 proposalId)",
   "function executeStakedAgentProposal(uint256 proposalId)",
   "function getProposal(uint256 proposalId) view returns (address)",
   "function claimDealRewardPool(uint256 evaluatorId)",
   "function setRootCapitalCallID(uint256 capitalCallId)",
-  "function recoverProfits(address token) returns (uint256)"
+  "function recoverProfits(address token) returns (uint256)",
+  "function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)",
+  "function approvedVenueVersions(bytes32 venueId, string version) view returns (bool)"
 ]);
 
 export const permit2TreasuryAbi = parseAbi([

@@ -1,0 +1,55 @@
+fragment DealVenueVersionFields on DealVenueVersion {
+  id
+  chainId
+  dealId
+  dacId
+  venueId
+  version
+  allowed
+  createdBlockNumber
+  updatedBlockNumber
+}
+
+fragment DealExternalVoteFields on DealExternalVote {
+  id
+  chainId
+  dealId
+  dacId
+  venueId
+  finalHash
+  expiry
+  createdBlockNumber
+  createdBlockTimestamp
+  createdTransactionHash
+}
+
+query ListDealVenueVersionsByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
+  DealVenueVersion(
+    where: {dealId: {_eq: $dealId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{updatedBlockNumber: desc}]
+  ) {
+    ...DealVenueVersionFields
+  }
+}
+
+query ListDealExternalVotesByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
+  DealExternalVote(
+    where: {dealId: {_eq: $dealId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{createdBlockNumber: desc}]
+  ) {
+    ...DealExternalVoteFields
+  }
+}
+
+query GetDealExternalVoteByHash($dealId: String!, $finalHash: String!) {
+  DealExternalVote(
+    where: {dealId: {_eq: $dealId}, finalHash: {_eq: $finalHash}}
+    limit: 1
+  ) {
+    ...DealExternalVoteFields
+  }
+}

@@ -1,8 +1,11 @@
 import {
+  buildApproveVotingVenueVersionProposal,
   buildChildDacCreateProposalProposal,
   buildChildDacReinvestProfitsProposal,
   buildChildDacReturnProfitsProposal,
   buildChildDacVoteProposalProposal,
+  buildExternalVoteSignProposal,
+  buildSnapshotV1VoteSignProposal,
   buildTreasuryApproveAgentSpendProposal,
   buildTreasuryAssignClaimerProposal,
   buildTreasuryDelegateVoteRightsProposal,
@@ -16,6 +19,7 @@ import {
   CORE_EVALUATOR_KIND,
   type ProposalParams,
 } from "@dac-cloud/core";
+const {VENUE_SNAPSHOT_V1} = coreModule;
 const {
   encodeDacDealConfigFromJson,
   encodePermit2TreasuryDealConfigFromJson,
@@ -328,6 +332,85 @@ function buildChildReinvestProfitsProposal(context: ModuleDealProposalBuildConte
   );
 }
 
+// Resolve a CLI-supplied venue identifier: the literal "snapshot-v1" maps to
+// the keccak256 discriminator known to the DACDeal contract; everything else
+// must be a bytes32 hex (for future / fork venues).
+function resolveVenueId(raw: string): Hex {
+  if (raw === "snapshot-v1" || raw === "snapshot_v1") {
+    return VENUE_SNAPSHOT_V1 as Hex;
+  }
+  return asBytes32(raw, "venueId") as Hex;
+}
+
+function readSnapshotV1Payload(
+  input: Record<string, unknown> | undefined,
+  resolvedDealAddress: string,
+): {
+  version: string;
+  from: string;
+  space: string;
+  timestamp: bigint;
+  proposal: string;
+  choice: number;
+  reason: string;
+  app: string;
+  metadata: string;
+  expiry: bigint;
+} {
+  if (!input) {
+    throw new Error("deal propose snapshot-vote-sign requires --input json with the Vote payload");
+  }
+  const choiceRaw = input["choice"];
+  if (typeof choiceRaw !== "number" && typeof choiceRaw !== "string") {
+    throw new Error("snapshot-vote-sign payload requires numeric 'choice'");
+  }
+  const choice = typeof choiceRaw === "number" ? choiceRaw : Number(choiceRaw);
+  if (!Number.isInteger(choice) || choice < 0 || choice > 0xffffffff) {
+    throw new Error("snapshot-vote-sign 'choice' must fit in uint32");
+  }
+  const fromRaw = typeof input["from"] === "string" && (input["from"] as string).length > 0
+    ? (input["from"] as string)
+    : resolvedDealAddress;
+  return {
+    version: readStringField(input, "version", "snapshot-vote-sign --input"),
+    from: fromRaw.toLowerCase(),
+    space: readStringField(input, "space", "snapshot-vote-sign --input"),
+    timestamp: readBigIntField(input, "timestamp", "snapshot-vote-sign --input"),
+    proposal: readStringField(input, "proposal", "snapshot-vote-sign --input"),
+    choice,
+    reason: typeof input["reason"] === "string" ? (input["reason"] as string) : "",
+    app: typeof input["app"] === "string" ? (input["app"] as string) : "dac-cloud",
+    metadata: typeof input["metadata"] === "string" ? (input["metadata"] as string) : "",
+    expiry: readBigIntField(input, "expiry", "snapshot-vote-sign --input"),
+  };
+}
+
+function buildApproveVenueVersionCmd(context: ModuleDealProposalBuildContext): ProposalParams {
+  const {args, input} = context;
+  ensureArgsOrInput(args, input, 3, "deal propose approve-venue-version");
+  const venueRaw = args[0] ?? readStringField(input, "venueId", "--input");
+  const version = args[1] ?? readStringField(input, "version", "--input");
+  const allowed = args[2] !== undefined ? parseBoolText(args[2]) : readBoolField(input, "allowed", "--input");
+  return buildApproveVotingVenueVersionProposal(resolveVenueId(venueRaw), version, allowed);
+}
+
+function buildSnapshotVoteSignCmd(context: ModuleDealProposalBuildContext): ProposalParams {
+  const {input, resolvedDeal} = context;
+  const payload = readSnapshotV1Payload(input, resolvedDeal.dealAddress);
+  return buildSnapshotV1VoteSignProposal(payload);
+}
+
+function buildExternalVoteSignCmd(context: ModuleDealProposalBuildContext): ProposalParams {
+  const {args, input} = context;
+  ensureArgsOrInput(args, input, 2, "deal propose external-vote-sign");
+  const venueRaw = args[0] ?? readStringField(input, "venueId", "--input");
+  const payloadHex = args[1] ?? readStringField(input, "payload", "--input");
+  return buildExternalVoteSignProposal(
+    resolveVenueId(venueRaw),
+    normalizeHexData(payloadHex, "external-vote-sign payload"),
+  );
+}
+
 export const coreCliModule: CliModuleSpec = {
   moduleId: "core",
   dealKinds: [
@@ -378,6 +461,9 @@ export const coreCliModule: CliModuleSpec = {
     {moduleId: "core", key: "child-vote-proposal", aliases: ["child-vote-proposal"], build: buildChildVoteProposal},
     {moduleId: "core", key: "child-return-profits", aliases: ["child-return-profits"], build: buildChildReturnProfitsProposal},
     {moduleId: "core", key: "child-reinvest-profits", aliases: ["child-reinvest-profits"], build: buildChildReinvestProfitsProposal},
+    {moduleId: "core", key: "approve-venue-version", aliases: ["approve-venue-version", "approve-snapshot-version"], build: buildApproveVenueVersionCmd},
+    {moduleId: "core", key: "snapshot-vote-sign", aliases: ["snapshot-vote-sign", "snapshot-v1-vote"], build: buildSnapshotVoteSignCmd},
+    {moduleId: "core", key: "external-vote-sign", aliases: ["external-vote-sign"], build: buildExternalVoteSignCmd},
   ],
   kernelDealProposalHooks: [
     {

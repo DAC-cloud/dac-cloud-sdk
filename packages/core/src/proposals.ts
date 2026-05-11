@@ -4,10 +4,13 @@ import {AGENT_TOKEN_MINT_ACTION, type AgentTokenMintAction} from "./types";
 import type {DealCreationConfig, GovernanceStrategyConfig, ProposalParams, VotingConfig} from "./types";
 import type {TreasurySpendAllowance} from "./modules/core/types";
 import {
+  buildApproveVotingVenueVersionProposal as buildApproveVotingVenueVersionProposalModule,
   buildChildDacCreateProposalProposal as buildChildDacCreateProposalProposalModule,
   buildChildDacReinvestProfitsProposal as buildChildDacReinvestProfitsProposalModule,
   buildChildDacReturnProfitsProposal as buildChildDacReturnProfitsProposalModule,
   buildChildDacVoteProposalProposal as buildChildDacVoteProposalProposalModule,
+  buildExternalVoteSignProposal as buildExternalVoteSignProposalModule,
+  buildSnapshotV1VoteSignProposal as buildSnapshotV1VoteSignProposalModule,
   buildTreasuryApproveAgentSpendProposal as buildTreasuryApproveAgentSpendProposalModule,
   buildTreasuryAssignClaimerProposal as buildTreasuryAssignClaimerProposalModule,
   buildTreasuryDelegateVoteRightsProposal as buildTreasuryDelegateVoteRightsProposalModule,
@@ -15,7 +18,9 @@ import {
   buildTreasuryPermit2SpendProposal as buildTreasuryPermit2SpendProposalModule,
   buildTreasuryReturnCapitalProposal as buildTreasuryReturnCapitalProposalModule,
   buildTreasuryRevokeAgentProposal as buildTreasuryRevokeAgentProposalModule,
+  encodeSnapshotV1Payload as encodeSnapshotV1PayloadModule,
 } from "./modules/core/proposals";
+import type {SnapshotV1Payload} from "./modules/core/types";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
 
@@ -320,4 +325,24 @@ export function buildChildDacReinvestProfitsProposal(
   capitalCallHash: Hex,
 ): ProposalParams {
   return buildChildDacReinvestProfitsProposalModule(token, amount, capitalCallHash);
+}
+
+export function buildApproveVotingVenueVersionProposal(
+  venueId: Hex,
+  version: string,
+  allowed: boolean,
+): ProposalParams {
+  return buildApproveVotingVenueVersionProposalModule(venueId, version, allowed);
+}
+
+export function buildExternalVoteSignProposal(venueId: Hex, payload: Hex): ProposalParams {
+  return buildExternalVoteSignProposalModule(venueId, payload);
+}
+
+export function buildSnapshotV1VoteSignProposal(payload: SnapshotV1Payload): ProposalParams {
+  return buildSnapshotV1VoteSignProposalModule(payload);
+}
+
+export function encodeSnapshotV1Payload(payload: SnapshotV1Payload): Hex {
+  return encodeSnapshotV1PayloadModule(payload);
 }

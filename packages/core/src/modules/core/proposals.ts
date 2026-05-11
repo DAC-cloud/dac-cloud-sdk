@@ -1,6 +1,6 @@
 import {encodeAbiParameters, numberToHex, type Address, type Hex} from "viem";
 import {CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE, CORE_TREASURY_PROPOSAL_TYPE} from "./selectors";
-import type {TreasurySpendAllowance} from "./types";
+import {VENUE_SNAPSHOT_V1, type SnapshotV1Payload, type TreasurySpendAllowance} from "./types";
 import type {ProposalParams} from "../../types";
 
 function toBytes32FromUint(value: bigint): Hex {
@@ -215,4 +215,72 @@ export function buildChildDacReinvestProfitsProposal(
       [amount, capitalCallHash],
     ),
   };
+}
+
+// Whitelist a (venueId, version) pair on a DACDeal so EXTERNAL_VOTE_SIGN can
+// approve payloads at that version. High quorum, blocking allowed in the
+// factory — treat this as an admin-tier change.
+export function buildApproveVotingVenueVersionProposal(
+  venueId: Hex,
+  version: string,
+  allowed: boolean,
+): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.APPROVE_VOTING_VENUE_VERSION,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [
+        {name: "venueId", type: "bytes32"},
+        {name: "version", type: "string"},
+        {name: "allowed", type: "bool"},
+      ],
+      [venueId, version, allowed],
+    ),
+  };
+}
+
+// Generic external vote-sign builder: caller supplies the venueId discriminator
+// and a venue-specific ABI-encoded payload. Use buildSnapshotV1VoteSignProposal
+// for the common snapshot.org case.
+export function buildExternalVoteSignProposal(venueId: Hex, payload: Hex): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.EXTERNAL_VOTE_SIGN,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [
+        {name: "venueId", type: "bytes32"},
+        {name: "payload", type: "bytes"},
+      ],
+      [venueId, payload],
+    ),
+  };
+}
+
+export function encodeSnapshotV1Payload(p: SnapshotV1Payload): Hex {
+  return encodeAbiParameters(
+    [
+      {
+        type: "tuple",
+        components: [
+          {name: "version", type: "string"},
+          {name: "from", type: "string"},
+          {name: "space", type: "string"},
+          {name: "timestamp", type: "uint64"},
+          {name: "proposal", type: "string"},
+          {name: "choice", type: "uint32"},
+          {name: "reason", type: "string"},
+          {name: "app", type: "string"},
+          {name: "metadata", type: "string"},
+          {name: "expiry", type: "uint64"},
+        ],
+      },
+    ],
+    [p],
+  );
+}
+
+export function buildSnapshotV1VoteSignProposal(p: SnapshotV1Payload): ProposalParams {
+  return buildExternalVoteSignProposal(VENUE_SNAPSHOT_V1, encodeSnapshotV1Payload(p));
 }

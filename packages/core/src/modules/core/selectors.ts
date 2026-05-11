@@ -15,6 +15,8 @@ export const CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE = {
   CREATE_DAC_PROPOSAL: toFunctionSelector("createDACManagementProposal()"),
   VOTE_DAC_PROPOSAL: toFunctionSelector("voteDACManagementProposal()"),
   RETURN_PROFITS: toFunctionSelector("returnProfits()"),
+  APPROVE_VOTING_VENUE_VERSION: toFunctionSelector("approveVotingVenueVersion()"),
+  EXTERNAL_VOTE_SIGN: toFunctionSelector("externalVoteSign()"),
   APPROVE_DIRECT_SPEND: toFunctionSelector("directSpend()"),
   APPROVE_PERMIT2_SPEND: toFunctionSelector("approvePermit2Spend()"),
   APPROVE_AGENT_SPEND: toFunctionSelector("approveAgentSpend()"),
