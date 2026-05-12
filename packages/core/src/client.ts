@@ -3,10 +3,13 @@ import {
   createWalletClient,
   decodeEventLog,
   http,
+  type Abi,
   type Address,
   type Chain,
+  type ContractFunctionName,
   type Hex,
   type PrivateKeyAccount,
+  type TransactionReceipt,
   type WalletClient,
 } from "viem";
 import {privateKeyToAccount} from "viem/accounts";
@@ -138,26 +141,74 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       })
     : undefined;
 
+  // Submit a contract write, wait for the receipt, and throw on revert.
+  //
+  // Why this helper exists:
+  //   1. Silent reverts — `walletClient.writeContract` returns a tx hash even
+  //      when the on-chain execution reverts. Without waiting for the receipt
+  //      and checking `status`, callers cannot distinguish a successful tx
+  //      from a reverted one. We've seen this mask claim failures in QA where
+  //      the tx hash looked successful but the position never updated.
+  //   2. Gas estimation under-prediction — viem's default `estimateGas` can
+  //      under-estimate paths that touch ERC20Votes checkpoints (e.g. minting
+  //      MainToken to an agent who has delegated to another holder writes
+  //      checkpoints on the delegate). Combined with the EVM's 63/64-rule
+  //      attrition through nested calls (DealCell → lib delegatecall →
+  //      DealManager → MainToken.mint), the inner mint can starve. We add a
+  //      50% buffer over the estimate to make these paths robust.
+  async function submitWrite<TAbi extends Abi, TFunctionName extends ContractFunctionName<TAbi, "nonpayable" | "payable">>(
+    params: {
+      address: Address;
+      abi: TAbi;
+      functionName: TFunctionName;
+      args?: readonly unknown[];
+    },
+  ): Promise<TransactionReceipt> {
+    if (!walletClient || !walletClient.account) {
+      throw new Error("Wallet client with account is required");
+    }
+    const account = walletClient.account;
+
+    const gasEstimate = await publicClient.estimateContractGas({
+      address: params.address,
+      abi: params.abi,
+      functionName: params.functionName,
+      args: params.args ?? [],
+      account,
+    } as Parameters<typeof publicClient.estimateContractGas>[0]);
+
+    const txHash = await walletClient.writeContract({
+      address: params.address,
+      abi: params.abi,
+      functionName: params.functionName,
+      args: params.args ?? [],
+      account,
+      gas: gasEstimate + (gasEstimate / 2n),
+    } as Parameters<typeof walletClient.writeContract>[0]);
+
+    const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
+    if (receipt.status !== "success") {
+      throw new Error(
+        `Transaction reverted on-chain (tx=${txHash}, to=${params.address}, fn=${String(params.functionName)})`,
+      );
+    }
+    return receipt;
+  }
+
   return {
     walletClient,
     protocol: options.protocol,
 
     async deployDac({config, salt, referralUid, deferBirthRole}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for deployDac");
-      }
-
       const resolvedSalt = resolveSalt({salt, referralUid});
 
-      const txHash = await walletClient.writeContract({
+      const receipt = await submitWrite({
         address: options.protocol.dacFactory,
         abi: dacFactoryAbi,
         functionName: "deployDAC",
         args: [config, resolvedSalt, deferBirthRole ?? ZERO_ADDRESS],
-        account: walletClient.account,
       });
-
-      const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
+      const txHash = receipt.transactionHash;
 
       let dac: Address | undefined;
       let mainToken: Address | undefined;
@@ -185,21 +236,15 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
     },
 
     async deployExistingTokenDac({config, salt, referralUid}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for deployExistingTokenDac");
-      }
-
       const resolvedSalt = resolveSalt({salt, referralUid});
 
-      const txHash = await walletClient.writeContract({
+      const receipt = await submitWrite({
         address: options.protocol.dacFactory,
         abi: dacFactoryAbi,
         functionName: "deployExistingTokenDAC",
         args: [encodeExistingTokenConfig(config), resolvedSalt],
-        account: walletClient.account,
       });
-
-      const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
+      const txHash = receipt.transactionHash;
 
       let dac: Address | undefined;
       let mainToken: Address | undefined;
@@ -267,101 +312,74 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         account: walletClient.account,
       });
 
-      const txHash = await walletClient.writeContract({
+      const receipt = await submitWrite({
         address: options.protocol.dacFactory,
         abi: dacFactoryAbi,
         functionName: "deployGovernanceOracle",
         args: [admin, initialPublisher],
-        account: walletClient.account,
       });
 
-      return {txHash, oracleAddress: oracleAddress as Address | undefined};
+      return {txHash: receipt.transactionHash, oracleAddress: oracleAddress as Address | undefined};
     },
 
     async wrapMainToken({wrappedToken, amount}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for wrapMainToken");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: wrappedToken,
         abi: wrappedMainTokenAbi,
         functionName: "wrap",
         args: [amount],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async wrapMainTokenTo({wrappedToken, recipient, amount}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for wrapMainTokenTo");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: wrappedToken,
         abi: wrappedMainTokenAbi,
         functionName: "wrapTo",
         args: [recipient, amount],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async unwrapMainToken({wrappedToken, amount}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for unwrapMainToken");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: wrappedToken,
         abi: wrappedMainTokenAbi,
         functionName: "unwrap",
         args: [amount],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async unwrapMainTokenTo({wrappedToken, recipient, amount}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for unwrapMainTokenTo");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: wrappedToken,
         abi: wrappedMainTokenAbi,
         functionName: "unwrapTo",
         args: [recipient, amount],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async createDealProposal({dealManager, params}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for createDealProposal");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealManager,
         abi: dealManagerAbi,
         functionName: "createDealProposal",
         args: [params],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async createDealProposalDetailed({dealManager, params}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for createDealProposalDetailed");
-      }
-
-      const txHash = await walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealManager,
         abi: dealManagerAbi,
         functionName: "createDealProposal",
         args: [params],
-        account: walletClient.account,
       });
-
-      const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
+      const txHash = receipt.transactionHash;
       let dealId: bigint | undefined;
       let proposalId: bigint | undefined;
       let dealCell: Address | undefined;
@@ -390,19 +408,13 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
     },
 
     async createDacManagementProposal({dacCell, params}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for createDacManagementProposal");
-      }
-
-      const txHash = await walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dacCell,
         abi: dacCellAbi,
         functionName: "createManagementProposal",
         args: [params],
-        account: walletClient.account,
       });
-
-      const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
+      const txHash = receipt.transactionHash;
       let proposalId: bigint | undefined;
       let proposalAddress: Address | undefined;
 
@@ -427,210 +439,148 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
     },
 
     async voteProposal({proposalAddress, support}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for voteProposal");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: proposalAddress,
         abi: votingProposalAbi,
         functionName: "vote",
         args: [support],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async executeDacProposal({dacCell, proposalId}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for executeDacProposal");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dacCell,
         abi: dacCellAbi,
         functionName: "executeDACProposal",
         args: [proposalId],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async setGovernanceOraclePublisher({governanceOracle, publisher, allowed}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for setGovernanceOraclePublisher");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: governanceOracle,
         abi: governanceOracleAbi,
         functionName: "setPublisher",
         args: [publisher, allowed],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async deactivateGovernanceOracle({governanceOracle, dac}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for deactivateGovernanceOracle");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: governanceOracle,
         abi: governanceOracleAbi,
         functionName: "deactivate",
         args: [dac],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async publishGovernanceOracleSnapshot({governanceOracle, dac, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for publishGovernanceOracleSnapshot");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: governanceOracle,
         abi: governanceOracleAbi,
         functionName: "publishSnapshot",
         args: [dac, proposalId, snapshotBlock, merkleRoot, totalUnderlyingVotingPower],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async activateHybridPrimaryVoting(proposalAddress) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for activateHybridPrimaryVoting");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: proposalAddress,
         abi: hybridDacManagementProposalAbi,
         functionName: "activatePrimaryVoting",
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async beginHybridFallbackWarmup(proposalAddress) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for beginHybridFallbackWarmup");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: proposalAddress,
         abi: hybridDacManagementProposalAbi,
         functionName: "beginFallbackWarmup",
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async triggerHybridEmergencyFallback(proposalAddress) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for triggerHybridEmergencyFallback");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: proposalAddress,
         abi: hybridDacManagementProposalAbi,
         functionName: "triggerEmergencyFallback",
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async activateHybridFallbackVoting(proposalAddress) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for activateHybridFallbackVoting");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: proposalAddress,
         abi: hybridDacManagementProposalAbi,
         functionName: "activateFallbackVoting",
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async voteMerkle({proposalAddress, support, index, amount, proof}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for voteMerkle");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: proposalAddress,
         abi: hybridDacManagementProposalAbi,
         functionName: "voteMerkle",
         args: [support, index, amount, proof],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async inviteAgentToDeal({dealCell, invitee, grantInviteRight}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for inviteAgentToDeal");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealCell,
         abi: dealCellAbi,
         functionName: "invite",
         args: [invitee, grantInviteRight],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async stakeAgentToDeal({agentToken, dealCell, amount}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for stakeAgentToDeal");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: agentToken,
         abi: agentTokenAbi,
         functionName: "stakeToDeal",
         args: [dealCell, amount],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async unstakeFromDeal({dealCell}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for unstakeFromDeal");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealCell,
         abi: dealCellAbi,
         functionName: "unstake",
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async claimMainToken({dealCell, evaluatorId}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for claimMainToken");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealCell,
         abi: dealCellAbi,
         functionName: "claimMainToken",
         args: [evaluatorId],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async createDealManagementProposal({dealAddress, params}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for createDealManagementProposal");
-      }
-
-      const txHash = await walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealAddress,
         abi: dealAbi,
         functionName: "createStakedAgentProposal",
         args: [params],
-        account: walletClient.account,
       });
-
-      const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
+      const txHash = receipt.transactionHash;
       let proposalId: bigint | undefined;
       let proposalAddress: Address | undefined;
 
@@ -655,33 +605,23 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
     },
 
     async executeDealProposal({dealAddress, proposalId}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for executeDealProposal");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealAddress,
         abi: dealAbi,
         functionName: "executeStakedAgentProposal",
         args: [proposalId],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async executeDealProposalDetailed({dealAddress, proposalId}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for executeDealProposalDetailed");
-      }
-
-      const txHash = await walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealAddress,
         abi: dealAbi,
         functionName: "executeStakedAgentProposal",
         args: [proposalId],
-        account: walletClient.account,
       });
-
-      const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
+      const txHash = receipt.transactionHash;
       let dacProposalId: bigint | undefined;
       let trancheId: bigint | undefined;
       let childProposalId: bigint | undefined;
@@ -725,241 +665,163 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
     },
 
     async claimDealRewardPool({dealAddress, evaluatorId}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for claimDealRewardPool");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealAddress,
         abi: dealAbi,
         functionName: "claimDealRewardPool",
         args: [evaluatorId],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async setRootCapitalCallID({dealAddress, capitalCallId}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for setRootCapitalCallID");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealAddress,
         abi: dealAbi,
         functionName: "setRootCapitalCallID",
         args: [capitalCallId],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async recoverProfits({dealAddress, token}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for recoverProfits");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealAddress,
         abi: dealAbi,
         functionName: "recoverProfits",
         args: [token],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async executeAgentSpend({treasuryAddress, token, destination, amount}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for executeAgentSpend");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: treasuryAddress,
         abi: permit2TreasuryAbi,
         functionName: "executeAgentSpend",
         args: [token, destination, amount],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async executeReceivePermit2({treasuryAddress, token, source, amount}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for executeReceivePermit2");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: treasuryAddress,
         abi: permit2TreasuryAbi,
         functionName: "executeReceivePermit2",
         args: [token, source, amount],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async evaluateDeal({dealManager, dealId, evaluatorId}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for evaluateDeal");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealManager,
         abi: dealManagerAbi,
         functionName: "evaluateDeal",
         args: [dealId, evaluatorId],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async forceReturnCapital({dealManager, dealId}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for forceReturnCapital");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealManager,
         abi: dealManagerAbi,
         functionName: "forceReturnCapital",
         args: [dealId],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async sendDacLegalWrapperMessage({dacCell, kind, message}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for sendDacLegalWrapperMessage");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dacCell,
         abi: dacCellAbi,
         functionName: "logLegalWrapperMessage",
         args: [kind, message],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async sendDealLegalWrapperMessage({dealManager, dealId, kind, message}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for sendDealLegalWrapperMessage");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dealManager,
         abi: dealManagerAbi,
         functionName: "legalWrapperMessage",
         args: [dealId, kind, message],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async claimDividend({dacCell, proposalId, index, receiver, amount, proof}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for claimDividend");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dacCell,
         abi: dacCellAbi,
         functionName: "claimDividend",
         args: [proposalId, index, receiver, amount, proof],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async fulfillCapitalCall({dacCell, call}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for fulfillCapitalCall");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dacCell,
         abi: dacCellAbi,
         functionName: "fulfillCapitalCall",
         args: [call],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async depositTreasury({dacCell, token, amount}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for depositTreasury");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: dacCell,
         abi: dacCellAbi,
         functionName: "depositTreasury",
         args: [token, amount],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async recoverTreasury({dacCell, token}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for recoverTreasury");
-      }
-
-      // recoverTreasury involves a deep call chain through proxies: transfer → onMainMove
-      // → recordDeposit → syncTreasury → getVotingConfig (governance schema proxy).
-      // Viem's auto gas estimate can be tight when called right after a state-changing
-      // transfer (storage slot warm/cold transitions affect estimation accuracy).
-      // We add a 50% buffer to the estimate to prevent out-of-gas reverts.
-      const gasEstimate = await publicClient.estimateContractGas({
+      const receipt = await submitWrite({
         address: dacCell,
         abi: dacCellAbi,
         functionName: "recoverTreasury",
         args: [token],
-        account: walletClient.account,
       });
-
-      return walletClient.writeContract({
-        address: dacCell,
-        abi: dacCellAbi,
-        functionName: "recoverTreasury",
-        args: [token],
-        account: walletClient.account,
-        gas: gasEstimate + (gasEstimate / 2n),
-      });
+      return receipt.transactionHash;
     },
 
     async approveErc20({token, spender, amount}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for approveErc20");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: token,
         abi: erc20Abi,
         functionName: "approve",
         args: [spender, amount],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async transferErc20({token, to, amount}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for transferErc20");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: token,
         abi: erc20Abi,
         functionName: "transfer",
         args: [to, amount],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async delegateVotes({token, delegatee}) {
-      if (!walletClient || !walletClient.account) {
-        throw new Error("Wallet client with account is required for delegateVotes");
-      }
-
-      return walletClient.writeContract({
+      const receipt = await submitWrite({
         address: token,
         abi: erc20VotesAbi,
         functionName: "delegate",
         args: [delegatee],
-        account: walletClient.account,
       });
+      return receipt.transactionHash;
     },
 
     async getErc20Allowance({token, owner, spender}) {

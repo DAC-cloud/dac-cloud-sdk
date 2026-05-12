@@ -10,6 +10,7 @@ import {
   resolveUnderlyingToken,
   transferErc20,
   verifyDealAccountingInvariants,
+  verifyTxReceipt,
   ZERO_ADDR,
 } from "./fixtures/index.js";
 
@@ -646,6 +647,8 @@ export const dealMultiDealNativeRewardsScenario: Scenario = {
         "--config", config.configPath, "--pretty-print",
       ]);
       assert.defined(cli.data.txHash, "founder Deal B claim tx");
+      const receipt = await verifyTxReceipt(h, cli.data.txHash as string);
+      assert.equal(receipt.status, "0x1", "founder Deal B claim tx on-chain status = success");
       return {cli, command: ["deal", "claim"]};
     });
 
@@ -656,6 +659,8 @@ export const dealMultiDealNativeRewardsScenario: Scenario = {
         "--config", config.configPath, "--pretty-print",
       ]);
       assert.defined(cli.data.txHash, "agent1 Deal B claim tx");
+      const receipt = await verifyTxReceipt(h, cli.data.txHash as string);
+      assert.equal(receipt.status, "0x1", "agent1 Deal B claim tx on-chain status = success");
       return {cli, command: ["deal", "claim"]};
     });
 
@@ -771,6 +776,8 @@ export const dealMultiDealNativeRewardsScenario: Scenario = {
         "--config", config.configPath, "--pretty-print",
       ]);
       assert.defined(cli.data.txHash, "founder Deal A claim tx");
+      const receipt = await verifyTxReceipt(h, cli.data.txHash as string);
+      assert.equal(receipt.status, "0x1", "founder Deal A claim tx on-chain status = success");
       return {cli, command: ["deal", "claim"]};
     });
 
@@ -781,6 +788,8 @@ export const dealMultiDealNativeRewardsScenario: Scenario = {
         "--config", config.configPath, "--pretty-print",
       ]);
       assert.defined(cli.data.txHash, "agent1 Deal A claim tx");
+      const receipt = await verifyTxReceipt(h, cli.data.txHash as string);
+      assert.equal(receipt.status, "0x1", "agent1 Deal A claim tx on-chain status = success");
       return {cli, command: ["deal", "claim"]};
     });
 
@@ -791,6 +800,8 @@ export const dealMultiDealNativeRewardsScenario: Scenario = {
         "--config", config.configPath, "--pretty-print",
       ]);
       assert.defined(cli.data.txHash, "Deal A pool claim tx");
+      const receipt = await verifyTxReceipt(h, cli.data.txHash as string);
+      assert.equal(receipt.status, "0x1", "Deal A pool claim tx on-chain status = success");
       return {cli, command: ["deal", "claim-reward-pool"]};
     });
 
