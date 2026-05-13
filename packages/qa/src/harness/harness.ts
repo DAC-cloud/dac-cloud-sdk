@@ -11,6 +11,7 @@ import {execCli, execCliAs} from "./cli-exec.js";
 import {advanceTime as chainAdvanceTime, mineBlock as chainMineBlock} from "./chain.js";
 import {syncIndexer as doSyncIndexer} from "./indexer-sync.js";
 import {createAssertApi} from "./assertions.js";
+import {createSubmitDryRun} from "./dry-run.js";
 
 export function createHarness(config: QaConfig): Harness {
   const steps: StepResult[] = [];
@@ -69,6 +70,8 @@ export function createHarness(config: QaConfig): Harness {
     return cli(["deal", "view", resource, ...args], opts);
   }
 
+  const submitDryRun = createSubmitDryRun(config, log);
+
   const assert: AssertApi = createAssertApi(currentAssertions);
 
   function recordStep(step: StepResult): void {
@@ -85,6 +88,7 @@ export function createHarness(config: QaConfig): Harness {
     config,
     cli,
     cliAs,
+    submitDryRun,
     advanceTime,
     mineBlock,
     syncIndexer,

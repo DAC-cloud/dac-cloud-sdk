@@ -26,6 +26,8 @@ import {dealMultiDealNativeRewardsScenario} from "./deal-multi-deal-native-rewar
 import {dealMultiDealWrappedRewardsScenario} from "./deal-multi-deal-wrapped-rewards.js";
 import {legalWrapperScenario} from "./legal-wrapper.js";
 import {dacDealSnapshotVoteScenario} from "./dac-deal-snapshot-vote.js";
+import {dryRunLifecycleScenario} from "./dry-run-lifecycle.js";
+import {dryRunMultiTxScenario} from "./dry-run-multi-tx.js";
 
 export const ALL_SCENARIOS: Scenario[] = [
   existingTokenDacScenario,
@@ -55,6 +57,8 @@ export const ALL_SCENARIOS: Scenario[] = [
   dealMultiDealWrappedRewardsScenario,
   legalWrapperScenario,
   dacDealSnapshotVoteScenario,
+  dryRunLifecycleScenario,
+  dryRunMultiTxScenario,
 ];
 
 export {
@@ -85,4 +89,6 @@ export {
   dealMultiDealWrappedRewardsScenario,
   legalWrapperScenario,
   dacDealSnapshotVoteScenario,
+  dryRunLifecycleScenario,
+  dryRunMultiTxScenario,
 };

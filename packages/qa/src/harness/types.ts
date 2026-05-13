@@ -113,12 +113,25 @@ export interface Scenario {
   run(harness: Harness): Promise<void>;
 }
 
+export interface DryRunSubmitResult {
+  /** Parsed JSON output from the dry-run CLI invocation */
+  cliData: Record<string, unknown>;
+  /** viem receipts in submission order, one per transaction emitted by the CLI */
+  receipts: import("viem").TransactionReceipt[];
+}
+
 export interface Harness {
   config: QaConfig;
   /** Run a CLI command and return parsed output */
   cli(args: string[], opts?: CliOpts): Promise<CliResult>;
   /** Run CLI with a specific wallet role */
   cliAs(role: string, args: string[], opts?: CliOpts): Promise<CliResult>;
+  /**
+   * Run a write CLI command in --dry-run mode (with --from <role.address>, no --private-key),
+   * then sign and broadcast every transaction it emits using the role's wallet via viem.
+   * Throws if any tx reverts. Exercises the third-party-wallet code path end-to-end.
+   */
+  submitDryRun(role: string, args: string[], opts?: CliOpts): Promise<DryRunSubmitResult>;
   /** Advance EVM time (local chain only) */
   advanceTime(seconds: number): Promise<void>;
   /** Mine a block (local chain only) */
