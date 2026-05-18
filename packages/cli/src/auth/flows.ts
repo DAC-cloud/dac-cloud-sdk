@@ -2,7 +2,7 @@
  * Auth flow orchestration — auto-auth, challenge, verify.
  */
 import {type Hex, type PrivateKeyAccount} from "viem";
-import {requestNonce, verifySignature, type VerifyResponse} from "./api.js";
+import {getMe, requestNonce, verifySignature, type VerifyResponse} from "./api.js";
 import {
   readCachedChallenge,
   readCachedToken,
@@ -146,6 +146,20 @@ function isGuestToken(token: string): boolean {
 }
 
 /**
+ * Probe a token against the backend. Returns true if the session is still
+ * valid; false otherwise. Errors are swallowed so callers can fall through
+ * to the next auth source.
+ */
+async function validateToken(apiUrl: string, token: string): Promise<boolean> {
+  try {
+    await getMe(apiUrl, token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Resolve a valid JWT for the current command.
  *
  * Resolution order:
@@ -153,6 +167,10 @@ function isGuestToken(token: string): boolean {
  *   2. Cached token from ~/.dac/auth/ (for --private-key overrides)
  *   3. Auto-auth (if private key is available)
  *   4. Error with actionable message
+ *
+ * Each stored-token source is probed against the backend (`/auth/me`) before
+ * being returned — a token that's local-valid but server-revoked (e.g. after
+ * a backend wipe) is treated as absent and we fall through to relogin.
  */
 export async function resolveAuthToken(opts: {
   configToken?: string;
@@ -163,26 +181,30 @@ export async function resolveAuthToken(opts: {
   dacs: string[];
 }): Promise<string> {
   const {configToken, configTokenExpires, chainId, account, apiUrl, dacs} = opts;
+  let staleTokenSeen = false;
 
   // 1. Try config token — only if it matches the current wallet (or no wallet specified)
   if (configToken && configTokenExpires) {
     const expires = new Date(configTokenExpires).getTime();
     if (expires > Date.now()) {
       if (!account) {
-        // No wallet to match against (dry-run without private key) — use config token
-        return configToken;
-      }
-      const tokenWallet = extractJwtSubject(configToken);
-      if (tokenWallet === account.address.toLowerCase()) {
-        // Token matches wallet — but check if it's guest and we can promote to member
-        if (isGuestToken(configToken) && dacs.length > 0) {
-          // Guest token with DAC context available — re-auth as member
-          const result = await autoAuth({apiUrl, chainId, account, dacs});
-          return result.token;
+        // No wallet to match against (dry-run without private key) — validate before use
+        if (await validateToken(apiUrl, configToken)) return configToken;
+        staleTokenSeen = true;
+      } else {
+        const tokenWallet = extractJwtSubject(configToken);
+        if (tokenWallet === account.address.toLowerCase()) {
+          // Token matches wallet — but check if it's guest and we can promote to member
+          if (isGuestToken(configToken) && dacs.length > 0) {
+            // Guest token with DAC context available — re-auth as member
+            const result = await autoAuth({apiUrl, chainId, account, dacs});
+            return result.token;
+          }
+          if (await validateToken(apiUrl, configToken)) return configToken;
+          staleTokenSeen = true;
         }
-        return configToken;
+        // Config token is for a different wallet — fall through to cache/auto-auth
       }
-      // Config token is for a different wallet — fall through to cache/auto-auth
     }
   }
 
@@ -195,7 +217,8 @@ export async function resolveAuthToken(opts: {
         const result = await autoAuth({apiUrl, chainId, account, dacs});
         return result.token;
       }
-      return cached.token;
+      if (await validateToken(apiUrl, cached.token)) return cached.token;
+      staleTokenSeen = true;
     }
   }
 
@@ -206,7 +229,9 @@ export async function resolveAuthToken(opts: {
   }
 
   // 4. No way to auth
-  const fromHint = opts.configToken ? " (token expired)" : "";
+  const fromHint = staleTokenSeen
+    ? " (stored session no longer valid on backend)"
+    : opts.configToken ? " (token expired)" : "";
   throw new Error(
     `No valid auth token${fromHint}. ` +
     `Run 'dac auth login' (with private key) or ` +

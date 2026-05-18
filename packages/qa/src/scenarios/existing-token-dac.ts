@@ -150,6 +150,8 @@ export const existingTokenDacScenario: Scenario = {
 
       // In the contracts level, the first vote will attempt phase transition to accept vote, we're testing here this path
 
+      await h.syncIndexer();
+
       // Advance past fallback warmup duration (10s)
       await h.advanceTime(15);
 

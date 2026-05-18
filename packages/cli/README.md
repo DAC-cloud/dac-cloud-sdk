@@ -1,8 +1,13 @@
 # `@dac-cloud/cli`
 
-JSON-first CLI for operating DACs and Deals.
+JSON-first CLI for operating DACs and Deals on the DAC Cloud protocol.
 
-The CLI is designed for automation and AI-agent workflows first: every command prints one JSON line to stdout.
+The CLI is designed for automation and AI-agent workflows first: every command prints
+one JSON object to stdout. Bigints are serialized as decimal strings.
+
+Binary: `dac`. Built on Commander.js. Talks to a **DAC Cloud backend** that proxies
+RPC, GraphQL, and serves protocol manifests — see
+[Auth & Backend](../../docs/cli/auth-and-backend.md).
 
 ## Build and Run
 
@@ -13,167 +18,162 @@ npm install
 npm run build -w @dac-cloud/cli
 ```
 
-Run examples:
+Then either:
 
 ```bash
 node packages/cli/dist/index.js --help
-node packages/cli/dist/index.js create --help
-node packages/cli/dist/index.js deal --help
+# or link as a global binary:
+npm link --workspace @dac-cloud/cli
+dac --help
 ```
 
-## Command Layout
+## Quick Start
 
 ```bash
-dac <subject?> <action> [args...] [--flags]
+# First-time authentication (signs a SIWE message with --private-key)
+dac auth login --config ./config.env
+
+# Deploy a native DAC
+dac create --name "My DAC" --description "Ops" --symbol "MDAC" \
+  --treasury-token 0x... --commitment 0 --allocation 1000000000000000000000000 \
+  --auto-delegate --config ./config.env --pretty-print
+
+# View it
+dac view dac --dac 0x<dac> --pretty-print
 ```
 
-- No subject means DAC-level command (`dac create`, `dac propose`, ...).
-- `deal` subject means deal-level command (`dac deal create`, `dac deal propose`, ...).
+## Configuration
 
-## Config and Params Resolution
-
-CLI options are resolved in this order:
+Resolution order:
 
 1. CLI flags
-2. `--config <path>` file (`.env` syntax)
+2. `--config <path>` file
 3. `./config.env`
-4. process environment
+4. Process environment (`KEY=` or `DAC_KEY=` variants both work)
 
-Keys support both plain and `DAC_` prefixed variants.
+```env
+DAC_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+DAC_CHAIN_ID=31337
+DAC_API_URL=http://localhost:3500
+# Auth fields are written automatically by `dac auth login`:
+# DAC_AUTH_TOKEN=<jwt>
+# DAC_AUTH_EXPIRES=<iso8601>
+```
 
-- `rpc-url` -> `RPC_URL` or `DAC_RPC_URL`
-- `private-key` -> `PRIVATE_KEY` or `DAC_PRIVATE_KEY`
-- `cell-address` -> `CELL_ADDRESS` or `DAC_CELL_ADDRESS`
+### Defaults
 
-Both dashed and camelCase CLI option names are accepted internally.
+- `--chain-id`: `31337` (Hardhat local)
+- `--api-url`: `https://api.dac.cloud`
+- `--private-key`: Anvil account #0
 
-### Default Values
-
-If not provided by flags/config/env:
-
-- `chain-id`: `31337`
-- `rpc-url`: `http://127.0.0.1:8545`
-- `indexer-url`: `http://127.0.0.1:8080/v1/graphql`
-- `private-key`: anvil account #0
-- `contracts-root`: `${DAC_CONTRACTS_ROOT}` or `../dac-cloud-contracts`
+The CLI does **not** accept `--rpc-url` or `--indexer-url`; both are derived from
+`--api-url` and `--chain-id` (`${apiUrl}/rpc/${chainId}` and `${apiUrl}/graphql`).
 
 ## Global Flags
 
-Global (root) flags are infrastructure/runtime related:
+| Flag | Purpose |
+|------|---------|
+| `--config <path>` | Path to `.env` config |
+| `--private-key <hex>` | Wallet private key |
+| `--chain-id <number>` | Target chain |
+| `--api-url <url>` | Backend URL |
+| `--dry-run` | Emit unsigned tx, don't broadcast |
+| `--from <address>` | Sender (required for dry-run without private key) |
+| `--pretty-print` | Format JSON output |
 
-- `--config <path>`
-- `--private-key <hex>`
-- `--chain-id <number>`
-- `--rpc-url <url>`
-- `--contracts-root <path>`
-- `--indexer-url <url>`
+## Command Tree
 
-Operation-specific flags are declared on each subcommand.
-Use `dac <command> --help` to see full options and resolved requirement groups for that command.
+```
+dac
+├── auth {login, challenge, verify, status, logout}
+├── discover
+├── create | create-existing-token
+├── balance <token> <holder>
+├── delegate | wrap | unwrap
+├── propose <type> | vote proposal | execute
+├── proposal {activate-primary, begin-warmup, trigger-fallback, activate-fallback,
+│              vote-merkle, state}
+├── oracle {deploy, set-publisher, publish, deactivate, status}
+├── join | recover-treasury | deposit-treasury | claim-dividend
+├── legal-message
+├── view [resource] [id]
+└── deal
+    ├── create | invite | stake | unstake | delegate | request
+    ├── propose | vote proposal | execute
+    ├── evaluate | claim | claim-reward-pool
+    ├── link-capital-call | agent-spend | recover-profits | receive-permit2
+    ├── legal-message | withdraw
+    └── view [resource] [id]
+```
 
-All outputs are JSON; bigint values are serialized as decimal strings.
+## Authentication
 
-## DAC Commands
+The CLI requires a SIWE-issued JWT for every command. `dac auth login` signs the
+challenge with `--private-key` and writes the token into `config.env`. For wallets
+where the key isn't local (hardware wallets, multisig), use the two-step
+challenge / verify flow. See [Auth & Backend](../../docs/cli/auth-and-backend.md).
 
-- `dac create`
-- `dac create-existing-token`
-- `dac delegate`
-- `dac propose <proposalType> [args...]`
-- `dac vote proposal <proposalId> <support>`
-- `dac execute <proposalId>`
-- `dac join`
-- `dac recover-treasury`
-- `dac deposit-treasury`
-- `dac wrap`
-- `dac unwrap`
-- `dac legal-message <messageFile>`
-- `dac claim-dividend <proofFile>`
-- `dac view [dac|dacs|proposal|dac-proposal|proposals|dac-proposals|deals|capital-calls|treasury-holdings|treasury-movements|treasury-delegations|governance-oracles|wrapper-actions|account] [id]`
+```bash
+dac auth login                              # private-key sign
+dac auth challenge --from 0x<wallet>        # request SIWE message
+dac auth verify --signature 0x<sig> --from 0x<wallet>
+dac auth status                             # current session
+dac auth logout                             # revoke + clear local state
 
-### DAC Proposal Types
+dac discover                                # list DACs the wallet belongs to
+```
 
-- `update-voting-config`
-- `update-governance-strategy`
-- `update-deal-creation-config`
-- `update-governance-oracle`
-- `update-legal-wrapper`
-- `approve-offchain-action`
-- `mint-agent-tokens`
-- `revoke-agent-tokens`
-- `mint-main-tokens`
-- `burn-main-tokens`
-- `toggle-dividends`
-- `dividend-payout`
-- `delegate-from-balance`
-- `capital-call`
-- `add-module`
-- `remove-module`
-- `recover-deal`
-- `deal-message`
-- `cast-veto-deal`
-- `challenge-deal`
-- `add-evaluator`
+## DAC Proposal Types
 
-## Deal Commands
+- Governance config: `update-voting-config`, `update-governance-strategy`,
+  `update-deal-creation-config`, `update-governance-oracle`, `update-legal-wrapper`
+- Tokens: `mint-agent-tokens`, `mint-agent-tokens-distributor`,
+  `disable-agent-distributor`, `revoke-agent-tokens`, `mint-main-tokens`,
+  `burn-main-tokens`
+- Treasury / dividends: `toggle-dividends`, `dividend-payout`, `capital-call`,
+  `delegate-from-balance`
+- Modules: `add-module`, `remove-module`, `add-evaluator`
+- Deals: `recover-deal`, `deal-message`, `challenge-deal` (alias `cast-veto-deal`)
+- Offchain: `approve-offchain-action`
+- Raw: `0x<bytes4>` selector via `--input` JSON
 
-- `dac deal create <dealFile>`
-- `dac deal stake <amount>`
-- `dac deal request <amount>`
-- `dac deal unstake`
-- `dac deal delegate`
-- `dac deal propose <proposalType> [args...]`
-- `dac deal vote proposal <proposalId> <support>`
-- `dac deal execute <proposalId>`
-- `dac deal evaluate [evaluatorId]`
-- `dac deal claim [evaluatorId]`
-- `dac deal legal-message [dealNumericId] <messageFile>`
-- `dac deal withdraw <dealNumericId>`
-- `dac deal view [deal|proposal|proposals|treasury-actions] [id]`
+## Deal Proposal Types
 
-### Kernel Deal Proposal Types
+**Kernel**: `update-voting-config`, `toggle-whitelist`, `toggle-early-returns`,
+`enable-veto-right`, `request-tranche`, `add-stake`, `strike-out-agent`.
 
-- `update-voting-config`
-- `toggle-whitelist`
-- `toggle-early-returns`
-- `enable-veto-right`
-- `request-tranche`
-- `add-stake`
+**Core module** (`core:` prefix optional):
+`direct-spend`, `permit2-spend`, `return-capital`, `approve-agent-spend`,
+`assign-claimer`, `revoke-agent`, `delegate-vote-rights`, `child-create-proposal`,
+`child-vote-proposal`, `child-return-profits`, `child-reinvest-profits`,
+`approve-venue-version`, `snapshot-vote-sign`, `external-vote-sign`.
 
-### Module Deal Proposal Types (current core module)
+## Deal Kinds (Core Module)
 
-- `core:direct-spend`
-- `core:permit2-spend`
-- `core:return-capital`
-- `core:approve-agent-spend`
-- `core:assign-claimer`
-- `core:revoke-agent`
-- `core:delegate-vote-rights`
-- `core:child-create-proposal`
-- `core:child-vote-proposal`
-- `core:child-return-profits`
-- `core:child-reinvest-profits`
+- `core:permit2-treasury` (aliases: `permit2-treasury`, `treasury-deal`)
+- `core:dac-deal` (alias: `dac-deal`)
 
-Module prefix is optional when unambiguous.
+## Evaluator Kinds
 
-## `--input` JSON Mode
+- `core:milestones-evaluator`
+- `core:revenue-evaluator`
 
-Many complex operations support `--input <jsonFile>` instead of positional args.
+## `--input` JSON Files
 
-Examples:
+Complex proposals accept a JSON file via `--input <path>`. The flag is a **file path**,
+not inline JSON.
 
-- `dac propose update-voting-config --input ./vote-config.json`
-- `dac deal propose update-voting-config --input ./deal-vote-config.json`
-- `dac deal propose core:approve-agent-spend --input ./approve-agent-spend.json`
+Files also accepted by: `legal-message`, `claim-dividend`, `deal create`,
+`deal legal-message`, `deal propose snapshot-vote-sign`, `deal propose
+approve-agent-spend`, etc.
 
-## Deal Create JSON Schema (practical)
-
-`dac deal create <dealFile>` expects:
+### Deal create JSON
 
 ```json
 {
   "dealKind": "core:permit2-treasury",
-  "name": "Treasury Deal",
-  "description": "Ops budget",
+  "name": "Q2 Ops",
+  "description": "Operations budget",
   "linkHash": "ipfs://...",
   "fundingToken": "0x...",
   "fundingAmount": "1000000",
@@ -183,113 +183,82 @@ Examples:
   "dealDeadline": "1711200000",
   "dealConfig": "0x",
   "evaluatorSelector": "core:milestones-evaluator",
-  "evaluatorConfig": "0x"
+  "evaluatorConfig": "0x",
+  "vetoEnabled": false,
+  "agentsLimit": "0",
+  "minimalStake": "0"
 }
 ```
 
-Notes:
+Deadline defaults: `evaluationDeadline` → `dealDeadline`; `dealDeadline` → `now + 30d`;
+`approveDeadline` → `now + 7d`.
 
-- `evaluationDeadline` defaults to `dealDeadline` if omitted.
-- `dealDeadline` defaults to `now + 30 days` if omitted.
-- `approveDeadline` defaults to `now + 7 days` if omitted.
+### Legal message JSON
 
-## Stake Request Flow
-
-`dac deal request <amount>` only performs ERC20 `approve` to the deal cell.
-
-A staked agent must then create and pass:
-
-```bash
-dac deal propose add-stake <agent> <amount>
-```
-
-Or source pending allowance automatically:
-
-```bash
-dac deal propose add-stake <agent> --from-request
-```
-
-## Tranche Request Flow
-
-### Generic deals
-
-```bash
-dac deal propose request-tranche <token> <amount> [rewards]
-```
-
-### DACDeal (capital-call linked)
-
-```bash
-# by child capital-call nonce
-dac deal propose request-tranche <capitalCallNonce> [rewards]
-
-# by child capital-call hash
-dac deal propose request-tranche [rewards] --capital-call-hash <bytes32>
-
-# by explicit nonce flag
-dac deal propose request-tranche [rewards] --capital-call-nonce <uint256>
-```
-
-For DACDeal request-tranche, CLI sets:
-
-- `target` from child capital call treasury token
-- `i` from child capital call `cashAmount`
-- `data = abi.encode(rewards, callHash)`
-
-## Legal Message JSON Files
-
-DAC-level:
+DAC-level (`dac legal-message`):
 
 ```json
-{
-  "kind": "0x12345678",
-  "message": "0x"
-}
+{ "kind": "0x12345678", "message": "0x..." }
 ```
 
 Deal-level (`dac deal legal-message`):
 
 ```json
-{
-  "dealId": "1",
-  "kind": "0x12345678",
-  "message": "0x"
-}
+{ "dealId": "1", "kind": "0x12345678", "message": "0x..." }
 ```
 
 `dealId` can be omitted if `--deal-id` / `--deal-address` is provided.
 
-## Claim Dividend JSON
-
-`dac claim-dividend <proofFile>` expects:
+### Claim dividend JSON
 
 ```json
 {
   "proposalId": "12",
   "index": "0",
   "receiver": "0x...",
-  "amount": "1000",
-  "proof": [
-    "0x...",
-    "0x..."
-  ]
+  "amount": "1000000000000000000000",
+  "proof": ["0x...", "0x..."]
 }
 ```
 
-## Helpful Patterns
-
-Inspect available commands and help text:
+## Tranche Request Flow (DACDeal)
 
 ```bash
-dac --help
+# By child capital-call nonce (= the proposal ID that created the call)
+dac deal propose request-tranche <nonce> [rewards] --deal 0x<deal>
+
+# By callHash
+dac deal propose request-tranche [rewards] --deal 0x<deal> --capital-call-hash <bytes32>
+
+# By explicit nonce flag
+dac deal propose request-tranche [rewards] --deal 0x<deal> --capital-call-nonce <n>
+```
+
+For `core:dac-deal` request-tranche, the CLI sets `target` from the child capital
+call's treasury token, `i` from `cashAmount`, and `data = abi.encode(rewards, callHash)`.
+
+## Helpful Patterns
+
+```bash
+dac --help                  # top-level
+dac auth --help
 dac propose --help
 dac deal --help
 dac deal propose --help
+dac oracle --help
+dac proposal --help         # hybrid governance phases
+dac view --help
 ```
 
-Use time-advance flags for local anvil governance testing:
+## Full Documentation
 
-```bash
-dac vote proposal <id> true --pre-vote-advance-seconds 1
-dac execute <id> --advance-seconds 604801
-```
+Detailed docs in [`docs/`](../../docs/README.md):
+
+- [CLI Overview](../../docs/cli/overview.md)
+- [Auth & Backend](../../docs/cli/auth-and-backend.md)
+- [DAC Commands](../../docs/cli/dac-commands.md)
+- [Deal Commands](../../docs/cli/deal-commands.md)
+- [Governance Guide](../../docs/cli/governance.md)
+- [Native DAC Guide](../../docs/guides/native-dac.md)
+- [Existing-Token DAC Guide](../../docs/guides/existing-token-dac.md)
+- [Deal Lifecycle Guide](../../docs/guides/deal-lifecycle.md)

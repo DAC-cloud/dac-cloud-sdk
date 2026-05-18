@@ -1,187 +1,341 @@
 # Guide: Deal Lifecycle
 
-This guide covers the complete deal lifecycle — from creation through evaluation, claims, and recovery.
-
-## Overview
+Walkthrough of a deal from creation through evaluation, claims, and recovery — covering
+the practical gotchas mined from the QA harness.
 
 ```
-Create  -->  Invite + Stake  -->  Approve  -->  Evaluate  -->  Claim / Unstake
-                                                    |
-                                              (if slashed)
-                                                    v
-                                                 Recover
+Create  →  Invite + Stake  →  Approve  →  (Optionally) Active Staking  →  Evaluate  →  Claim / Unstake
+                                                                              │
+                                                                        (if slashed)
+                                                                              ↓
+                                                                          Recover
 ```
 
-## 1. Create a Deal
+## 1. Prepare a Deal JSON
 
-Prepare a deal configuration JSON file (see [Deal Commands > create](../cli/deal-commands.md#create-dealfile) for the schema).
+```json
+{
+  "dealKind": "core:permit2-treasury",
+  "name": "Q2 Operations",
+  "description": "Operational budget",
+  "linkHash": "ipfs://Qm...",
+  "fundingToken": "0x<usdc>",
+  "fundingAmount": "1000000000000000000000",
+  "rewardsLimit": "500000000000000000000",
+  "approveDeadline": "1735689600",
+  "evaluationDeadline": "1736899200",
+  "dealDeadline": "1738108800",
+  "dealConfig": "0x",
+  "evaluatorSelector": "core:milestones-evaluator",
+  "evaluatorConfig": {
+    "rewardShare": "1000000000000000000",
+    "dealRewardPoolPercent": "300000000000000000",
+    "milestones": [{
+      "milestoneType": 0,
+      "token": "0x<usdc>",
+      "expectedReturn": "1000000000000000000000",
+      "timestamp": "1736294400",
+      "rewardPercentage": "500000000000000000",
+      "rewardCurve": ["1000000000000000000"],
+      "penaltyCurve": ["0", "1000000000000000000"],
+      "extensionPeriod": 0
+    }]
+  },
+  "vetoEnabled": false,
+  "agentsLimit": "0",
+  "minimalStake": "0"
+}
+```
+
+Key encoding rules:
+
+- **Percentages use 1e18 mantissa**: `300000000000000000` = 30%.
+- **`rewardCurve`** is a polynomial: `[1e18]` is the constant 100% (always full reward
+  regardless of progress); `[0, 1e18]` is linear `y = x` (50% reward at 50% progress).
+- **`penaltyCurve`** likewise. `[0, 1e18]` means slash scales linearly with shortfall.
+- **`rewardsLimit`** must be `0` for existing-token DACs (no minting headroom). Native
+  DACs can mint up to `mainTokenMaxSupply`.
+- **`vetoEnabled`** must be set at creation — can't be added later (except via
+  `enable-veto-right` deal proposal, which requires deal approval).
+- **`extensionPeriod`** > 0 lets the milestone deadline extend once if progress < 100%
+  (no penalty applied for that cycle).
+
+## 2. Create the Deal
 
 ```bash
 dac deal create ./deal.json --dac 0x<dac> --config ./config.env --pretty-print
 ```
 
-This creates a DAC governance proposal. The deal address and cell address are returned.
+This creates a **DAC governance proposal** — the deal contract is deployed when the
+proposal executes. The response includes the proposed `dealCell` and `dealAddress`.
 
-## 2. Invite Agents (Whitelist)
+## 3. Invite Agents (Whitelist)
 
-Deals are created with `whitelistOnly=true`. The deal proposer must invite agents before they can stake:
+Deals are `whitelistOnly=true` by default. **Invites must be issued before deal
+approval** because staking requires `!isApproved()`.
 
 ```bash
-# Invite agent1
+# Founder invites agent1
 dac deal invite 0x<agent1> --deal 0x<deal>
 
-# Invite agent2 with invite rights (can invite others)
+# Grant invite-right (transitive whitelisting)
 dac deal invite 0x<agent2> --deal 0x<deal> --grant-invite-right
 ```
 
-## 3. Stake
-
-Agents stake AgentTokens into the deal. **Staking must happen before approval.**
+## 4. Stake (Pre-Approval)
 
 ```bash
 # Founder stakes
 dac deal stake 10000000000000000000000 \
-  --deal 0x<deal> --dac 0x<dac> --auto-delegate
+  --deal 0x<deal> --dac 0x<dac> --auto-delegate --auto-approve
 
-# Agent1 stakes (using their private key)
+# Agent1 stakes using their own key
 dac deal stake 5000000000000000000000 \
-  --deal 0x<deal> --dac 0x<dac> --auto-delegate \
+  --deal 0x<deal> --dac 0x<dac> --auto-delegate --auto-approve \
   --private-key 0x<agent1-key>
 ```
 
-## 4. Approve the Deal
+`--dac` is **required** so the CLI can resolve the AgentToken address.
+`--auto-approve` runs ERC20 approve. `--auto-delegate` self-delegates StakedAgent
+voting power (required to vote in deal governance).
 
-The deal was created as a DAC proposal. Vote and execute it:
+## 5. Approve the Deal
+
+The deal-create proposal still needs to pass:
 
 ```bash
 dac vote proposal <proposalId> true --dac 0x<dac>
 dac execute <proposalId> --dac 0x<dac>
 ```
 
-After approval, the deal becomes `active=true`. Pre-approval staking is no longer possible — see [Active Staking](#4a-active-staking-post-approval) for the post-approval path.
+After execution the deal is `active=true`. Pre-approval staking and invites are closed.
 
-## 4a. Active Staking (Post-Approval)
+## 6. Active Staking (Post-Approval)
 
-After a deal is approved, new agents can still join through the **stake request** flow. This requires deal governance approval from existing staked agents.
+After approval, new agents join via the **stake request** flow — deal-governance gates
+the addition.
 
 ```bash
-# 1. New agent requests to stake (approves AgentTokens to the deal cell)
+# 1. New agent approves AgentTokens to the deal cell
 dac deal request 5000000000000000000000 --deal 0x<deal> --dac 0x<dac> \
   --private-key 0x<new-agent-key>
 
-# 2. An existing staked agent proposes add-stake via deal governance
+# 2. An existing staked agent proposes add-stake
 dac deal propose add-stake 0x<new-agent> --from-request --dac 0x<dac> --deal 0x<deal>
 
-# 3. Staked agents vote (quorum required)
+# 3. Staked agents vote (cast smallest-first to avoid quorum-cutoff)
 dac deal vote proposal <proposalId> true --deal 0x<deal>
 dac deal vote proposal <proposalId> true --deal 0x<deal> --private-key 0x<other-agent-key>
 
-# 4. Execute (must be within executionValidityDuration of quorum being reached)
+# 4. Execute promptly (deal validity windows are tight — see below)
 dac deal execute <proposalId> --deal 0x<deal>
 ```
 
-An already-staked agent can also increase their stake through the same flow — `deal request` + `deal propose add-stake`. The position accumulates (not replaced).
+`--dac` is **required** with `--from-request` — the CLI needs the AgentToken address
+to look up the on-chain allowance. Existing stakers can also use this flow to increase
+their position (it accumulates, not replaces).
 
-**Important timing**: Deal governance proposals auto-resolve when quorum is met during voting (`_checkAndEmitResolution` in Proposal.sol). The execution window starts from the resolution timestamp, not the end of the voting period. Execute promptly after quorum is reached.
+> **Critical timing.** Deal proposals auto-resolve when quorum is met during voting.
+> The execution window starts at the resolution timestamp, not the voting end. With
+> 7-day voting + 1-day execution validity, the proposal expires 1 day after quorum is
+> hit — execute immediately. See [Governance → Execution Validity](../cli/governance.md#execution-validity-window).
 
-## 5. Evaluate
+## 7. Evaluate
 
-After a milestone deadline passes (or if progress >= 100%), trigger evaluation:
-
-```bash
-dac deal evaluate --deal-id 1 --dac 0x<dac>
-```
-
-### Evaluation Outcomes
-
-| Progress | Action | Result |
-|----------|--------|--------|
-| >= 100% (before deadline) | Reward | Reward unlocked immediately |
-| < 100%, deadline passed, extension configured | Extend | Deadline extended, no penalty |
-| < 100%, deadline passed, no extension | Penalty + Reward | Partial slash + partial reward |
-| 0%, deadline passed | Full slash | All stake burned, deal auto-closes |
-
-### Multi-Milestone Deals
-
-Milestones are evaluated independently in a single call. If progress >= 100% for a milestone, it triggers regardless of its deadline. To test sequential evaluation, ensure each milestone has a different `expectedReturn` so deposits can't satisfy both at once.
-
-## 6. Claim Rewards
-
-After evaluation unlocks rewards, each agent claims their proportional share:
+After milestone deadlines pass (or progress >= 100%), trigger evaluation:
 
 ```bash
-dac deal claim --deal 0x<deal>
+dac deal evaluate --deal 0x<deal> --config ./config.env
 ```
 
-Rewards are proportional to stake: an agent with 40% of total stake gets 40% of allocated rewards.
+| Progress | Deadline | Result |
+|----------|----------|--------|
+| >= 100% | (any) | Reward unlocked **immediately** regardless of deadline |
+| < 100%, extension configured | passed | Deadline extended once, no penalty applied |
+| < 100%, no extension | passed | Penalty (slash) + partial reward per `rewardCurve` |
+| 0% | passed | Full slash — all stake **burned**, deal auto-closes |
 
-## 7. Unstake
+**Multi-milestone deals**: each milestone is evaluated independently in a single call.
+Rewards **accumulate** across evaluations — they don't overwrite. To test sequential
+evaluation in local dev, give each milestone a distinct `expectedReturn` so a single
+deposit can't satisfy both at once.
 
-After the deal closes, agents can unstake to recover their AgentTokens:
+**`rewardsConvertedPct == 100%` → implicit close**: when the full reward share converts,
+the deal auto-closes via `_performTransformation` regardless of remaining deadline.
+
+## 8. Claim Rewards
+
+```bash
+# Each agent claims their proportional share
+dac deal claim --deal 0x<deal> --private-key 0x<agent-key>
+
+# Optionally the collective reward pool (if dealRewardPoolPercent > 0)
+dac deal claim-reward-pool --deal 0x<deal>
+```
+
+Per-agent rewards are proportional to share of stake. The reward pool is allocated when
+`dealRewardPoolPercent > 0`; due to rounding, expect ~25-35% tolerance on a 30% target.
+
+> Note: `writeContract` returns a hash even on revert. For critical paths, verify via
+> `dac deal view positions` afterward that `totalClaimedMainTokenAmount` increased.
+
+## 9. Unstake
+
+After the deal is closed, agents recover their AgentTokens (less any slash):
 
 ```bash
 dac deal unstake --deal 0x<deal>
 ```
 
-Note: After a full slash (100%), all StakedAgent tokens are **burned**. Unstake will revert with `NoStake()`. Use deal recovery instead.
+> **After a full slash, unstake reverts with `NoStake()`** — all StakedAgent tokens
+> were burned. Use [Deal Recovery](#10-deal-recovery) instead.
 
-## 8. Force Return Capital
+## 10. Deal Recovery
 
-Return remaining capital from a deal to the DAC treasury:
+When the deal is fully slashed (`totalSupply=0` on StakedAgent), the DAC can recover
+it by appointing liquidators with fresh StakedAgent minting — they do **not** need
+AgentTokens:
+
+```bash
+dac propose recover-deal <dealId> 0x<liquidator1> 1000000000000000000000 --dac 0x<dac>
+dac vote proposal <id> true --dac 0x<dac>
+dac execute <id> --dac 0x<dac>
+```
+
+`liquidatorStake` must be > 0. Multiple liquidators can be appointed via separate
+`recover-deal` proposals. Original agents cannot unstake after recovery; the liquidators
+have full deal-governance powers (propose, vote, execute).
+
+## 11. Force Return Capital
+
+To pull remaining funding-token capital from the deal back into the DAC treasury:
 
 ```bash
 dac deal withdraw <dealNumericId> --dac 0x<dac>
 ```
 
-Requirements (at least one must be true):
-- The deal deadline has passed, **OR**
-- All agents have unstaked (for closed deals before the deadline)
+Preconditions (one of):
+- Deal deadline has passed, **OR**
+- All agents have unstaked (for closed-but-not-deadlined deals)
 
-For closed deals that haven't reached the deadline, unstake all agents first:
+**This does not close the deal** and only moves the funding token — stakes, slashes,
+and releases are untouched.
+
+## 12. Strike-Out an Agent
+
+Deal governance can forcibly remove an agent without slashing:
 
 ```bash
-# Each agent unstakes
-dac deal unstake --deal 0x<deal>
-
-# Then force return capital
-dac deal withdraw <dealId> --dac 0x<dac>
+dac deal propose strike-out-agent 0x<agent> --deal 0x<deal>
 ```
 
-This returns funds to the DAC treasury but does **not** close the deal.
+- Uses **high quorum** (75% typical).
+- The agent's stake is **released**, not slashed:
+  `currentStakedAmount=0`, `totalReleasedAmount=originalStake`, `totalSlashedAmount=0`.
+- AgentTokens return to the agent.
+- "Always challengeable" — the DAC can challenge `strike-out-agent` regardless of
+  the deal's `vetoEnabled` flag.
 
-## 9. Deal Recovery
+## 13. DAC Veto (Challenge)
 
-When a deal is fully slashed and closed (`totalSupply=0`), the DAC can recover it by appointing liquidators:
+When a deal has `vetoEnabled=true` (or has executed `propose enable-veto-right`), the
+DAC can challenge any deal proposal:
 
 ```bash
-# Appoint a liquidator via DAC governance
-dac propose recover-deal <dealId> 0x<liquidator> 1000000000000000000000 --dac 0x<dac>
+# Deal-side: agent creates the proposal
+dac deal propose toggle-early-returns true --deal 0x<deal>
+
+# DAC-side: challenge it
+dac propose challenge-deal <dealNumericId> <dealProposalId> --dac 0x<dac>
 dac vote proposal <id> true --dac 0x<dac>
 dac execute <id> --dac 0x<dac>
+
+# Deal-side: execution now reverts
+dac deal execute <dealProposalId> --deal 0x<deal>   # reverts
 ```
 
-Key points:
-- `liquidatorStake` must be > 0 (StakedAgent tokens are minted directly to the liquidator)
-- The liquidator does NOT need AgentTokens — tokens are minted fresh
-- Multiple liquidators can be appointed via separate `recover-deal` proposals
-- Liquidators can use deal governance (propose, vote, execute) with their minted StakedAgent tokens
-- After recovery, the deal is in liquidation mode — original agents cannot unstake
+The challenge is permanent — once executed, the deal proposal cannot be executed.
 
-## Verifying Deal State
+## 14. Treasury Operations
+
+### Direct spend (proposal + execute)
 
 ```bash
-# Deal overview (active, closed, recovered, rewards, slashing)
+dac deal propose direct-spend 0x<token> 0x<dest> 1000000000000000000000 --deal 0x<deal>
+dac deal vote proposal <id> true --deal 0x<deal>
+dac deal execute <id> --deal 0x<deal>
+```
+
+### Pre-authorized agent spend
+
+Approve an agent for repeated spends, then they execute directly without further
+governance:
+
+```bash
+# 1. Propose approval (with limits)
+dac deal propose approve-agent-spend --input ./approve-agent-spend.json --deal 0x<deal>
+# JSON: {agent, token, totalAmount, singleTxAmount, clockLimit, duration}
+
+# 2. Vote + execute the approval
+dac deal vote proposal <id> true --deal 0x<deal>
+dac deal execute <id> --deal 0x<deal>
+
+# 3. The approved agent spends directly (no further governance)
+dac deal agent-spend 0x<token> 0x<dest> 100000000000000000000 --deal 0x<deal> \
+  --private-key 0x<approved-agent-key>
+```
+
+### Return capital to DAC
+
+```bash
+# Mid-deal returns require toggle-early-returns first (or deal must be closed):
+dac deal propose toggle-early-returns true --deal 0x<deal>
+# ... vote + execute ...
+dac deal propose return-capital 0x<token> 500000000000000000000 --deal 0x<deal>
+# ... vote + execute ...
+```
+
+### Permit2 receive (two-layer approval)
+
+```bash
+# Source wallet does both:
+#   1. ERC20.approve(permit2, amount)
+#   2. permit2.approve(token, dealCell, amount, expiration)
+# Use expiration = 4294967295 (max uint32, year 2106) — Hardhat chain time can
+# be far ahead of wall-clock and shorter expirations silently fail.
+
+# Then deal-side (assign-claimer role required via prior proposal):
+dac deal receive-permit2 0x<token> 0x<source> 1000000000000000000000 --deal 0x<deal>
+```
+
+## 15. Verifying State
+
+```bash
+# Deal overview (active, closed, recovered, rewards, slashing aggregates)
 dac deal view deal --deal 0x<deal>
 
-# Agent positions (per-agent stake, slash, claim amounts)
+# Per-agent positions
 dac deal view positions --deal 0x<deal>
 
-# Deal governance proposals
+# Deal governance proposals (with challenge info)
 dac deal view proposals --deal 0x<deal>
+
+# Treasury action history
+dac deal view treasury-actions --deal 0x<deal>
 ```
+
+**Accounting invariants** (verified by QA across 4+ deal scenarios):
+
+- `sum(positions.currentStakedAmount) == deal.currentStakedAmount`
+- `sum(positions.totalSlashedAmount) == deal.totalSlashedStakeAmount`
+- `sum(positions.totalReleasedAmount) == deal.totalReleasedStakeAmount`
+- `sum(positions.totalClaimedMainTokenAmount) == deal.totalRewardClaimedAmount`
+- `deal.totalRewardClaimedAmount <= deal.totalRewardAllocatedAmount`
+- **Per position**: `currentStakedAmount + totalSlashedAmount + totalReleasedAmount == totalStakedAmount`
 
 ## Related
 
 - [Deal Commands Reference](../cli/deal-commands.md)
 - [Native DAC Guide](./native-dac.md)
 - [Governance Guide](../cli/governance.md)
+- [Existing-Token DAC Guide](./existing-token-dac.md) — cross-DAC investment via `core:dac-deal`
