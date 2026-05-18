@@ -53,8 +53,17 @@ Key encoding rules:
 - **`rewardCurve`** is a polynomial: `[1e18]` is the constant 100% (always full reward
   regardless of progress); `[0, 1e18]` is linear `y = x` (50% reward at 50% progress).
 - **`penaltyCurve`** likewise. `[0, 1e18]` means slash scales linearly with shortfall.
-- **`rewardsLimit`** must be `0` for existing-token DACs (no minting headroom). Native
-  DACs can mint up to `mainTokenMaxSupply`.
+- **`rewardsLimit`** — maximum reward payout (in MainToken or WrappedMainToken). Both
+  DAC modes support `> 0`, with different funding mechanics:
+  - **Native DAC**: capacity is checked against `mainTokenMaxSupply` headroom. At claim,
+    `mainToken.mint(agent, amount)` mints fresh tokens. No upfront treasury funding needed.
+  - **Existing-Token DAC**: capacity is checked against `_freeBalance(WrappedMainToken)` in
+    the AssetController. At approval, `rewardsLimit` of WMT is moved from free →
+    `committedBalances`. At claim, `safeTransfer(agent, amount)` transfers pre-existing
+    WMT from the controller. **You must pre-fund the treasury** with WMT (via
+    `--treasury-seed-amount` at creation or `dac deposit-treasury --token <WMT>` later)
+    so `_freeBalance(WMT) >= rewardsLimit` at approval time — otherwise approval reverts
+    with `InsufficientRewards()`.
 - **`vetoEnabled`** must be set at creation — can't be added later (except via
   `enable-veto-right` deal proposal, which requires deal approval).
 - **`extensionPeriod`** > 0 lets the milestone deadline extend once if progress < 100%

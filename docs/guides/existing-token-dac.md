@@ -25,7 +25,7 @@ Existing ERC20  ───►  Wrap  ───►  WrappedMainToken (ERC20Votes)
 | Founder allocation | `--allocation` minted to founder | None — founder must `wrap` to gain voting power |
 | Supply cap | `--max-supply` | Bounded by underlying token's circulating supply |
 | Treasury seed | None at creation; deposit separately | `--treasury-seed-amount` of underlying wraps into treasury |
-| Deal `rewardsLimit` | Can be > 0 (mintable headroom) | **Must be 0** — wrapped token has no minting headroom (1:1 invariant); reverts with `InsufficientRewards()` |
+| Deal `rewardsLimit` | Backed by `mainTokenMaxSupply` headroom; minted at claim | Backed by **WrappedMainToken already in the treasury**; locked at approval, **transferred at claim**. Pre-fund via `--treasury-seed-amount` or `dac deposit-treasury --token <WMT>` |
 | Governance proposals | Single voting phase | Multi-phase: PrimaryVoting → FallbackWarmup → FallbackVoting |
 
 ## 1. (Optional) Deploy a Governance Oracle
@@ -196,7 +196,64 @@ dac vote proposal <id> true --dac 0x<dac>
 dac execute <id> --dac 0x<dac>
 ```
 
-## 7. Treasury Deposits (Underlying Token Funding)
+## 7. Deal Reward Funding (WrappedMainToken)
+
+Existing-token DACs pay deal rewards in **WrappedMainToken (WMT)** drawn from the
+treasury — rewards cannot be minted because the wrapper has a strict 1:1 invariant with
+the underlying. This differs from native DACs, where rewards are minted from
+`mainTokenMaxSupply` headroom at claim time.
+
+The flow:
+
+```
+┌─────────────────────┐         ┌──────────────────┐         ┌───────────────┐
+│ Treasury holds WMT  │  ──→    │ Deal approval:   │  ──→    │ Deal claim:   │
+│ (seed or donation)  │         │ locks rewardsLimit│        │ transfers WMT │
+│                     │         │ → committed      │         │ to agent      │
+│ _freeBalance(WMT)   │         │ balances         │         │ committed &   │
+│                     │         │                  │         │ balance both  │
+│                     │         │                  │         │ decrease      │
+└─────────────────────┘         └──────────────────┘         └───────────────┘
+```
+
+**Two ways to fund the treasury with WMT:**
+
+1. **At creation** — `--treasury-seed-amount <n>` wraps `n` underlying tokens and
+   deposits them as WMT into the AssetController.
+2. **Post-creation** — anyone can donate via:
+   ```bash
+   # First wrap if you only hold the underlying
+   dac wrap --amount 5000000000000000000000 --dac 0x<dac> --auto-approve
+
+   # Then deposit WMT to the treasury (transfers to DACCell + recoverTreasury sweeps it)
+   dac deposit-treasury --token 0x<wrappedMainToken> --amount 5000000000000000000000 \
+     --dac 0x<dac>
+   ```
+
+**At deal approval:**
+
+`AssetController.approveFunding` checks `_freeBalance(WMT) >= rewardsLimit`. If true, it
+moves `rewardsLimit` from free → `committedBalances`. If not, approval reverts with
+`InsufficientRewards()`. The committed WMT is **locked** for this deal until claim or
+release-on-close.
+
+**At deal claim:**
+
+`AssetController.settleMainRewardClaim` does `IERC20.safeTransfer(agent, amount)` and
+decrements both `committedBalances[WMT]` and `treasuryBalances[WMT]` by the claimed
+amount. The agent receives real WMT (which they can `unwrap` to the underlying if
+desired).
+
+**At deal close:**
+
+Any unused reward budget (committed but never allocated) is released back from
+`committedBalances` to `_freeBalance` via `releaseUnusedMintRewards`, making it
+available for the next deal.
+
+Use `dac view treasury-holdings --dac 0x<dac>` to inspect WMT `balance`,
+`committedAmount`, and `freeAmount` at any time.
+
+## 8. Treasury Deposits (Underlying Token Funding)
 
 For deals that need to disburse the underlying token (not the wrapped form), the
 treasury must hold the underlying directly:
@@ -209,7 +266,7 @@ dac deposit-treasury --token 0x<underlying-erc20> --amount 500000000000000000000
 The wrap operation puts underlying into the WrappedMainToken contract (not into
 the DAC treasury), so a separate `deposit-treasury` is required to fund deals.
 
-## 8. Cross-DAC Investment via `core:dac-deal`
+## 9. Cross-DAC Investment via `core:dac-deal`
 
 An existing-token DAC can invest in another DAC (typically a native sub-DAC) using a
 `core:dac-deal`:
@@ -245,7 +302,7 @@ An existing-token DAC can invest in another DAC (typically a native sub-DAC) usi
 The capital call nonce equals the child proposal ID that created the call — the
 contract reuses the proposal ID as the call nonce.
 
-## 9. Snapshot.org Voting via ERC-1271 (Advanced)
+## 10. Snapshot.org Voting via ERC-1271 (Advanced)
 
 A `core:dac-deal` can sign Snapshot.org Vote payloads via the deal's ERC-1271 interface,
 allowing the deal to participate in child-DAC governance using a familiar off-chain

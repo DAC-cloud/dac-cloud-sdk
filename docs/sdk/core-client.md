@@ -46,6 +46,26 @@ All mutating methods route through an internal `submitWrite` helper that:
 Therefore: a tx hash returned by any `DacCoreClient` method is the hash of a **mined,
 successful** transaction. You don't need to manually check the receipt.
 
+## Deal Rewards by DAC Mode
+
+Both DAC modes share the same `createDealProposal` / `createDealManagementProposal` /
+`claimMainToken` surface, but rewards flow through different mechanisms internally:
+
+- **Native DAC** — `rewardsLimit` is a budget bounded by `mainTokenMaxSupply` headroom.
+  At deal approval, `_mainTokenObligations` is incremented (pure accounting; no tokens
+  move). At claim, `MainToken.mint(agent, amount)` mints fresh tokens.
+
+- **Existing-Token DAC** — `rewardsLimit` is bounded by `_freeBalance(WrappedMainToken)`
+  in the AssetController. At deal approval, `committedBalances[WMT] += rewardsLimit`
+  **locks real WMT** that must already be in the treasury. At claim,
+  `IERC20.safeTransfer(agent, amount)` transfers WMT from the controller and
+  decrements `committedBalances[WMT]` and `treasuryBalances[WMT]`. Insufficient free
+  balance reverts with `InsufficientRewards()` at approval time.
+
+To pre-fund WMT in an existing-token DAC's treasury, use `--treasury-seed-amount` at
+DAC creation (`deployExistingTokenDac`) or call `depositTreasury` with the WMT address
+later. See the [Existing-Token DAC Guide](../guides/existing-token-dac.md#7-deal-reward-funding-wrappedmaintoken).
+
 ## Method Reference
 
 The client exposes 45 methods grouped below.
@@ -118,7 +138,7 @@ For existing-token DACs with a GovernanceOracle.
 | `inviteAgentToDeal({ dealCell, invitee, grantInviteRight? })` | Whitelist an agent (pre-approval) |
 | `stakeAgentToDeal({ agentToken, dealCell, amount })` | Stake AgentTokens (pre-approval) |
 | `unstakeFromDeal({ dealCell })` | Unstake from a closed deal |
-| `claimMainToken({ dealCell, evaluatorId })` | Claim agent's MainToken rewards |
+| `claimMainToken({ dealCell, evaluatorId })` | Claim agent's MainToken rewards (native: minted; existing-token: transferred from treasury WMT) |
 | `claimDealRewardPool({ dealCell, evaluatorId })` | Claim deal's collective reward pool |
 | `evaluateDeal({ dealManager, dealId, evaluatorId })` | Trigger evaluation |
 | `forceReturnCapital({ dealManager, dealId })` | Force-return capital after deadline |

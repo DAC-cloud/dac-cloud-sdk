@@ -80,24 +80,42 @@ async function captureDealSnapshot(
  *
  * Concentrated multi-phase scenario targeting indexer accounting bugs:
  * drift on consecutive updates, overwrites vs accumulation, stale caches.
+ * Also exercises the full existing-token reward flow end-to-end.
  *
- * Uses an Existing-Token DAC (oracle fallback voting) — first deal scenario
- * on this DAC mode. Three agents with uneven stakes (10k/8k/3k = 21k total).
+ * Uses an Existing-Token DAC (fallback voting). Three agents with uneven
+ * stakes (10k/8k/3k = 21k total).
  *
- * PROTOCOL FINDING: existing-token DAC deals CANNOT have rewardsLimit > 0.
- * The WrappedMainToken is a 1:1 wrapper — totalSupply always equals
- * underlying.balanceOf(wrapper), leaving zero capacity for minting reward
- * tokens. InsufficientRewards() is thrown on approval for any rewardsLimit > 0.
- * Native DAC avoids this because MainToken has mainTokenMaxSupply (default 1B)
- * with minting headroom. This scenario uses rewardsLimit=0 and focuses on
- * treasury funding, evaluation slashing, and stake lifecycle.
+ * REWARDS MODEL (existing-token DAC):
+ *   Rewards are paid in WrappedMainToken (WMT) drawn from the DAC's treasury
+ *   balance — not minted (the wrapper has a strict 1:1 invariant with the
+ *   underlying, so no minting headroom exists).
+ *
+ *   - Funding: treasury holds WMT either from `--treasury-seed-amount` at DAC
+ *     creation OR from later donations via `dac deposit-treasury --token <WMT>`
+ *     (which transfers WMT to the DACCell and then sweeps it to the
+ *     AssetController via `recoverTreasury`).
+ *   - Approval: when a deal is approved, AssetController checks
+ *     `_freeBalance(WMT) >= rewardsLimit`, then moves `rewardsLimit` from
+ *     free to `committedBalances[WMT]`. Insufficient free balance reverts
+ *     with `InsufficientRewards()`.
+ *   - Claim: agents call `deal claim`. AssetController does
+ *     `IERC20.safeTransfer(agent, amount)` and decrements both
+ *     `committedBalances[WMT]` and `treasuryBalances[WMT]`.
+ *   - Close: any unused reward budget is released back from committed → free
+ *     when the deal closes.
+ *
+ *   Native DAC equivalent: same `settleMainRewardClaim` path, but it calls
+ *   `mainToken.mint(to, amount)` instead of `safeTransfer`, and the approval
+ *   capacity check is against `mainTokenMaxSupply` headroom.
  *
  * Phase 1: Baseline — verify funded deal, zero rewards/slashing
  * Phase 2: Partial progress (60%) + first eval → slashing from penalty curve
  * Phase 3: Multi-tranche treasury deposits (accumulation stress)
- * Phase 4: More progress (110%) + second eval → deal closes
- * Phase 5: Force return capital → treasury balance restored
- * Phase 6: Unstake + final accounting invariants
+ * Phase 4: More progress (110%) + second eval → rewards accumulate
+ * Phase 5: Per-agent reward claim → verify WMT flow from controller to agents
+ *          (balance deltas + treasury committed/balance decrement)
+ * Phase 6: Force return funding capital → treasury balance restored
+ * Phase 7: Final state + accounting invariants
  *
  * Accounting invariant check at every phase transition.
  */
@@ -126,20 +144,14 @@ export const existingTokenAccountingStressScenario: Scenario = {
     const underlyingToken = h.config.tokens.treasury;
     await mintMockToken(h, {token: underlyingToken, to: founderWallet.address, amount: "50000000000000000000000"}); // 50k extra
 
-    // PROTOCOL FINDINGS (existing-token DAC reward funding):
-    //
-    // 1. recoverTreasury(mainToken) REVERTS — DACCell has special handling that
-    //    prevents recovering the governance token. deposit-treasury silently fails
-    //    because writeContract doesn't check receipts.
-    //
-    // 2. wrap --recipient <dacCell> fails with NoVotingPower() — WrappedMainToken
-    //    requires delegation, and contracts can't self-delegate.
-    //
-    // 3. The ONLY way to fund AssetController's mainToken balance for reward capacity
-    //    is through treasury-seed-amount at DAC creation time. This means existing-token
-    //    DACs must plan their reward capacity upfront.
-    //
-    // We set treasury-seed-amount = rewardsLimit + buffer to cover the deal rewards.
+    // REWARDS FUNDING:
+    //   `--treasury-seed-amount` provides the initial WrappedMainToken supply
+    //   in the AssetController (wraps underlying at DAC creation). The scenario
+    //   also exercises the post-creation top-up path below via
+    //   `dac deposit-treasury --token <WrappedMainToken>` (transfer to DACCell +
+    //   recoverTreasury sweep). At deal approval, AssetController commits
+    //   `rewardsLimit` of WMT into `committedBalances` — reverts with
+    //   `InsufficientRewards()` if `_freeBalance(WMT) < rewardsLimit`.
     const rewardsLimit = "5000000000000000000000"; // 5k rewards in WrappedMainToken
     const treasurySeedAmount = "8000000000000000000000"; // 8k seed (covers 5k rewards + buffer)
 
@@ -190,9 +202,12 @@ export const existingTokenAccountingStressScenario: Scenario = {
     // user path for adding reward capacity after DAC creation.
 
     await step(h, "deposit-treasury-wrapped", async () => {
-      // Test the standard user path for adding reward capacity post-creation:
-      // deposit-treasury for WrappedMainToken (ERC20 transfer + recoverTreasury).
-      // Requires the contract fix that skips _autoDelegate for controlled addresses.
+      // Standard user path for adding reward capacity post-creation:
+      // `dac deposit-treasury --token <WrappedMainToken>` transfers WMT to the
+      // DACCell and then calls recoverTreasury, which sweeps the held WMT into
+      // the AssetController and credits `treasuryBalances[WMT]`. The freshly
+      // added balance becomes part of `_freeBalance` and is available to back
+      // future deal approvals.
       h.log("Depositing WrappedMainToken to treasury (2k) for reward top-up...");
       const depositCli = await h.cli([
         "deposit-treasury", "--token", ctx.wrappedMainTokenAddress,
@@ -312,6 +327,17 @@ export const existingTokenAccountingStressScenario: Scenario = {
         (ent) => (ent.tokenAddress as string)?.toLowerCase() === ctx.treasuryToken.toLowerCase(),
       );
       h.log(`Treasury after funding: balance=${underlyingHolding?.balance}, committed=${underlyingHolding?.committedAmount}, free=${underlyingHolding?.freeAmount}`);
+
+      // Verify WrappedMainToken (rewards) committed amount equals rewardsLimit
+      const wmtHolding = holdings?.find(
+        (ent) => (ent.tokenAddress as string)?.toLowerCase() === ctx.wrappedMainTokenAddress.toLowerCase(),
+      );
+      h.log(`Treasury WMT after approval: balance=${wmtHolding?.balance}, committed=${wmtHolding?.committedAmount}, free=${wmtHolding?.freeAmount}`);
+      assert.defined(wmtHolding, "WMT holding exists in treasury");
+      assert.equal(
+        String(wmtHolding?.committedAmount), rewardsLimit,
+        "WMT committed equals rewardsLimit after deal approval (rewards locked)",
+      );
 
       const dealCli = await h.dealView("deal", ["--deal-address", ctx.dealAddress]);
       return {
@@ -514,7 +540,154 @@ export const existingTokenAccountingStressScenario: Scenario = {
     });
 
     // ══════════════════════════════════════════════════════════════
-    // PHASE 5: FORCE RETURN CAPITAL
+    // PHASE 5: CLAIM REWARDS (WMT flow from controller to agents)
+    // ══════════════════════════════════════════════════════════════
+    //
+    // Existing-token rewards are paid from `committedBalances[WMT]` in the
+    // AssetController. Each `deal claim` triggers `IERC20.safeTransfer(agent, ...)`
+    // and decrements both `committedBalances[WMT]` and `treasuryBalances[WMT]`
+    // by the claimed amount. We assert the full balance flow.
+
+    const wrappedMainToken = ctx.wrappedMainTokenAddress;
+    const agent1Wallet = config.wallets.agent1;
+    const agent2Wallet = config.wallets.agent2;
+    if (!agent1Wallet || !agent2Wallet) throw new Error("agent1/agent2 wallets required");
+
+    async function readWmtBalance(addr: string): Promise<bigint> {
+      const cli = await h.cli([
+        "balance", wrappedMainToken, addr,
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      return BigInt(cli.data.balance as string);
+    }
+
+    async function readWmtTreasury(): Promise<{balance: bigint; committed: bigint; free: bigint}> {
+      const thCli = await h.view("treasury-holdings", ["--dac", ctx.dacAddress]);
+      const holdings = thCli.data.holdings as Array<Record<string, unknown>> | undefined;
+      const wmt = holdings?.find(
+        (ent) => (ent.tokenAddress as string)?.toLowerCase() === wrappedMainToken.toLowerCase(),
+      );
+      return {
+        balance: BigInt((wmt?.balance as string) ?? "0"),
+        committed: BigInt((wmt?.committedAmount as string) ?? "0"),
+        free: BigInt((wmt?.freeAmount as string) ?? "0"),
+      };
+    }
+
+    const preClaimTreasury = await readWmtTreasury();
+    const preFounderWmt = await readWmtBalance(ctx.founderAddress);
+    const preAgent1Wmt = await readWmtBalance(agent1Wallet.address);
+    const preAgent2Wmt = await readWmtBalance(agent2Wallet.address);
+    h.log(`Pre-claim treasury WMT: balance=${preClaimTreasury.balance}, committed=${preClaimTreasury.committed}, free=${preClaimTreasury.free}`);
+    h.log(`Pre-claim agent WMT: founder=${preFounderWmt}, agent1=${preAgent1Wmt}, agent2=${preAgent2Wmt}`);
+    assert.equal(preClaimTreasury.committed > 0n, true, "WMT committed > 0 before claim");
+
+    await step(h, "phase5-claim-founder", async () => {
+      const cli = await h.cli([
+        "deal", "claim",
+        "--deal-address", ctx.dealAddress,
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      assert.defined(cli.data.txHash, "founder claim tx hash");
+      return {cli, command: ["deal", "claim"]};
+    });
+
+    await step(h, "phase5-claim-agent1", async () => {
+      const cli = await h.cliAs("agent1", [
+        "deal", "claim",
+        "--deal-address", ctx.dealAddress,
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      assert.defined(cli.data.txHash, "agent1 claim tx hash");
+      return {cli, command: ["deal", "claim"]};
+    });
+
+    await step(h, "phase5-claim-agent2", async () => {
+      const cli = await h.cliAs("agent2", [
+        "deal", "claim",
+        "--deal-address", ctx.dealAddress,
+        "--config", config.configPath, "--pretty-print",
+      ]);
+      assert.defined(cli.data.txHash, "agent2 claim tx hash");
+      return {cli, command: ["deal", "claim"]};
+    });
+
+    await h.syncIndexer();
+
+    await step(h, "phase5-verify-claim-flow", async () => {
+      const postFounderWmt = await readWmtBalance(ctx.founderAddress);
+      const postAgent1Wmt = await readWmtBalance(agent1Wallet.address);
+      const postAgent2Wmt = await readWmtBalance(agent2Wallet.address);
+
+      const founderDelta = postFounderWmt - preFounderWmt;
+      const agent1Delta = postAgent1Wmt - preAgent1Wmt;
+      const agent2Delta = postAgent2Wmt - preAgent2Wmt;
+      const totalClaimed = founderDelta + agent1Delta + agent2Delta;
+
+      h.log(`Agent WMT deltas: founder=+${founderDelta}, agent1=+${agent1Delta}, agent2=+${agent2Delta}, total=+${totalClaimed}`);
+
+      assert.equal(founderDelta > 0n, true, "founder received WMT rewards");
+      assert.equal(agent1Delta > 0n, true, "agent1 received WMT rewards");
+      assert.equal(agent2Delta > 0n, true, "agent2 received WMT rewards");
+      assert.equal(totalClaimed > 0n, true, "total claimed across agents > 0");
+
+      // AssetController-side accounting (via indexer treasury-holdings)
+      const postClaimTreasury = await readWmtTreasury();
+      h.log(`Post-claim treasury WMT: balance=${postClaimTreasury.balance}, committed=${postClaimTreasury.committed}, free=${postClaimTreasury.free}`);
+
+      // Both `committedBalances[WMT]` and `treasuryBalances[WMT]` should drop
+      // by exactly the total claimed amount; `free` stays unchanged.
+      assert.equal(
+        String(preClaimTreasury.committed - postClaimTreasury.committed), String(totalClaimed),
+        "WMT committed dropped by total claimed",
+      );
+      assert.equal(
+        String(preClaimTreasury.balance - postClaimTreasury.balance), String(totalClaimed),
+        "WMT treasury balance dropped by total claimed",
+      );
+      assert.equal(
+        String(postClaimTreasury.free), String(preClaimTreasury.free),
+        "WMT free amount unchanged by claim",
+      );
+
+      // Indexer-side `totalRewardClaimedAmount` should match aggregated deltas.
+      const snap = await captureDealSnapshot(h, ctx.dealAddress, ctx.treasuryToken);
+      assert.equal(
+        String(snap.totalRewardClaimedAmount), String(totalClaimed),
+        "deal.totalRewardClaimedAmount == sum(agent WMT deltas)",
+      );
+      assert.equal(
+        snap.totalRewardClaimedAmount <= snap.totalRewardAllocatedAmount, true,
+        "claimed <= allocated",
+      );
+
+      await verifyDealAccountingInvariants(h, ctx.dealAddress);
+
+      const dealCli = await h.dealView("deal", ["--deal-address", ctx.dealAddress]);
+      const posCli = await h.dealView("positions", ["--deal-address", ctx.dealAddress]);
+      return {
+        cli: dealCli,
+        command: ["deal", "view", "deal"],
+        indexerSnapshot: {
+          deal: dealCli.data.deal,
+          positions: posCli.data.positions,
+          treasuryHoldingsWmt: {
+            balance: String(postClaimTreasury.balance),
+            committed: String(postClaimTreasury.committed),
+            free: String(postClaimTreasury.free),
+          },
+          agentDeltas: {
+            founder: String(founderDelta),
+            agent1: String(agent1Delta),
+            agent2: String(agent2Delta),
+            total: String(totalClaimed),
+          },
+        } as Record<string, unknown>,
+      };
+    });
+
+    // ══════════════════════════════════════════════════════════════
+    // PHASE 6: FORCE RETURN CAPITAL
     // ══════════════════════════════════════════════════════════════
 
     // Advance past deal deadline for force return
@@ -526,7 +699,7 @@ export const existingTokenAccountingStressScenario: Scenario = {
       await h.advanceTime(neededAdvance3);
     }
 
-    await step(h, "phase5-force-return", async () => {
+    await step(h, "phase6-force-return", async () => {
       const args = [
         "deal", "withdraw", ctx.dealNumericId,
         "--dac", ctx.dacAddress,
@@ -541,7 +714,7 @@ export const existingTokenAccountingStressScenario: Scenario = {
 
     let s4: DealSnapshot;
 
-    await step(h, "phase5-verify", async () => {
+    await step(h, "phase6-verify", async () => {
       s4 = await captureDealSnapshot(h, ctx.dealAddress, ctx.treasuryToken);
 
       h.log(`After force return: cellBalance=${s4.dealCellBalance}, staked=${s4.currentStakedAmount}`);
@@ -569,17 +742,19 @@ export const existingTokenAccountingStressScenario: Scenario = {
     });
 
     // ══════════════════════════════════════════════════════════════
-    // PHASE 6: FINAL STATE VERIFICATION
+    // PHASE 7: FINAL STATE VERIFICATION
     // ══════════════════════════════════════════════════════════════
     //
     // The deal remains ACTIVE because M1 at 60% progress only allocated 24% of
     // the total reward share (0.6 * 40% = 24%). Combined with M2's 60% share:
     // total allocated = 84% of rewardsLimit. Deal needs 100% to auto-close.
     // This is correct protocol behavior — partial milestone progress means
-    // the deal's reward budget isn't fully consumed.
+    // the deal's reward budget isn't fully consumed. The remaining ~16% of WMT
+    // stays in `committedBalances` until the deal eventually closes (then
+    // released back to `_freeBalance` via `onDealClosed`).
     // Unstake requires deal close, so we verify final accounting state instead.
 
-    await step(h, "phase6-final-verify", async () => {
+    await step(h, "phase7-final-verify", async () => {
       const s5 = await captureDealSnapshot(h, ctx.dealAddress, ctx.treasuryToken);
 
       h.log(`Final state: active=${s5.active}, closed=${s5.closed}, evalCount=${s5.totalEvaluationCount}`);
@@ -589,18 +764,30 @@ export const existingTokenAccountingStressScenario: Scenario = {
       // Both milestones evaluated
       assert.equal(s5.totalEvaluationCount, 2, "both milestones evaluated");
 
-      // Staking state preserved through all phases (use String to avoid BigInt serialization issues)
+      // Staking state preserved through phases 5+6 (claim doesn't touch stake,
+      // force-return only moves funding tokens)
       assert.equal(
         String(s5.currentStakedAmount), String(s4!.currentStakedAmount),
-        "staking unchanged since phase 5",
+        "staking unchanged since phase 6",
       );
       assert.equal(
         String(s5.totalSlashedStakeAmount), String(s4!.totalSlashedStakeAmount),
-        "slashing unchanged since phase 5",
+        "slashing unchanged since phase 6",
       );
       assert.equal(
         String(s5.totalRewardAllocatedAmount), String(s4!.totalRewardAllocatedAmount),
-        "rewards unchanged since phase 5",
+        "rewards allocated unchanged since phase 6",
+      );
+
+      // Rewards CLAIMED in phase 5 should equal the per-position sums
+      assert.equal(s5.totalRewardClaimedAmount > 0n, true, "rewards were claimed in phase 5");
+      let positionsClaimedSum = 0n;
+      for (const pos of s5.positions) {
+        positionsClaimedSum += pos.totalClaimedMainTokenAmount;
+      }
+      assert.equal(
+        String(positionsClaimedSum), String(s5.totalRewardClaimedAmount),
+        "sum(positions.totalClaimedMainTokenAmount) == deal.totalRewardClaimedAmount",
       );
 
       // Per-position stake conservation still holds

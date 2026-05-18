@@ -80,7 +80,7 @@ ANTHROPIC_API_KEY=sk-... node packages/qa/dist/index.js
 | `deal-force-return` | deal, force-return | Force return capital after deadline |
 | `deal-unstake-after-close` | deal, unstake, multi-deal | Close deal, both agents unstake, two deals in one DAC |
 | `deal-multi-deal-native-rewards` | deal, multi-deal, native | Multiple deals, native DAC rewards accumulate correctly |
-| `deal-multi-deal-wrapped-rewards` | deal, multi-deal, wrapped | Multiple deals, existing-token DAC rewards (no rewardsLimit) |
+| `deal-multi-deal-wrapped-rewards` | deal, multi-deal, wrapped | Multiple deals on existing-token DAC, rewards drawn from treasury-seeded WMT, claim flow |
 
 ### Cross-DAC Investment
 
@@ -94,7 +94,7 @@ ANTHROPIC_API_KEY=sk-... node packages/qa/dist/index.js
 | Scenario | Tags | Description |
 |----------|------|-------------|
 | `oracle-governance` | oracle, governance, merkle | Oracle Merkle voting (3 voters), mixed voting, config proposals, oracle swap |
-| `existing-token-accounting-stress` | existing-token, accounting | rewardsLimit=0 invariant, accounting cross-validation |
+| `existing-token-accounting-stress` | existing-token, accounting | Full reward flow: WMT treasury → lock at approval → per-agent claim → committed/balance decrement |
 
 ### Raw / Module
 
