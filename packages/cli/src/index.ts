@@ -27,7 +27,7 @@ Option keys support both plain and DAC_ prefixed env names.
 Example: --api-url resolves from API_URL or DAC_API_URL.
 
 Defaults:
-  --chain-id 31337
+  --chain-id 84532
   --api-url https://api.dac.cloud
   --private-key anvil account #0
 

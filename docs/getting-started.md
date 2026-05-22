@@ -38,9 +38,9 @@ The CLI resolves options in priority order:
 `config.env`:
 
 ```env
-DAC_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-DAC_CHAIN_ID=31337
-DAC_API_URL=http://localhost:3500
+DAC_PRIVATE_KEY=0x<your-32-byte-hex-key>
+DAC_CHAIN_ID=84532
+DAC_API_URL=https://api.dac.cloud
 # Auth fields are written automatically by `dac auth login`:
 # DAC_AUTH_TOKEN=<jwt>
 # DAC_AUTH_EXPIRES=<iso8601>
@@ -50,9 +50,9 @@ DAC_API_URL=http://localhost:3500
 
 | Option | Default |
 |--------|---------|
-| `--chain-id` | `31337` (Hardhat) |
+| `--chain-id` | `84532` (Base Sepolia) |
 | `--api-url` | `https://api.dac.cloud` |
-| `--private-key` | Anvil account #0 |
+| `--private-key` | **required** — no default; supply via flag, config, or `DAC_PRIVATE_KEY` env var |
 
 The CLI **does not** accept `--rpc-url` or `--indexer-url` directly; both are derived from
 `--api-url` and `--chain-id`. The backend proxies RPC at `${apiUrl}/rpc/${chainId}` and

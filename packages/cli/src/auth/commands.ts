@@ -38,7 +38,7 @@ export function registerAuthCommands(
   loginCmd.action(async function handleLogin(this: Command) {
     const opts = this.optsWithGlobals();
     const resolver = await resolverFactory(opts);
-    const chainId = resolver.resolveNumber("chain-id") ?? 31337;
+    const chainId = resolver.resolveNumber("chain-id") ?? 84532;
     const apiUrl = resolveApiUrl(resolver);
     const privateKey = resolver.requireString("private-key",
       "Login requires a private key. Use 'dac auth challenge' for external signing.");
@@ -77,7 +77,7 @@ export function registerAuthCommands(
   challengeCmd.action(async function handleChallenge(this: Command) {
     const opts = this.optsWithGlobals();
     const resolver = await resolverFactory(opts);
-    const chainId = resolver.resolveNumber("chain-id") ?? 31337;
+    const chainId = resolver.resolveNumber("chain-id") ?? 84532;
     const apiUrl = resolveApiUrl(resolver);
     const configPath = resolver.resolveString("config") ?? "./config.env";
 
@@ -125,7 +125,7 @@ export function registerAuthCommands(
   verifyCmd.action(async function handleVerify(this: Command) {
     const opts = this.optsWithGlobals();
     const resolver = await resolverFactory(opts);
-    const chainId = resolver.resolveNumber("chain-id") ?? 31337;
+    const chainId = resolver.resolveNumber("chain-id") ?? 84532;
     const apiUrl = resolveApiUrl(resolver);
     const address = resolver.requireString("from",
       "'dac auth verify' requires --from <address> to locate the pending challenge.");
@@ -199,7 +199,7 @@ export function registerAuthCommands(
     const opts = this.optsWithGlobals();
     const resolver = await resolverFactory(opts);
     const apiUrl = resolveApiUrl(resolver);
-    const chainId = resolver.resolveNumber("chain-id") ?? 31337;
+    const chainId = resolver.resolveNumber("chain-id") ?? 84532;
     const configPath = resolver.resolveString("config") ?? "./config.env";
 
     const configToken = resolver.resolveString("auth-token");

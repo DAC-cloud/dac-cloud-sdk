@@ -11,10 +11,8 @@ import {defineChain, type Address, type Hex, type PrivateKeyAccount} from "viem"
 import {resolveAuthToken} from "../auth/flows.js";
 import type {OptionResolver} from "./config";
 
-export const DEFAULT_ANVIL_PK_0 =
-  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as Hex;
-
 const DEFAULT_API_URL = "https://api.dac.cloud";
+const DEFAULT_CHAIN_ID = 84532;
 
 export interface CoreContext {
   chainId: number;
@@ -53,11 +51,14 @@ function authHeaders(token: string): Record<string, string> {
 }
 
 export async function makeCoreContext(resolver: OptionResolver): Promise<CoreContext> {
-  const chainId = resolver.resolveNumber("chain-id") ?? 31337;
+  const chainId = resolver.resolveNumber("chain-id") ?? DEFAULT_CHAIN_ID;
   const apiUrl = resolveApiUrl(resolver);
   const rpcUrl = deriveRpcUrl(apiUrl, chainId);
 
-  const privateKey = (resolver.resolveString("private-key", DEFAULT_ANVIL_PK_0) ?? DEFAULT_ANVIL_PK_0) as Hex;
+  const privateKey = resolver.requireString(
+    "private-key",
+    "Missing --private-key. Pass --private-key <hex>, set DAC_PRIVATE_KEY in your config, or export DAC_PRIVATE_KEY in the environment.",
+  ) as Hex;
   const account = accountFromPrivateKey(privateKey);
 
   const authToken = await resolveAuthToken({
@@ -106,7 +107,7 @@ export interface DryRunContext {
 }
 
 export async function makeDryRunContext(resolver: OptionResolver): Promise<DryRunContext> {
-  const chainId = resolver.resolveNumber("chain-id") ?? 31337;
+  const chainId = resolver.resolveNumber("chain-id") ?? DEFAULT_CHAIN_ID;
   const apiUrl = resolveApiUrl(resolver);
 
   const fromRaw = resolver.resolveString("from");
@@ -144,7 +145,7 @@ export async function makeDryRunContext(resolver: OptionResolver): Promise<DryRu
 
 export async function makeIndexer(resolver: OptionResolver) {
   const apiUrl = resolveApiUrl(resolver);
-  const chainId = resolver.resolveNumber("chain-id") ?? 31337;
+  const chainId = resolver.resolveNumber("chain-id") ?? DEFAULT_CHAIN_ID;
   const indexerUrl = deriveGraphqlUrl(apiUrl);
 
   const privateKeyRaw = resolver.resolveString("private-key");

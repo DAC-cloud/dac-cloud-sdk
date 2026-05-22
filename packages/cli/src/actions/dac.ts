@@ -1380,7 +1380,7 @@ async function cmdDiscover(resolver: OptionResolver): Promise<void> {
   const authToken = await resolveAuthToken({
     configToken: resolver.resolveString("auth-token"),
     configTokenExpires: resolver.resolveString("auth-expires"),
-    chainId: chainId ?? 31337,
+    chainId: chainId ?? 84532,
     account,
     apiUrl,
     dacs: [],
@@ -1844,7 +1844,7 @@ Raw proposal (3rd party modules):
     ],
     examples: [
       "dac discover",
-      "dac discover --chain-id 31337",
+      "dac discover --chain-id 84532",
     ],
   });
   discoverCmd.action(async function handleDiscover() {

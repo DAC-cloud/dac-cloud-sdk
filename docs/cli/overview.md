@@ -87,8 +87,8 @@ Set at the root command, inherited by all subcommands:
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--config <path>` | `./config.env` | Path to `.env`-format config file |
-| `--private-key <hex>` | Anvil acct #0 | Wallet private key (use for write commands) |
-| `--chain-id <number>` | `31337` | Target chain ID |
+| `--private-key <hex>` | **required** | Wallet private key (use for write commands) |
+| `--chain-id <number>` | `84532` (Base Sepolia) | Target chain ID |
 | `--api-url <url>` | `https://api.dac.cloud` | DAC Cloud backend URL |
 | `--dry-run` | off | Output unsigned transaction data, don't broadcast |
 | `--from <address>` | — | Sender address (required with `--dry-run` if no private key) |
