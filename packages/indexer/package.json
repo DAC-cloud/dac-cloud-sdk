@@ -1,6 +1,28 @@
 {
   "name": "@dac-cloud/indexer",
   "version": "0.1.0",
+  "description": "Typed GraphQL query client for the DAC Cloud Envio indexer read-model.",
+  "keywords": [
+    "dac-cloud",
+    "dao",
+    "ethereum",
+    "evm",
+    "graphql",
+    "indexer",
+    "envio",
+    "web3"
+  ],
+  "homepage": "https://github.com/DAC-cloud/dac-cloud-sdk/tree/master/packages/indexer#readme",
+  "bugs": {
+    "url": "https://github.com/DAC-cloud/dac-cloud-sdk/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DAC-cloud/dac-cloud-sdk.git",
+    "directory": "packages/indexer"
+  },
+  "license": "Apache-2.0",
+  "author": "DAC Cloud",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,10 +32,22 @@
       "default": "./dist/index.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts",
+    "prepublishOnly": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "codegen": "graphql-codegen --config codegen.ts"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@graphql-typed-document-node/core": "^3.2.0",

@@ -1,6 +1,28 @@
 {
   "name": "@dac-cloud/core",
   "version": "0.1.0",
+  "description": "Viem-based TypeScript SDK for the DAC Cloud protocol — ABIs, types, proposal builders, and contract client.",
+  "keywords": [
+    "dac-cloud",
+    "dao",
+    "ethereum",
+    "evm",
+    "viem",
+    "smart-contracts",
+    "governance",
+    "web3"
+  ],
+  "homepage": "https://github.com/DAC-cloud/dac-cloud-sdk/tree/master/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/DAC-cloud/dac-cloud-sdk/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DAC-cloud/dac-cloud-sdk.git",
+    "directory": "packages/core"
+  },
+  "license": "Apache-2.0",
+  "author": "DAC Cloud",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,9 +32,21 @@
       "default": "./dist/index.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts",
+    "prepublishOnly": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@dac-cloud/manifests": "0.1.0",

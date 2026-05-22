@@ -1,6 +1,26 @@
 {
   "name": "@dac-cloud/manifests",
   "version": "0.1.0",
+  "description": "Per-chain protocol manifest types and HTTP loader for the DAC Cloud SDK.",
+  "keywords": [
+    "dac-cloud",
+    "dao",
+    "ethereum",
+    "evm",
+    "manifest",
+    "web3"
+  ],
+  "homepage": "https://github.com/DAC-cloud/dac-cloud-sdk/tree/master/packages/manifests#readme",
+  "bugs": {
+    "url": "https://github.com/DAC-cloud/dac-cloud-sdk/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DAC-cloud/dac-cloud-sdk.git",
+    "directory": "packages/manifests"
+  },
+  "license": "Apache-2.0",
+  "author": "DAC Cloud",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,8 +30,20 @@
       "default": "./dist/index.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts",
+    "prepublishOnly": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
