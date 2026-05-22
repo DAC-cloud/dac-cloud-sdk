@@ -27,6 +27,7 @@ fragment ProposalBaseFields on Proposal {
   resolved
   passed
   executed
+  challenged
   executionValidityDuration
   resolutionTime
   executionDeadline

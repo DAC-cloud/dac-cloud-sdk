@@ -65,7 +65,7 @@ ANTHROPIC_API_KEY=sk-... node packages/qa/dist/index.js
 
 | Scenario | Tags | Description |
 |----------|------|-------------|
-| `deal-veto` | deal, veto, challenge | `vetoEnabled=true`, DAC challenges a deal proposal |
+| `deal-veto` | deal, veto, challenge | Full DAC challenge state machine: 4 paths (challenge during voting, after resolve, lapsed, executed) with quorum-isolated reverts |
 | `deal-strike-out` | deal, strike-out, multi-agent | Strike out agent (released, not slashed) via deal governance |
 | `deal-approve-expired` | deal, approve-expired | Deal approval past deadline, create replacement |
 | `deal-active-staking` | deal, active-staking, multi-agent | Post-approval add-stake flow + executionValidityDuration |

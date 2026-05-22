@@ -183,12 +183,49 @@ dac vote proposal <id> true --dac 0x<dac>
 dac execute <id> --dac 0x<dac>
 
 # 3. Deal proposal is now permanently blocked
-dac deal execute <dealProposalId> --deal 0x<deal>   # reverts
+dac deal execute <dealProposalId> --deal 0x<deal>   # reverts ProposalNotExecutable()
 ```
 
-`strike-out-agent` is "always challengeable" — the DAC can challenge it regardless of
-the deal's `vetoEnabled` flag, on the theory that removing a stakeholder is severe
-enough that the DAC always gets a final say.
+### Challenge state machine
+
+**The challenge is registered the moment the DAC `propose challenge-deal` transaction
+lands — not when the DAC vote passes or executes.** Filing a challenge immediately flips
+`dealProposal.challenged=true` and suspends execution. The DAC vote then determines
+whether the block becomes permanent or eventually lifts:
+
+| Challenge state | Effect on deal proposal execution | Revert reason |
+|---|---|---|
+| No challenge | Available at `resolutionTime` (normal) | — |
+| **Filed, unresolved** | Blocked indefinitely | `ProposalNotExecutable()` |
+| **Resolved, failed** (voted down, where blocking permits) | Available at `max(deal.resolutionTime, challenge.resolutionTime)` | — |
+| **Resolved, passed, NOT executed, NOT expired** | Blocked indefinitely | `ProposalNotExecutable()` |
+| **Resolved, passed, EXECUTED** | Permanently blocked | `ProposalNotExecutable()` |
+| **Resolved, passed, NOT executed, EXPIRED** (lapsed) | Available at challenge's `executionDeadline` | — |
+
+The "lapsed challenge" outcome means a DAC that fails to enact its veto within
+`executionValidityDuration` after passing the vote loses the block — the deal proposal
+becomes executable again.
+
+### Revert distinction (debugging)
+
+When `dac deal execute <id>` reverts, the cause depends on which check failed:
+
+- **`VoteNotPassed()`** — the deal proposal didn't reach quorum (or hasn't resolved yet).
+  Sort voters smallest-first to avoid quorum-cutoff cases.
+- **`ProposalNotExecutable()`** — quorum was reached, but the proposal is blocked by an
+  active or executed DAC challenge.
+- **`ProposalAlreadyExecuted()`** — already executed once.
+
+Inspect `dealProposal.passed` and `dealProposal.challenged` in the indexer to disambiguate.
+
+### Other notes
+
+- **Challenges are single-shot** — a second `propose challenge-deal` on the same deal
+  proposal reverts with `ProposalAlreadyChallenged()`. The challenge proposal itself
+  may be filed any time before the deal proposal has executed or expired.
+- **`strike-out-agent` is "always challengeable"** — the DAC can challenge it regardless
+  of the deal's `vetoEnabled` flag, on the theory that removing a stakeholder is severe
+  enough that the DAC always gets a final say.
 
 ## Multi-Voter Quorum Patterns
 

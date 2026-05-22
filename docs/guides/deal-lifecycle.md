@@ -248,22 +248,38 @@ dac deal propose strike-out-agent 0x<agent> --deal 0x<deal>
 ## 13. DAC Veto (Challenge)
 
 When a deal has `vetoEnabled=true` (or has executed `propose enable-veto-right`), the
-DAC can challenge any deal proposal:
+DAC can challenge any deal proposal.
+
+**Key fact:** the challenge takes effect the moment the DAC's `propose challenge-deal`
+transaction lands — not when the DAC vote/execute happens. Filing the challenge
+immediately flips `dealProposal.challenged=true` and suspends execution.
 
 ```bash
 # Deal-side: agent creates the proposal
 dac deal propose toggle-early-returns true --deal 0x<deal>
 
-# DAC-side: challenge it
+# DAC-side: file the challenge (this alone suspends deal execution)
 dac propose challenge-deal <dealNumericId> <dealProposalId> --dac 0x<dac>
+
+# Optional: from here, the DAC vote determines the long-term outcome:
 dac vote proposal <id> true --dac 0x<dac>
 dac execute <id> --dac 0x<dac>
 
 # Deal-side: execution now reverts
-dac deal execute <dealProposalId> --deal 0x<deal>   # reverts
+dac deal execute <dealProposalId> --deal 0x<deal>   # ProposalNotExecutable()
 ```
 
-The challenge is permanent — once executed, the deal proposal cannot be executed.
+Possible end states for a challenged deal proposal:
+
+| DAC challenge outcome | Deal proposal outcome |
+|-----------------------|----------------------|
+| Unresolved (still voting / sitting) | **Blocked** (`ProposalNotExecutable()`) |
+| Resolved-failed | Deal proposal becomes executable again |
+| Resolved-passed + executed | **Permanently blocked** |
+| Resolved-passed + lapsed (not executed within `executionValidityDuration`) | Deal proposal becomes executable again |
+
+Challenges are single-shot per deal proposal — a second `propose challenge-deal` reverts
+with `ProposalAlreadyChallenged()`. See [Governance Guide → Challenge state machine](../cli/governance.md#challenge-state-machine).
 
 ## 14. Treasury Operations
 

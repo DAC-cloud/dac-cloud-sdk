@@ -11,6 +11,8 @@ export const dacErrorSignatures = [
   "error NoVotingPower()",
   "error VoteNotPassed()",
   "error ProposalAlreadyExecuted()",
+  "error ProposalNotExecutable()",
+  "error ProposalAlreadyChallenged()",
   "error MaxSupplyExceeded()",
   "error NotTransferable()",
   "error TransferFailed()",
