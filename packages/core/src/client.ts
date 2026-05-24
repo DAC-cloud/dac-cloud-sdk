@@ -155,7 +155,10 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
   //      checkpoints on the delegate). Combined with the EVM's 63/64-rule
   //      attrition through nested calls (DealCell → lib delegatecall →
   //      DealManager → MainToken.mint), the inner mint can starve. We add a
-  //      50% buffer over the estimate to make these paths robust.
+  //      50% buffer over the estimate, with a 200k floor — small calls like
+  //      ERC20Votes.delegate() were observed OOG'ing on Base Sepolia with a
+  //      ~22k estimate × 1.5 = ~33k limit, because the hook callback chain
+  //      needed more than the 63/64 attrition left it.
   async function submitWrite<TAbi extends Abi, TFunctionName extends ContractFunctionName<TAbi, "nonpayable" | "payable">>(
     params: {
       address: Address;
@@ -177,13 +180,17 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       account,
     } as Parameters<typeof publicClient.estimateContractGas>[0]);
 
+    const buffered = gasEstimate + (gasEstimate / 2n);
+    const floor = 200_000n;
+    const gas = buffered > floor ? buffered : floor;
+
     const txHash = await walletClient.writeContract({
       address: params.address,
       abi: params.abi,
       functionName: params.functionName,
       args: params.args ?? [],
       account,
-      gas: gasEstimate + (gasEstimate / 2n),
+      gas,
     } as Parameters<typeof walletClient.writeContract>[0]);
 
     const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
