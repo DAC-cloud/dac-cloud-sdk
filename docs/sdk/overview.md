@@ -10,27 +10,30 @@ private QA harness. All packages target ESM and ship `.d.ts` declarations.
 The main SDK package — a [viem](https://viem.sh)-based client for the DAC Cloud
 contracts. Exports:
 
-- `createDacCoreClient(options)` — signing client (writes + reads). 45 methods covering
+- `createDacCoreClient(options)` — signing client (writes + reads). 54 methods covering
   every contract entrypoint.
 - `createDacTransactionBuilder(options)` — unsigned-tx builder that mirrors the client's
   method set but returns `TransactionRequest` objects for multisig / external signers.
 - `accountFromPrivateKey(privateKey)` — viem `PrivateKeyAccount` helper.
 - All contract **ABIs** (`dacFactoryAbi`, `dacCellAbi`, `dealManagerAbi`, `dealCellAbi`,
   `dealAbi`, `governanceOracleAbi`, `votingProposalAbi`, `wrappedMainTokenAbi`,
-  `permit2TreasuryAbi`, etc.).
+  `permit2TreasuryAbi`, `moduleFactoryAbi`, `agentDealAbi`, etc.).
 - **Proposal builders** (`buildMintAgentTokensProposal`, `buildStrikeOutAgentProposal`,
   `buildUpdateGovernanceStrategyProposal`, …) — return `ProposalParams` ready to pass
   to `createDacManagementProposal` / `createDealManagementProposal`.
 - **Selectors** — `DAC_PROPOSAL_TYPE`, `DEAL_PROPOSAL_TYPE`, `CORE_DEAL_KIND`,
-  `CORE_EVALUATOR_KIND`, `CORE_DEAL_PROPOSAL_TYPE`, `CORE_TREASURY_PROPOSAL_TYPE`.
+  `CORE_EVALUATOR_KIND`, `CORE_DEAL_PROPOSAL_TYPE`, `CORE_TREASURY_PROPOSAL_TYPE`,
+  `CORE_AGENT_DEAL_PROPOSAL_TYPE`.
 - **Types** — `DACConfig`, `NativeDacConfig`, `ExistingTokenDacConfig`,
   `GovernanceStrategyConfig`, `VotingConfig`, `DealCreationConfig`, `DealParams`,
   `CapitalCall`, `HybridProposalState`, `PROPOSAL_PHASE`, `ASSET_CAPABILITY`, …
 - **`coreModule` namespace** — JSON parsers and encoders for the core module's
-  evaluator configs (milestones, revenue), deal configs (permit2-treasury, dac-deal),
+  evaluator configs (milestones, revenue), deal configs (permit2-treasury, dac-deal,
+  agent-deal),
   plus Snapshot.org ERC-1271 helpers (`computeSnapshotV1FinalHash`, `SNAPSHOT_VOTE_EIP712`).
 - **Utilities** — `formatViemError`, `randomSalt`, `referralUidToSalt`,
-  `percentToScale`/`scaleToPercent` (1e18 mantissa math), `encodeExistingTokenConfig`.
+  `percentToScale`/`scaleToPercent` (1e18 mantissa math), `encodeExistingTokenConfig`,
+  `encodeDealParams`/`decodeDealParams`.
 
 ```typescript
 import { createDacCoreClient, accountFromPrivateKey } from "@dac-cloud/core";
@@ -66,8 +69,8 @@ const dac = await indexer.dacs.getByAddress("0x...");
 const positions = await indexer.deals.listAgentPositions("31337:0x...");
 ```
 
-Namespaces: `dacs`, `deals`, `proposals`, `accounts`, `treasury`, `oracle`, `wrapper`,
-`legalWrapper`, plus compat aliases `capitalCalls` and `treasuryActions`. See
+Namespaces: `dacs`, `deals`, `agentDeals`, `proposals`, `accounts`, `treasury`, `oracle`,
+`wrapper`, `legalWrapper`, plus compat aliases `capitalCalls` and `treasuryActions`. See
 [Indexer Client API](./indexer-client.md).
 
 ### @dac-cloud/manifests
@@ -81,7 +84,7 @@ const protocol = await fetchManifest(31337, "https://api.dac.cloud");
 // protocol.dacFactory, protocol.coreModuleFactory, protocol.permit2, ...
 ```
 
-A manifest is a JSON object mapping a chain to its deployed contract addresses. 43
+A manifest is a JSON object mapping a chain to its deployed contract addresses. 46
 address fields are defined (3 required: `dacFactory`, `coreModuleFactory`, `permit2`).
 See [Manifests](./manifests.md).
 
@@ -93,7 +96,7 @@ automation. See [CLI Overview](../cli/overview.md).
 
 ### @dac-cloud/qa (private)
 
-E2E QA harness: 29 scenarios covering DAC + deal lifecycles, accounting invariants, and
+E2E QA harness: 31 scenarios covering DAC + deal lifecycles, accounting invariants, and
 an optional Claude-based agent reviewer. Not published. See
 [QA package README](../../packages/qa/README.md).
 
@@ -128,8 +131,8 @@ npm run build
 npm run build        # Build all packages (tsup)
 npm run typecheck    # Type-check all packages (tsc --noEmit)
 
-# After modifying packages/indexer/src/queries/*.graphql:
-npm run codegen --workspace @dac-cloud/indexer
+# After modifying packages/indexer/src/queries/*.graphql (needs the running indexer):
+INDEXER_SCHEMA_URL=http://localhost:8080/v1/graphql npm run codegen --workspace @dac-cloud/indexer
 ```
 
 `tsup` outputs ESM with `.d.ts` declarations for each package's `src/index.ts`.

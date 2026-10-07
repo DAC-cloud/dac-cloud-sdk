@@ -87,7 +87,8 @@ All views return JSON; pipe through `jq` or use `--pretty-print` for human readi
 
 ### Deposit funds
 
-`deposit-treasury` does ERC20 transfer + accounting recovery in one step:
+`deposit-treasury` transfers the tokens to the DACCell and credits them to the treasury
+(permissionless `recoverERC20`) in one step — the caller need not hold the DAC's token:
 
 ```bash
 dac deposit-treasury --token 0x<usdc> --amount 5000000000000000000000 \
@@ -101,6 +102,9 @@ If tokens were sent to the AssetController directly (bypassing `deposit-treasury
 ```bash
 dac recover-treasury --token 0x<usdc> --dac 0x<dac>
 ```
+
+For tokens sitting on the **DACCell** itself, anyone can credit them to the treasury with
+the permissionless `dac recover-erc20 --token 0x<usdc> --dac 0x<dac>`.
 
 ### View treasury
 

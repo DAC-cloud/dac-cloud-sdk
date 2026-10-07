@@ -8,7 +8,7 @@ import type {
   StepResult,
 } from "./types.js";
 import {execCli, execCliAs} from "./cli-exec.js";
-import {advanceTime as chainAdvanceTime, mineBlock as chainMineBlock} from "./chain.js";
+import {advanceTime as chainAdvanceTime, mineBlock as chainMineBlock, mineBlocks as chainMineBlocks} from "./chain.js";
 import {syncIndexer as doSyncIndexer} from "./indexer-sync.js";
 import {createAssertApi} from "./assertions.js";
 import {createSubmitDryRun} from "./dry-run.js";
@@ -56,6 +56,11 @@ export function createHarness(config: QaConfig): Harness {
     await chainMineBlock(config);
   }
 
+  async function mineBlocks(count: number): Promise<void> {
+    log(`⛏ mine ${count} blocks`);
+    await chainMineBlocks(config, count);
+  }
+
   async function syncIndexer(opts?: {timeoutMs?: number}): Promise<void> {
     log(`⏳ syncing indexer...`);
     await doSyncIndexer(config, opts);
@@ -91,6 +96,7 @@ export function createHarness(config: QaConfig): Harness {
     submitDryRun,
     advanceTime,
     mineBlock,
+    mineBlocks,
     syncIndexer,
     view,
     dealView,

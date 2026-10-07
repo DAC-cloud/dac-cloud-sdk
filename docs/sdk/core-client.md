@@ -68,7 +68,7 @@ later. See the [Existing-Token DAC Guide](../guides/existing-token-dac.md#7-deal
 
 ## Method Reference
 
-The client exposes 45 methods grouped below.
+The client exposes 54 methods grouped below.
 
 ### DAC Deployment
 
@@ -91,6 +91,7 @@ The client exposes 45 methods grouped below.
 | `transferErc20({ token, to, amount })` | ERC20 transfer |
 | `getErc20Allowance({ token, owner, spender })` | Read allowance |
 | `getErc20Balance({ token, owner })` | Read balance |
+| `getChainTime()` | Timestamp of the latest block — the clock on-chain deadline checks run against |
 
 ### DAC Governance
 
@@ -99,6 +100,13 @@ The client exposes 45 methods grouped below.
 | `createDacManagementProposal({ dacCell, params })` | Create DAC proposal. Returns `{txHash, proposalId, proposalAddress}` |
 | `voteProposal({ proposalAddress, support })` | Vote on any proposal (DAC or deal) |
 | `executeDacProposal({ dacCell, proposalId })` | Execute a passed DAC proposal |
+| `getProposalResolution({ proposalAddress })` | Simulates `isResolved()` then `outcome()`. Returns `{resolved, outcome?}` — `outcome` is undefined while unresolved |
+
+> The proposal getters `isResolved()`, `outcome()`, `isExecutableNow()`,
+> `isExecutionExpired()` and `executionDeadline()` are **not `view`** — they lazily
+> settle phase and resolution. Read them with `simulateContract` (as
+> `getProposalResolution` does), not `readContract`. On hybrid proposals `outcome()`
+> reverts `NotResolved` before a voting phase is active.
 
 ```typescript
 import { DAC_PROPOSAL_TYPE, buildMintAgentTokensProposal } from "@dac-cloud/core";
@@ -129,12 +137,23 @@ For existing-token DACs with a GovernanceOracle.
 | `activateHybridFallbackVoting(proposalAddress)` | Activate fallback voting after warmup |
 | `voteMerkle({ proposalAddress, support, index, amount, proof })` | Vote with Merkle proof |
 
+`GovernanceStrategyConfig.fallbackWarmupBlocks` is a
+**block count**: triggering fallback sets `fallbackSnapshotBlock = block.number +
+fallbackWarmupBlocks` and voting opens once that block has passed. The explicit
+`beginHybridFallbackWarmup` / `activateHybridFallbackVoting` calls are optional — the
+first vote (or any state read above) performs the transition lazily.
+
 ### Deal Lifecycle
 
 | Method | Description |
 |--------|-------------|
-| `createDealProposal({ dealManager, params })` | Create a deal (returns `{txHash, proposalId}`) |
+| `createDealProposal({ dealManager, params })` | Create a deal (returns `{txHash, proposalId}`). Preflights `dealAcceptsGovernanceFactory` and throws a descriptive `GovernanceFactoryNotAccepted` error before sending |
 | `createDealProposalDetailed({ dealManager, params })` | Same but also returns deal addresses post-execution |
+| `getDealGovernanceFactory({ moduleFactory })` | `CoreModuleFactory.dealGovernanceFactory()` — the only `governanceFactory` core deals accept. `undefined` if the module does not expose it |
+| `dealAcceptsGovernanceFactory({ moduleFactory, dealKind, governanceFactory })` | `IModuleFactory.dealAcceptsGovernanceFactory`. `undefined` if the module predates the check |
+| `getDealInitParams({ dealManager, dealCell })` | Full `DealParams` the deal was created with, decoded from `DealManager.state(dealCell).initParams` |
+| `getControlledAddressBudget({ dealManager, dealCell })` | Module-controlled addresses of a deal against the kernel cap: `{used, max, remaining}` |
+| `getAgentDealHost({ dealAddress })` | For a `core:agent-deal`: `{hostDac, hostAgentToken, hostMainToken}` |
 | `inviteAgentToDeal({ dealCell, invitee, grantInviteRight? })` | Whitelist an agent (pre-approval) |
 | `stakeAgentToDeal({ agentToken, dealCell, amount })` | Stake AgentTokens (pre-approval) |
 | `unstakeFromDeal({ dealCell })` | Unstake from a closed deal |
@@ -151,7 +170,8 @@ For existing-token DACs with a GovernanceOracle.
 |--------|-------------|
 | `createDealManagementProposal({ dealAddress, params })` | Create deal proposal (uses Deal contract, not DealCell) |
 | `executeDealProposal({ dealAddress, proposalId })` | Execute a passed deal proposal |
-| `executeDealProposalDetailed({ dealAddress, proposalId })` | Same + decoded event data |
+| `executeDealProposalDetailed({ dealAddress, proposalId })` | Same + decoded event data (`dacProposalId`, `trancheId`, `childProposalId`, `childVoteProposalId`, and for agent-deals `hostDealCell`, `hostDealId`, `hostProposalId`) |
+| `getDealVotingConfig({ dealAddress })` | The deal's `VotingConfig` (e.g. to validate a Permit2 `expiration` against `duration`) |
 
 ### Treasury
 
@@ -159,6 +179,7 @@ For existing-token DACs with a GovernanceOracle.
 |--------|-------------|
 | `depositTreasury({ dacCell, token, amount })` | Transfer + recover treasury accounting |
 | `recoverTreasury({ dacCell, token })` | Recover treasury accounting (no transfer) |
+| `recoverErc20({ dacCell, token })` | Permissionless `DACCell.recoverERC20` — credits tokens sitting on the DACCell to its treasury |
 | `fulfillCapitalCall({ dacCell, call })` | Fulfill an open capital call |
 | `claimDividend({ dacCell, proposalId, index, receiver, amount, proof })` | Permissionless dividend claim |
 
@@ -208,6 +229,18 @@ For existing-token DACs with a GovernanceOracle.
 `buildExternalVoteSignProposal`, `buildSnapshotV1VoteSignProposal`,
 `encodeSnapshotV1Payload`.
 
+**Agent-deal (home DAC acting inside a host DAC):** `buildHostStakeProposal`,
+`buildHostApproveStakeProposal`, `buildHostCreateDealProposal`,
+`buildHostCreateProposalProposal`, `buildHostVoteProposal`,
+`buildHostClaimRewardProposal`, `buildHostUnstakeProposal`, `buildHostInviteProposal`,
+`buildReturnAssetToDacProposal`. `hostDealCell` arguments are always the host deal's
+**DealCell** address. `buildHostCreateDealProposal(hostDealParams)` takes a full
+`DealParams`; `proposer` is overwritten on-chain with the agent-deal address.
+
+`buildTreasuryPermit2SpendProposal` does not validate `expiration`: the contract reverts
+`PermitExpirationTooShort` unless `expiration > chain time + deal voting duration`
+(check with `getChainTime` + `getDealVotingConfig`).
+
 Each builder accepts strongly-typed args and returns:
 
 ```typescript
@@ -228,13 +261,16 @@ import {
   CORE_DEAL_KIND,
   CORE_EVALUATOR_KIND,
   CORE_DEAL_PROPOSAL_TYPE,
+  CORE_AGENT_DEAL_PROPOSAL_TYPE,
 } from "@dac-cloud/core";
 
 DAC_PROPOSAL_TYPE.MINT_AGENT_TOKENS;           // bytes4 selector
 DEAL_PROPOSAL_TYPE.STRIKE_OUT_AGENT;
 CORE_DEAL_KIND.PERMIT2_TREASURY;               // createPermit2TreasuryDeal selector
+CORE_DEAL_KIND.AGENT_DEAL;                     // createAgentDeal selector
 CORE_EVALUATOR_KIND.MILESTONES_EVALUATOR;
 CORE_DEAL_PROPOSAL_TYPE.APPROVE_AGENT_SPEND;
+CORE_AGENT_DEAL_PROPOSAL_TYPE.HOST_STAKE;      // the nine agent-deal types
 ```
 
 All selectors are `0x<bytes4>` strings derived from `viem.toFunctionSelector(signature)`.
@@ -256,6 +292,19 @@ Available encoders / parsers:
 - `encodeDacDealConfigFromJson`, `encodePermit2TreasuryDealConfigFromJson`
 - `encodeMilestoneEvaluatorConfigFromJson`, `encodeRevenueEvaluatorConfigFromJson`
 - `buildMilestoneEvaluatorConfig`, `buildRevenueEvaluatorConfig`
+- `encodeAgentDealConfigFromJson` (agent-deals take no config — returns `0x`)
+- `decodeDacDealConfig(dealConfig, { spawnsChild })` — decodes a `core:dac-deal`'s
+  `dealConfig`; with `spawnsChild` (zero `dealTarget`) also the inner
+  `{dacFactory, deployer, salt, config}` under `spawn`
+
+`Milestone` and `RevenueSchedule` carry a trailing `excludePrincipal: boolean` (count only
+returns above the invested capital). It is required on the typed structs; the JSON
+parsers default it to `false`.
+
+Top-level `DealParams` helpers: `encodeDealParams(params)`, `decodeDealParams(data)`
+(decodes `DealManager.state(dealCell).initParams` / the `DealInitialized` event) and
+`DEAL_PARAMS_ABI_COMPONENTS`. ABIs for these surfaces: `moduleFactoryAbi`,
+`agentDealAbi`.
 
 Types: `DACDealConfig`, `TreasurySpendAllowance`, `Milestone`,
 `MilestoneEvaluatorConfig`, `RevenueSchedule`, `RevenueEvaluatorConfig`,
@@ -277,6 +326,10 @@ try {
   // → "DealIsNotApproved()" instead of "0x4f6b1b39..."
 }
 ```
+
+`dacErrorSignatures` covers the kernel errors, including `GovernanceFactoryNotAccepted`,
+`ControlledAddressLimitReached`, `ControlledAddressNotContract`,
+`ControlledAddressHasVotingPower`, `DividendPayoutExceeded`, `PermitExpirationTooShort`.
 
 ## Utilities
 

@@ -2,6 +2,10 @@ import {GraphQLClient} from "graphql-request";
 import type {IndexerClientConfig, ListQueryArgs} from "./types";
 import {
   GetAccountByAddressDocument,
+  GetAgentDealByDealDocument,
+  ListAgentDealActionsByDealDocument,
+  ListAgentDealHostPositionsByDealDocument,
+  ListDealFundingTokensByDealDocument,
   GetDacByAddressDocument,
   GetDacByIdDocument,
   GetDacProposalByProposalIdDocument,
@@ -32,6 +36,14 @@ import {
   ListLegalWrapperStatesByDacDocument,
   type GetAccountByAddressQuery,
   type GetAccountByAddressQueryVariables,
+  type GetAgentDealByDealQuery,
+  type GetAgentDealByDealQueryVariables,
+  type ListAgentDealActionsByDealQuery,
+  type ListAgentDealActionsByDealQueryVariables,
+  type ListAgentDealHostPositionsByDealQuery,
+  type ListAgentDealHostPositionsByDealQueryVariables,
+  type ListDealFundingTokensByDealQuery,
+  type ListDealFundingTokensByDealQueryVariables,
   type GetDacByAddressQuery,
   type GetDacByAddressQueryVariables,
   type GetDacByIdQuery,
@@ -196,6 +208,44 @@ export function createIndexerClient(config: IndexerClientConfig) {
           {dealId, limit, offset},
         );
         return data.DealAgentPosition;
+      },
+
+      // Settlement-populated: empty until the deal's first tranche settles.
+      async listFundingTokens(dealId: string, args?: ListQueryArgs) {
+        const {limit, offset} = normalizeListArgs(args);
+        const data = await gql.request<ListDealFundingTokensByDealQuery, ListDealFundingTokensByDealQueryVariables>(
+          ListDealFundingTokensByDealDocument,
+          {dealId, limit, offset},
+        );
+        return data.DealFundingToken;
+      },
+    },
+
+    agentDeals: {
+      async getByDeal(dealId: string) {
+        const data = await gql.request<GetAgentDealByDealQuery, GetAgentDealByDealQueryVariables>(
+          GetAgentDealByDealDocument,
+          {dealId},
+        );
+        return data.AgentDeal[0] ?? null;
+      },
+
+      async listHostPositions(dealId: string, args?: ListQueryArgs) {
+        const {limit, offset} = normalizeListArgs(args);
+        const data = await gql.request<ListAgentDealHostPositionsByDealQuery, ListAgentDealHostPositionsByDealQueryVariables>(
+          ListAgentDealHostPositionsByDealDocument,
+          {dealId, limit, offset},
+        );
+        return data.AgentDealHostPosition;
+      },
+
+      async listActions(dealId: string, args?: ListQueryArgs) {
+        const {limit, offset} = normalizeListArgs(args);
+        const data = await gql.request<ListAgentDealActionsByDealQuery, ListAgentDealActionsByDealQueryVariables>(
+          ListAgentDealActionsByDealDocument,
+          {dealId, limit, offset},
+        );
+        return data.AgentDealAction;
       },
     },
 

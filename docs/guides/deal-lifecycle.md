@@ -33,12 +33,17 @@ Create  →  Invite + Stake  →  Approve  →  (Optionally) Active Staking  →
     "milestones": [{
       "milestoneType": 0,
       "token": "0x<usdc>",
+      "oracle": "0x0000000000000000000000000000000000000000",
+      "valuationMode": 0,
+      "fundingToken": "0x0000000000000000000000000000000000000000",
       "expectedReturn": "1000000000000000000000",
       "timestamp": "1736294400",
       "rewardPercentage": "500000000000000000",
       "rewardCurve": ["1000000000000000000"],
       "penaltyCurve": ["0", "1000000000000000000"],
-      "extensionPeriod": 0
+      "minPercentGrace": "0",
+      "extension": "0",
+      "excludePrincipal": false
     }]
   },
   "vetoEnabled": false,
@@ -66,8 +71,19 @@ Key encoding rules:
     with `InsufficientRewards()`.
 - **`vetoEnabled`** must be set at creation — can't be added later (except via
   `enable-veto-right` deal proposal, which requires deal approval).
-- **`extensionPeriod`** > 0 lets the milestone deadline extend once if progress < 100%
+- **`extension`** > 0 lets the milestone deadline extend once if progress < 100%
   (no penalty applied for that cycle).
+- **`expectedReturn`** — in holdings mode, the amount of `token` the deal must return to
+  the DAC. With the milestone's `fundingToken` set, it is the scaled share of invested
+  capital expected back (1e18 = 100%). **`excludePrincipal`** (optional, default
+  `false`) counts only returns above the invested capital, making `expectedReturn` the
+  expected profit share.
+- **Evaluator configs are validated at deal creation**: curves must be non-empty,
+  `expectedReturn > 0`, percents `<= 1e18` (revenue evaluator: `duration > 0`,
+  `revenueProjection > 0`). Bad input reverts `dac deal create`.
+- **`governanceFactory`** can be omitted — core deals accept only
+  `CoreModuleFactory.dealGovernanceFactory()`, which the CLI resolves on-chain. Any
+  other value fails with `GovernanceFactoryNotAccepted`.
 
 ## 2. Create the Deal
 
@@ -77,6 +93,10 @@ dac deal create ./deal.json --dac 0x<dac> --config ./config.env --pretty-print
 
 This creates a **DAC governance proposal** — the deal contract is deployed when the
 proposal executes. The response includes the proposed `dealCell` and `dealAddress`.
+
+Voters can inspect the full on-chain terms behind the approval proposal (which itself
+binds only the deal ID, tranche and `rewardsLimit`) with
+`dac deal view terms --deal 0x<deal>`.
 
 ## 3. Invite Agents (Whitelist)
 
@@ -142,7 +162,8 @@ dac deal execute <proposalId> --deal 0x<deal>
 
 `--dac` is **required** with `--from-request` — the CLI needs the AgentToken address
 to look up the on-chain allowance. Existing stakers can also use this flow to increase
-their position (it accumulates, not replaces).
+their position (it accumulates, not replaces). `agentsLimit` counts agents with a
+**live** stake — a holder who fully unstaked and returns takes a seat again.
 
 > **Critical timing.** Deal proposals auto-resolve when quorum is met during voting.
 > The execution window starts at the resolution timestamp, not the voting end. With
@@ -167,7 +188,14 @@ dac deal evaluate --deal 0x<deal> --config ./config.env
 **Multi-milestone deals**: each milestone is evaluated independently in a single call.
 Rewards **accumulate** across evaluations — they don't overwrite. To test sequential
 evaluation in local dev, give each milestone a distinct `expectedReturn` so a single
-deposit can't satisfy both at once.
+return can't satisfy both at once.
+
+**Progress is measured by returned capital, not by balance.** In holdings mode the
+milestone evaluator counts only capital the kernel recorded as returned to the DAC
+(`DealCell.getReturnedCapital`). Tokens merely transferred to the DealCell do not count.
+For a treasury deal, record returns with `toggle-early-returns true` followed by
+`return-capital <token> <amount>` — see
+[Return capital to DAC](#return-capital-to-dac).
 
 **`rewardsConvertedPct == 100%` → implicit close**: when the full reward share converts,
 the deal auto-closes via `_performTransformation` regardless of remaining deadline.
@@ -227,8 +255,10 @@ Preconditions (one of):
 - Deal deadline has passed, **OR**
 - All agents have unstaked (for closed-but-not-deadlined deals)
 
-**This does not close the deal** and only moves the funding token — stakes, slashes,
-and releases are untouched.
+**This does not close the deal** and only moves the funding tokens — stakes, slashes,
+and releases are untouched. The clawback covers the deal's `fundingTokens()` list, which
+holds only tokens the DAC actually settled (empty until the first tranche settles;
+inspect with `dac deal view funding-tokens`).
 
 ## 12. Strike-Out an Agent
 
@@ -279,7 +309,8 @@ Possible end states for a challenged deal proposal:
 | Resolved-passed + lapsed (not executed within `executionValidityDuration`) | Deal proposal becomes executable again |
 
 Challenges are single-shot per deal proposal — a second `propose challenge-deal` reverts
-with `ProposalAlreadyChallenged()`. See [Governance Guide → Challenge state machine](../cli/governance.md#challenge-state-machine).
+with `ProposalAlreadyChallenged()`. The challenge creator must hold
+`max(qualification, 0.1%)` of the DAC's votable supply. See [Governance Guide → Challenge state machine](../cli/governance.md#challenge-state-machine).
 
 ## 14. Treasury Operations
 
@@ -320,6 +351,18 @@ dac deal propose return-capital 0x<token> 500000000000000000000 --deal 0x<deal>
 # ... vote + execute ...
 ```
 
+Funds come from the deal's managed treasury. The kernel records the amount as the deal's
+returned capital for that token — this is what evaluators read as progress.
+
+### Permit2 spend allowance
+
+```bash
+dac deal propose permit2-spend 0x<token> 0x<spender> 1000000000000000000000 <expiration> --deal 0x<deal>
+```
+
+`expiration` must be greater than chain time + the deal's voting duration, otherwise the
+contract reverts `PermitExpirationTooShort`. The CLI validates this before submitting.
+
 ### Permit2 receive (two-layer approval)
 
 ```bash
@@ -347,6 +390,11 @@ dac deal view proposals --deal 0x<deal>
 
 # Treasury action history
 dac deal view treasury-actions --deal 0x<deal>
+
+# Settled funding tokens (invested / returned), related contracts, on-chain terms
+dac deal view funding-tokens --deal 0x<deal>
+dac deal view related-contracts --deal 0x<deal>
+dac deal view terms --deal 0x<deal>
 ```
 
 **Accounting invariants** (verified by QA across 4+ deal scenarios):
@@ -357,6 +405,62 @@ dac deal view treasury-actions --deal 0x<deal>
 - `sum(positions.totalClaimedMainTokenAmount) == deal.totalRewardClaimedAmount`
 - `deal.totalRewardClaimedAmount <= deal.totalRewardAllocatedAmount`
 - **Per position**: `currentStakedAmount + totalSlashedAmount + totalReleasedAmount == totalStakedAmount`
+
+## 16. Agent Deals (Cross-DAC Agency)
+
+A `core:agent-deal` lets the **home** DAC act as an agent inside one other **host** DAC.
+The agent-deal is created and approved in the home DAC like any deal (step 1–5), with
+`dealTarget` set to the host DACCell (`fundingAmount` may be `"0"`). Every host-side
+action is then a home deal proposal (`dac deal propose host-* ... --deal 0x<agentDeal>`),
+and the host DAC's own governance still approves whatever the agent-deal brings to it.
+
+The agent-deal needs host AgentTokens first — the host DAC mints them to the agent-deal
+address (`dac propose mint-agent-tokens <amount> 0x<agentDeal> --dac 0x<hostDac>`).
+
+**Path A — originate a host deal** (stake before host approval):
+
+```bash
+# 1. Agent-deal creates a deal in the host DAC (same JSON as `dac deal create`)
+dac deal propose host-create-deal --input ./host-deal.json --deal 0x<agentDeal>
+# ... vote, then execute — output includes hostDealCell / hostDealId ...
+
+# 2. Agent-deal stakes into it while it is still unapproved
+dac deal propose host-stake 0x<hostDeal> <amount> --deal 0x<agentDeal>
+# ... vote + execute; the host DAC then approves the host deal as usual ...
+```
+
+**Path B — join an already-approved host deal**:
+
+```bash
+# 1. A host agent with invite rights whitelists the agent-deal
+dac deal invite 0x<agentDeal> --deal 0x<hostDeal>
+
+# 2. Agent-deal approves the stake
+dac deal propose host-approve-stake 0x<hostDeal> <amount> --deal 0x<agentDeal>
+# ... vote + execute ...
+
+# 3. A staked host agent pulls it in through the kernel add-stake proposal
+dac deal propose add-stake 0x<agentDeal> --from-request --dac 0x<hostDac> --deal 0x<hostDeal>
+# ... host deal vote + execute ...
+```
+
+Once staked, the agent-deal governs the host deal with `host-create-proposal`,
+`host-vote` and `host-invite`, and leaves with `host-unstake`.
+
+**Reward routing:**
+
+```bash
+# Host MainToken rewards land on the agent-deal itself
+dac deal propose host-claim-reward 0x<hostDeal> 0 --deal 0x<agentDeal>
+
+# Route them to the home treasury (recorded there as returned capital of that token)
+dac deal propose return-asset 0x<hostMainToken> <amount> --deal 0x<agentDeal>
+```
+
+`return-asset` refuses the home MainToken. Inspect the binding and host activity with
+`dac deal view agent-deal` and `dac deal view agent-actions`. See
+[Deal Commands → Agent-deal proposal types](../cli/deal-commands.md#agent-deal-proposal-types)
+for arguments and quorum classes.
 
 ## Related
 

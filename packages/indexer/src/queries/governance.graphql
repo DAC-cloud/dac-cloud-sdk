@@ -35,7 +35,10 @@ fragment ProposalBaseFields on Proposal {
   currentPhase
   phaseStartTime
   phaseEndTime
+  phaseEndBlock
+  phaseEndTimeEstimate
   currentPhaseSnapshotBlock
+  resolvedWithoutElectorate
   createdBlockNumber
   createdBlockTimestamp
   createdTransactionHash
@@ -52,6 +55,8 @@ fragment ProposalPhaseEventViewFields on ProposalPhaseEvent {
   snapshotBlock
   startTime
   endTime
+  endBlock
+  endTimeEstimate
   totalVotingPower
   quorum
   blockingQuorum

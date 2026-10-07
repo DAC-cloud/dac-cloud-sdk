@@ -65,6 +65,8 @@ export interface Milestone {
   penaltyCurve: bigint[];
   minPercentGrace: bigint;
   extension: bigint;
+  // Holdings mode: count only returns above the capital invested in `token`.
+  excludePrincipal: boolean;
 }
 
 export interface RevenueSchedule {
@@ -80,6 +82,8 @@ export interface RevenueSchedule {
   penaltyPerMiss: bigint;
   evaluationStart: bigint;
   autoClose: boolean;
+  // Count only returns above the capital invested in `token` as revenue.
+  excludePrincipal: boolean;
 }
 
 export interface MilestoneEvaluatorConfig {

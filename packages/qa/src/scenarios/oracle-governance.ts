@@ -1,6 +1,7 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
 import {
+  FALLBACK_WARMUP_BLOCKS,
   mintMockToken,
   resolveUnderlyingToken,
   buildVotingPowerMerkleTree,
@@ -85,7 +86,7 @@ export const oracleGovernanceScenario: Scenario = {
         "--qualification", "0",
         "--execution-validity-duration", "86400",
         "--oracle-publish-deadline", "600",
-        "--fallback-warmup-duration", "10",
+        "--fallback-warmup-blocks", String(FALLBACK_WARMUP_BLOCKS),
         "--fallback-duration", "3600",
         "--auto-delegate",
         "--auto-approve",
@@ -159,7 +160,7 @@ export const oracleGovernanceScenario: Scenario = {
         "0",      // qualification
         "86400",  // executionValidityDuration
         "600",    // oraclePublishDeadline
-        "10",     // fallbackWarmupDuration
+        "10",     // fallbackWarmupBlocks
         "3600",   // fallbackDuration
         "false",  // blockingOnAllProposals
         "false",  // blockingOnHighQuorum
@@ -613,7 +614,7 @@ export const oracleGovernanceScenario: Scenario = {
         "0",      // qualification
         "86400",  // executionValidityDuration
         "600",    // oraclePublishDeadline
-        "10",     // fallbackWarmupDuration
+        "10",     // fallbackWarmupBlocks
         "3600",   // fallbackDuration
         "false",  // blockingOnAllProposals
         "true",   // blockingOnHighQuorum

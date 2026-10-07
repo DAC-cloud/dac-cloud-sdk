@@ -7,9 +7,10 @@
  * Each parser also accepts pre-encoded hex strings (0x...) as passthrough.
  */
 
-import {encodeAbiParameters, type Address, type Hex} from "viem";
+import {decodeAbiParameters, encodeAbiParameters, type Address, type Hex} from "viem";
 import {z} from "zod";
 import {buildMilestoneEvaluatorConfig, buildRevenueEvaluatorConfig} from "./encoders";
+import type {NativeDacConfig} from "../../types";
 import type {DACDealConfig, MilestoneEvaluatorConfig, RevenueEvaluatorConfig} from "./types";
 
 function asAddress(value: string, label: string): Address {
@@ -66,6 +67,7 @@ const milestoneSchema = z.object({
   penaltyCurve: z.array(bigintish),
   minPercentGrace: bigintish,
   extension: bigintish,
+  excludePrincipal: z.boolean().optional(),
 });
 
 const milestoneEvaluatorConfigSchema = z.object({
@@ -90,6 +92,7 @@ export function parseMilestoneEvaluatorConfig(input: unknown): MilestoneEvaluato
       penaltyCurve: parseBigintArray(item.penaltyCurve, "penaltyCurve"),
       minPercentGrace: parseBigNumberish(item.minPercentGrace, "minPercentGrace"),
       extension: parseBigNumberish(item.extension, "extension"),
+      excludePrincipal: item.excludePrincipal ?? false,
     })),
   };
 }
@@ -118,6 +121,7 @@ const revenueScheduleSchema = z.object({
   penaltyPerMiss: bigintish,
   evaluationStart: bigintish,
   autoClose: z.boolean(),
+  excludePrincipal: z.boolean().optional(),
 });
 
 const revenueEvaluatorConfigSchema = z.object({
@@ -142,6 +146,7 @@ export function parseRevenueEvaluatorConfig(input: unknown): RevenueEvaluatorCon
       penaltyPerMiss: parseBigNumberish(parsed.schedule.penaltyPerMiss, "penaltyPerMiss"),
       evaluationStart: parseBigNumberish(parsed.schedule.evaluationStart, "evaluationStart"),
       autoClose: parsed.schedule.autoClose,
+      excludePrincipal: parsed.schedule.excludePrincipal ?? false,
     },
   };
 }
@@ -180,4 +185,74 @@ export function encodeDacDealConfigFromJson(input: unknown): Hex {
     }],
     [config],
   );
+}
+
+// ---- Agent Deal Config ----
+
+// AgentDeal takes no deal-specific config: the host DAC is `DealParams.dealTarget`.
+export function encodeAgentDealConfigFromJson(input: unknown): Hex {
+  if (typeof input === "string" && input.startsWith("0x")) return input as Hex;
+  return "0x";
+}
+
+// ---- DAC Deal Config (encoded → decoded) ----
+
+export interface DecodedDacDealConfig extends DACDealConfig {
+  /** Present when the deal spawns its own child DAC (`dealTarget` is zero). */
+  spawn?: {
+    dacFactory: Address;
+    deployer: Address;
+    salt: Hex;
+    config: NativeDacConfig;
+  };
+}
+
+/**
+ * Decode `DealParams.dealConfig` of a DAC_DEAL. With `spawnsChild` (dealTarget == 0)
+ * the inner `config` is `(dacFactory, deployer, salt, DACConfig)`; compare `dacFactory`
+ * against the manifest, since the kernel accepts any factory there.
+ */
+export function decodeDacDealConfig(dealConfig: Hex, opts: {spawnsChild: boolean}): DecodedDacDealConfig {
+  const [outer] = decodeAbiParameters(
+    [{
+      name: "value",
+      type: "tuple",
+      components: [
+        {name: "managedEquity", type: "uint256"},
+        {name: "config", type: "bytes"},
+      ],
+    }],
+    dealConfig,
+  );
+  const decoded: DecodedDacDealConfig = {managedEquity: outer.managedEquity, config: outer.config};
+  if (!opts.spawnsChild) {
+    return decoded;
+  }
+
+  const [dacFactory, deployer, salt, config] = decodeAbiParameters(
+    [
+      {name: "dacFactory", type: "address"},
+      {name: "deployer", type: "address"},
+      {name: "salt", type: "bytes32"},
+      {
+        name: "config",
+        type: "tuple",
+        components: [
+          {name: "symbol", type: "string"},
+          {name: "name", type: "string"},
+          {name: "description", type: "string"},
+          {name: "mainTokenMaxSupply", type: "uint256"},
+          {name: "defaultQuorum", type: "uint256"},
+          {name: "founder", type: "address"},
+          {name: "founderAllocation", type: "uint256"},
+          {name: "treasuryToken", type: "address"},
+          {name: "founderCommitment", type: "uint256"},
+          {name: "dividendsEnabled", type: "bool"},
+        ],
+      },
+    ],
+    outer.config,
+  );
+  decoded.spawn = {dacFactory, deployer, salt, config: {...config}};
+  return decoded;
 }

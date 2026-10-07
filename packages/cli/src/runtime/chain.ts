@@ -98,6 +98,51 @@ export async function makeCoreContext(resolver: OptionResolver): Promise<CoreCon
   };
 }
 
+export interface ReadOnlyCoreContext {
+  chainId: number;
+  protocol: ProtocolManifest;
+  core: DacCoreClient;
+}
+
+/** Core client for on-chain reads; a private key is optional (used only for auth). */
+export async function makeReadOnlyCoreContext(resolver: OptionResolver): Promise<ReadOnlyCoreContext> {
+  const chainId = resolver.resolveNumber("chain-id") ?? DEFAULT_CHAIN_ID;
+  const apiUrl = resolveApiUrl(resolver);
+  const rpcUrl = deriveRpcUrl(apiUrl, chainId);
+
+  const privateKeyRaw = resolver.resolveString("private-key");
+  const account = privateKeyRaw ? accountFromPrivateKey(privateKeyRaw as Hex) : undefined;
+
+  const authToken = await resolveAuthToken({
+    configToken: resolver.resolveString("auth-token"),
+    configTokenExpires: resolver.resolveString("auth-expires"),
+    chainId,
+    account,
+    apiUrl,
+    dacs: collectDacsFromResolver(resolver),
+  });
+
+  const chain = defineChain({
+    id: chainId,
+    name: `dac-${chainId}`,
+    nativeCurrency: {name: "ETH", symbol: "ETH", decimals: 18},
+    rpcUrls: {
+      default: {http: [rpcUrl]},
+      public: {http: [rpcUrl]},
+    },
+  });
+
+  const protocol = await fetchManifest(chainId, apiUrl);
+  const core = createDacCoreClient({
+    chain,
+    rpcUrl,
+    protocol,
+    fetchOptions: {headers: authHeaders(authToken)},
+  });
+
+  return {chainId, protocol, core};
+}
+
 export interface DryRunContext {
   chainId: number;
   apiUrl: string;

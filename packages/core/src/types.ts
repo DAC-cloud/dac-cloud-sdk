@@ -54,7 +54,7 @@ export interface GovernanceStrategyConfig {
   qualification: bigint;
   executionValidityDuration: bigint;
   oraclePublishDeadline: bigint;
-  fallbackWarmupDuration: bigint;
+  fallbackWarmupBlocks: bigint;
   fallbackDuration: bigint;
   blockingOnAllProposals: boolean;
   blockingOnHighQuorum: boolean;

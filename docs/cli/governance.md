@@ -44,7 +44,12 @@ dac deal vote proposal <proposalId> <support> --deal 0x<deal>
 ```
 
 `support` is one of `true`, `false`, `1`, `0`, `yes`, `no`. Voting power is the
-voter's balance at the proposal's snapshot block.
+voter's balance at the proposal's snapshot (a timestamp for native DAC and deal
+proposals, a block number for hybrid proposals).
+
+> **Same-second votes revert.** Native and deal proposals snapshot at the creation
+> timestamp; a vote in the same second as the proposal fails with
+> `ERC5805FutureLookup`. Relevant for batched smart-account flows.
 
 ### Step 3 — Execute
 
@@ -94,6 +99,10 @@ executed **within the next day**, even though "voting" technically continues unt
 **Constraint:** if `blockingPercent = 0`, both `blockingOnAllProposals` and
 `blockingOnHighQuorum` must be `false`.
 
+Quorum and blocking thresholds **round up** (`ceil(total × percent)`). If the votable
+supply at a proposal's snapshot is zero, the proposal resolves as **rejected**
+(`resolvedWithoutElectorate` in the indexer).
+
 ## DAC Proposal Types — High vs Normal Quorum
 
 **High-quorum DAC proposals** (use `highQuorumPercent`):
@@ -120,6 +129,16 @@ Three deal proposal types can be created **before** the deal is approved:
 
 All other types require the deal to be active (`DealIsNotApproved` error otherwise).
 
+## Agent-Deal Proposal Types — Quorum Classes
+
+Proposals of a `core:agent-deal` (the home DAC acting inside a host DAC):
+
+- **High quorum, veto**: `host-stake`, `host-approve-stake`, `host-create-deal`
+- **Default quorum, blocking**: `host-create-proposal`, `host-vote`, `host-unstake`
+- **Default quorum**: `host-claim-reward`, `host-invite`, `return-asset`
+
+See [Deal Commands → Agent-deal proposal types](./deal-commands.md#agent-deal-proposal-types).
+
 ## Hybrid Governance (Existing-Token DACs)
 
 Existing-token DACs use multi-phase voting because token holders may not have wrapped.
@@ -139,10 +158,10 @@ Existing-token DACs use multi-phase voting because token holders may not have wr
               │
               ▼
        ┌─────────────────┐
-       │ FallbackWarmup  │ ← `proposal begin-warmup`
+       │ FallbackWarmup  │ ← `proposal begin-warmup` (wrapped-only DACs start here)
        └──────┬──────────┘
               │
-   warmup elapsed?
+   warmup blocks passed?
               │
               ▼
        ┌─────────────────┐
@@ -158,6 +177,19 @@ Existing-token DACs use multi-phase voting because token holders may not have wr
 
 **Emergency fallback** (`proposal trigger-fallback`) applies if the oracle is deactivated
 while a proposal is in PrimaryVoting.
+
+**The warmup ends at a block, not a time.** Triggering fallback sets
+`fallbackSnapshotBlock = block.number + fallbackWarmupBlocks`; voting opens once
+`block.number > fallbackSnapshotBlock`. While in `FallbackWarmup`, `phaseEndTime` is `0`
+— `dac proposal state` reports `phaseEndBlock` and `phaseEndTimeEstimate` instead. On a
+local chain, advancing time is not enough; you must mine blocks.
+
+**Transitions are lazy.** The proposal's `isResolved()`, `outcome()`,
+`isExecutableNow()`, `isExecutionExpired()` and `executionDeadline()` getters are not
+`view` — any of them (and the first vote) can move a proposal into `FallbackWarmup` /
+`FallbackVoting` or resolve it, so the explicit `begin-warmup` / `activate-fallback`
+calls are optional. `outcome()` reverts `NotResolved` before a voting phase is active;
+check `isResolved()` first (the SDK's `getProposalResolution` does both via simulation).
 
 **Important:** during PrimaryVoting, the same wallet can cast **both** a wrapped vote
 (`vote proposal`) and a Merkle vote (`vote-merkle`) — they tally separately because
@@ -223,6 +255,8 @@ Inspect `dealProposal.passed` and `dealProposal.challenged` in the indexer to di
 - **Challenges are single-shot** — a second `propose challenge-deal` on the same deal
   proposal reverts with `ProposalAlreadyChallenged()`. The challenge proposal itself
   may be filed any time before the deal proposal has executed or expired.
+- **Challenge creator threshold** — the creator must hold `max(qualification, 0.1%)` of
+  the DAC's votable supply.
 - **`strike-out-agent` is "always challengeable"** — the DAC can challenge it regardless
   of the deal's `vetoEnabled` flag, on the theory that removing a stakeholder is severe
   enough that the DAC always gets a final say.

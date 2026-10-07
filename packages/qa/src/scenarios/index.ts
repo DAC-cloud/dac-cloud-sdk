@@ -28,6 +28,8 @@ import {legalWrapperScenario} from "./legal-wrapper.js";
 import {dacDealSnapshotVoteScenario} from "./dac-deal-snapshot-vote.js";
 import {dryRunLifecycleScenario} from "./dry-run-lifecycle.js";
 import {dryRunMultiTxScenario} from "./dry-run-multi-tx.js";
+import {agentDealHostGovernanceScenario} from "./agent-deal-host-governance.js";
+import {agentDealHostRewardsScenario} from "./agent-deal-host-rewards.js";
 
 export const ALL_SCENARIOS: Scenario[] = [
   existingTokenDacScenario,
@@ -59,6 +61,8 @@ export const ALL_SCENARIOS: Scenario[] = [
   dacDealSnapshotVoteScenario,
   dryRunLifecycleScenario,
   dryRunMultiTxScenario,
+  agentDealHostGovernanceScenario,
+  agentDealHostRewardsScenario,
 ];
 
 export {
@@ -91,4 +95,6 @@ export {
   dacDealSnapshotVoteScenario,
   dryRunLifecycleScenario,
   dryRunMultiTxScenario,
+  agentDealHostGovernanceScenario,
+  agentDealHostRewardsScenario,
 };

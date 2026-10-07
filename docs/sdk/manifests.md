@@ -15,7 +15,7 @@ interface ProtocolManifest {
   coreModuleFactory: `0x${string}`;
   permit2: `0x${string}`;
 
-  // 40 optional addresses covering factories, implementations, evaluator/module
+  // 43 optional addresses covering factories, implementations, evaluator/module
   // libraries, and standalone deployments:
   dacCellImplementation?: `0x${string}`;
   mainTokenImplementation?: `0x${string}`;
@@ -30,9 +30,12 @@ interface ProtocolManifest {
   hybridProposalImplementation?: `0x${string}`;
   permit2TreasuryFactory?: `0x${string}`;
   dacDealFactory?: `0x${string}`;
+  agentDealFactory?: `0x${string}`;
+  agentDealImpl?: `0x${string}`;
+  coreDealGovernanceFactory?: `0x${string}`;  // the only governanceFactory core deals accept
   milestonesEvaluatorFactory?: `0x${string}`;
   revenueEvaluatorFactory?: `0x${string}`;
-  // ... (43 address fields total)
+  // ... (46 address fields total)
 
   // Optional metadata:
   blockNumber?: number;
@@ -95,7 +98,10 @@ const factory = requireProtocolAddress(protocol, "permit2TreasuryFactory");
 ```
 
 This lets clients fail fast with a meaningful error when running against a partial
-deployment (e.g. testnet that hasn't deployed the revenue evaluator yet).
+deployment (e.g. testnet that hasn't deployed the revenue evaluator yet). For example,
+the Base Sepolia (`84532`) deployment predates AgentDeal — `agentDealFactory` /
+`agentDealImpl` are absent there until the protocol is redeployed, so `core:agent-deal`
+cannot be used on it yet.
 
 ## Type Guards
 

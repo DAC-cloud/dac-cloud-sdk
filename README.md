@@ -10,7 +10,7 @@ TypeScript SDK and CLI for the [DAC Cloud](https://dac.cloud) protocol — EVM s
 | `@dac-cloud/indexer` | Typed GraphQL client for the Envio indexer read-model |
 | `@dac-cloud/manifests` | Per-chain protocol manifest loader (deployed contract addresses) |
 | `@dac-cloud/cli` | Commander.js CLI (`dac` binary) — JSON-first, automation/agent-friendly |
-| `@dac-cloud/qa` | Internal E2E QA harness with 29 scenarios and AI reviewer (private, not published) |
+| `@dac-cloud/qa` | Internal E2E QA harness with 31 scenarios and AI reviewer (private, not published) |
 
 ## Quick Start
 
@@ -24,7 +24,7 @@ dac auth login --config ./config.env
 # Deploy a native DAC
 dac create \
   --name "My DAC" --description "Operations" --symbol "MDAC" \
-  --treasury-token 0x4A679253410272dd5232B3Ff7cF5dbB88f295319 \
+  --treasury-token 0x<treasuryToken> \
   --commitment 0 \
   --allocation 1000000000000000000000000 \
   --max-supply 10000000000000000000000000 \
@@ -69,8 +69,8 @@ Full docs live in [`docs/`](./docs/README.md):
 npm run build        # Build all packages
 npm run typecheck    # Type-check all packages
 
-# After changing GraphQL queries:
-npm run codegen --workspace @dac-cloud/indexer
+# After changing GraphQL queries (needs the running indexer's GraphQL endpoint):
+INDEXER_SCHEMA_URL=http://localhost:8080/v1/graphql npm run codegen --workspace @dac-cloud/indexer
 
 # Run QA scenarios (requires local Hardhat + Envio indexer + backend):
 node ./packages/qa/dist/index.js --config ./config.env

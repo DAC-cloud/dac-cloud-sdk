@@ -5,6 +5,8 @@ fragment DacViewFields on Dac {
   mode
   name
   description
+  canonical
+  factoryAddress
   creator
   mainTokenAddress
   wrappedMainTokenAddress
@@ -32,7 +34,8 @@ fragment DacViewFields on Dac {
   dealCreationMinAgentBalance
   dealCreationMinInitialAgentStake
   oraclePublishDeadline
-  fallbackWarmupDuration
+  fallbackWarmupBlocks
+  fallbackWarmupEstimatedSeconds
   fallbackDuration
   blockingOnAllProposals
   blockingOnHighQuorum

@@ -74,6 +74,7 @@ export interface DacTransactionBuilder {
   fulfillCapitalCall(args: {dacCell: Address; call: CapitalCall}): TransactionRequest;
   depositTreasury(args: {dacCell: Address; token: Address; amount: bigint}): TransactionRequest;
   recoverTreasury(args: {dacCell: Address; token: Address}): TransactionRequest;
+  recoverErc20(args: {dacCell: Address; token: Address}): TransactionRequest;
   approveErc20(args: {token: Address; spender: Address; amount: bigint}): TransactionRequest;
   transferErc20(args: {token: Address; to: Address; amount: bigint}): TransactionRequest;
   delegateVotes(args: {token: Address; delegatee: Address}): TransactionRequest;
@@ -249,6 +250,10 @@ export function createDacTransactionBuilder(options: DacTxBuilderOptions): DacTr
 
     recoverTreasury({dacCell, token}) {
       return tx(dacCell, dacCellAbi, "recoverTreasury", [token]);
+    },
+
+    recoverErc20({dacCell, token}) {
+      return tx(dacCell, dacCellAbi, "recoverERC20", [token]);
     },
 
     approveErc20({token, spender, amount}) {

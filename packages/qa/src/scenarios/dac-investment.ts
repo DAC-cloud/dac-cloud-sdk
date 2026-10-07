@@ -5,9 +5,11 @@ import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
 import {
   buildDividendMerkleTree,
+  existingTokenProposeVoteExecute,
+  FALLBACK_WARMUP_BLOCKS,
   getChainTimestamp,
   mintMockToken,
-  proposeVoteExecute,
+  passFallbackWarmup,
   resolveUnderlyingToken,
   ZERO_ADDR,
 } from "./fixtures/index.js";
@@ -75,7 +77,7 @@ export const dacInvestmentScenario: Scenario = {
         "--qualification", "0",
         "--execution-validity-duration", "86400",
         "--oracle-publish-deadline", "600",
-        "--fallback-warmup-duration", "10",
+        "--fallback-warmup-blocks", String(FALLBACK_WARMUP_BLOCKS),
         "--fallback-duration", "3600",
         "--auto-delegate", "--auto-approve",
         "--config", config.configPath, "--pretty-print",
@@ -101,7 +103,7 @@ export const dacInvestmentScenario: Scenario = {
 
     // Investor needs agent tokens so founder A can stake on the dac-deal
     h.log("Minting agent tokens to founder A (investor)...");
-    await proposeVoteExecute(h, investorDacAddress!, [
+    await existingTokenProposeVoteExecute(h, investorDacAddress!, [
       "propose", "mint-agent-tokens", "100000000000000000000000", founderA.address,
     ]);
 
@@ -294,6 +296,7 @@ export const dacInvestmentScenario: Scenario = {
     //           → triggers _afterApprove → fulfills capital call #1
     h.log("Approving deal (triggers first tranche fulfillment)...");
     await h.advanceTime(10);
+    await passFallbackWarmup(h);
     await h.cli([
       "vote", "proposal", dealDacProposalId!, "true",
       "--dac", investorDacAddress!,
@@ -389,6 +392,7 @@ export const dacInvestmentScenario: Scenario = {
     //           → approveFunding(trancheId=1) → _afterApprove(1) → fulfill
     h.log("Voting/executing DAC-level tranche approval...");
     await h.advanceTime(10);
+    await passFallbackWarmup(h);
     await h.cli([
       "vote", "proposal", dacTrancheProposalId, "true",
       "--dac", investorDacAddress!,

@@ -36,8 +36,9 @@ interface ProtocolManifest {
   coreModuleFactory: `0x${string}`;
   permit2: `0x${string}`;
 
-  // 40 optional address fields — factories and implementations for every
-  // DAC component (DAC cell, deal cell, deal, evaluators, modules, ...).
+  // 43 optional address fields — factories and implementations for every
+  // DAC component (DAC cell, deal cell, deal kinds incl. agentDealFactory /
+  // agentDealImpl, coreDealGovernanceFactory, evaluators, modules, ...).
   // Plus optional metadata: blockNumber, deployer.
 }
 ```
@@ -45,7 +46,7 @@ interface ProtocolManifest {
 Exported helpers:
 
 - `PROTOCOL_MANIFEST_CORE_ADDRESS_KEYS` — the 3 required core keys
-- `PROTOCOL_MANIFEST_ADDRESS_KEYS` — all 43 address keys
+- `PROTOCOL_MANIFEST_ADDRESS_KEYS` — all 46 address keys
 - `isProtocolAddress(value)` — type guard for `0x...` 20-byte hex
 - `requireProtocolAddress(manifest, key)` — typed getter that throws if a field is missing
 

@@ -50,12 +50,17 @@ dac deal create ./deal.json --dac 0x<dac> --config ./config.env --pretty-print
     "milestones": [{
       "milestoneType": 0,
       "token": "0x<erc20>",
+      "oracle": "0x0000000000000000000000000000000000000000",
+      "valuationMode": 0,
+      "fundingToken": "0x0000000000000000000000000000000000000000",
       "expectedReturn": "1000000000000000000000",
       "timestamp": "1736294400",
       "rewardPercentage": "500000000000000000",
       "rewardCurve": ["1000000000000000000"],
       "penaltyCurve": ["0", "1000000000000000000"],
-      "extensionPeriod": 0
+      "minPercentGrace": "0",
+      "extension": "0",
+      "excludePrincipal": false
     }]
   },
   "vetoEnabled": false,
@@ -66,11 +71,15 @@ dac deal create ./deal.json --dac 0x<dac> --config ./config.env --pretty-print
 
 | Field | Notes |
 |-------|-------|
-| `dealKind` | `core:permit2-treasury` or `core:dac-deal`. Aliases (`permit2-treasury`, `dac-deal`, `treasury-deal`) also accepted |
+| `dealKind` | `core:permit2-treasury`, `core:dac-deal` or `core:agent-deal`. Aliases (`permit2-treasury`, `dac-deal`, `treasury-deal`, `agent-deal`) also accepted |
+| `governanceFactory` | Optional. Core deals accept only `CoreModuleFactory.dealGovernanceFactory()` — the kernel reverts `GovernanceFactoryNotAccepted` otherwise. When omitted, the CLI reads it from the module on-chain (falling back to the manifest's `coreDealGovernanceFactory`) |
+| `dealTarget` | Optional for treasury / DAC deals. **Required for `core:agent-deal`** — the host DACCell address |
 | `evaluatorSelector` | `core:milestones-evaluator` or `core:revenue-evaluator` |
 | `evaluatorConfig` | Object form (parsed by core module) or pre-encoded `0x` hex |
 | `rewardCurve` / `penaltyCurve` | Polynomials with 1e18 mantissa. `[1e18]` = constant 100%; `[0, 1e18]` = linear `y = x` |
 | `rewardPercentage` | Per-milestone share, 1e18 = 100% |
+| `expectedReturn` | Holdings mode: amount of `token` the deal must return. With the milestone's `fundingToken` set it is instead the scaled share of invested capital expected back (1e18 = 100%). Only kernel-recorded returned capital counts — see [Evaluate](#evaluate-evaluatorid) |
+| `excludePrincipal` | Optional, default `false`. Count only returns above the capital invested in `token` (`expectedReturn` is then the expected profit share). Also available on the revenue evaluator's `schedule` |
 | `dealRewardPoolPercent` | Fraction of rewards allocated to the deal's collective pool (1e18 = 100%) |
 | `approveDeadline` | Defaults to `now + 7d` |
 | `evaluationDeadline` | Defaults to `dealDeadline` |
@@ -78,8 +87,37 @@ dac deal create ./deal.json --dac 0x<dac> --config ./config.env --pretty-print
 | `vetoEnabled` | If false, DAC cannot `challenge-deal` later. Must be set at creation |
 | `linkHash` | Off-chain reference; not interpreted by contracts |
 
+Evaluators validate their config when the deal is created and revert on bad input:
+non-empty `rewardCurve` / `penaltyCurve`, `expectedReturn > 0`, percents `<= 1e18`; for
+the revenue evaluator also `duration > 0` and `revenueProjection > 0`.
+
+The response includes the resolved `governanceFactory` next to `dealId`, `dealCell`,
+`dealAddress` and `evaluatorAddress`.
+
 For `core:dac-deal`, additional fields apply to the child-DAC investment vehicle —
 see the [Existing-Token DAC Guide](../guides/existing-token-dac.md).
+
+**`core:agent-deal`** — the home DAC acts as an agent inside **one** other ("host") DAC:
+
+```json
+{
+  "dealKind": "core:agent-deal",
+  "name": "Agent seat in Host DAC",
+  "description": "Home DAC operates inside the host DAC",
+  "linkHash": "ipfs://...",
+  "dealTarget": "0x<hostDacCell>",
+  "fundingToken": "0x<erc20>",
+  "fundingAmount": "0",
+  "evaluatorSelector": "core:milestones-evaluator",
+  "evaluatorConfig": { "rewardShare": "...", "milestones": [ ... ] }
+}
+```
+
+`dealTarget` is required and must differ from the home DAC (the CLI rejects both cases
+before submitting). `fundingAmount` may be `"0"`, `dealConfig` is not needed, and a
+reward pool (`dealRewardPoolPercent`) is not supported. All host-side actions go through
+the [agent-deal proposal types](#agent-deal-proposal-types); see
+[Deal Lifecycle → Agent Deals](../guides/deal-lifecycle.md#16-agent-deals-cross-dac-agency).
 
 ### `invite <invitee>`
 
@@ -181,11 +219,11 @@ Invoke as `core:<type>` or bare `<type>` (the `core:` prefix is optional when un
 | Type | Args | Description |
 |------|------|-------------|
 | `direct-spend` | `<token> <destination> <amount>` | Transfer tokens from deal treasury |
-| `permit2-spend` | `<token> <destination> <amount>` | Transfer via Permit2 |
-| `return-capital` | `<token> <amount>` | Return capital to DAC treasury |
-| `approve-agent-spend` | `<agent> <token> <amount>` (or `--input` for `singleTxAmount`/`clockLimit`/`duration`) | Pre-authorize an agent to spend deal funds |
-| `assign-claimer` | `<agent> <evaluatorId>` | Assign a claimer role (e.g. for Permit2 receive) |
-| `revoke-agent` | `<agent>` | Revoke an agent's spend rights |
+| `permit2-spend` | `<token> <spender> <amount> <expiration>` | Grant a Permit2 allowance on deal funds. `expiration` must be later than chain time + the deal's voting duration (see below) |
+| `return-capital` | `<token> <amount>` | Return capital to DAC treasury (requires early returns). Recorded as the deal's returned capital — the only returns evaluators count |
+| `approve-agent-spend` | `<token> <agent> <destination> <totalAmount> <singleTxAmount> <clockLimit> <duration>` (or `--input`) | Pre-authorize an agent to spend deal funds |
+| `assign-claimer` | `<agent> <token> <counterparty> <amount>` | Assign a claimer role (e.g. for Permit2 receive) |
+| `revoke-agent` | `<token> <agent> <counterparty>` | Revoke an agent's spend rights; also zeroes the agent's Permit2 allowance for that token |
 | `delegate-vote-rights` | `<token> <delegatee>` | Delegate IVotes treasury holdings (requires IVotes-compatible token) |
 | `child-create-proposal` | `<typ> <target> <i> <data>` | Create proposal in a child DAC (`core:dac-deal` only) |
 | `child-vote-proposal` | `<proposalId> <support>` | Vote on a child-DAC proposal |
@@ -210,7 +248,41 @@ dac deal propose request-tranche [rewards] --deal 0x<deal> --capital-call-nonce 
 ```
 
 The CLI auto-resolves `target` (child capital call's treasury token), `i` (its
-`cashAmount`), and `data` (`abi.encode(rewards, callHash)`).
+`cashAmount`), and `data` (`abi.encode(rewards, callHash)`). `request-tranche` reverts
+`DealIsClosed` on a closed deal.
+
+**`permit2-spend` expiration.** The contract reverts `PermitExpirationTooShort` unless
+`expiration > chain time + deal voting duration` (the allowance must outlive the vote).
+The CLI checks this against chain time before submitting and fails with the minimum
+acceptable value.
+
+#### Agent-deal proposal types
+
+For `core:agent-deal` only. Each one makes the agent-deal act inside its host DAC; all
+accept positional args or `--input <json>`.
+
+| Type | Args | Quorum | Description |
+|------|------|--------|-------------|
+| `host-stake` | `<hostDeal> <amount>` | high, veto | Stake host AgentTokens held by the agent-deal into a host deal (before host approval) |
+| `host-approve-stake` | `<hostDeal> <amount>` | high, veto | Approve a host deal to pull stake through a host `add-stake` proposal (after host approval) |
+| `host-create-deal` | `--input <deal.json>` | high, veto | Originate a deal in the host DAC. Same JSON format as `dac deal create`; `proposer` is overwritten on-chain with the agent-deal address |
+| `host-create-proposal` | `<hostDeal> <typ> <target> <i> <data>` | default, blocking | Create a deal proposal inside a host deal |
+| `host-vote` | `<hostDeal> <hostProposalId> <support>` | default, blocking | Vote on a host deal proposal |
+| `host-claim-reward` | `<hostDeal> [evaluatorId]` | default | Claim host MainToken rewards onto the agent-deal (`evaluatorId` defaults to `0`) |
+| `host-unstake` | `<hostDeal>` | default, blocking | Unstake from a host deal |
+| `host-invite` | `<hostDeal> <invitee> [grantInviteRight]` | default | Whitelist an agent in a host deal |
+| `return-asset` | `<token> <amount>` | default | Route an earned asset held by the agent-deal to the home treasury. Alias `return-asset-to-dac`. Refuses the home MainToken |
+
+`<hostDeal>` accepts the host deal's Deal **or** DealCell address (the CLI maps it to
+the cell through the indexer). `--input` keys are `hostDealCell`, `amount`, `typ`,
+`target`, `i`, `data`, `hostProposalId`, `support`, `evaluatorId`, `invitee`,
+`grantInviteRight`, `token`.
+
+```bash
+dac deal propose host-create-deal --input ./host-deal.json --deal 0x<agentDeal>
+dac deal propose host-stake 0x<hostDeal> 60000000000000000000000 --deal 0x<agentDeal>
+dac deal propose host-vote 0x<hostDeal> 1 true --deal 0x<agentDeal>
+```
 
 ### `vote proposal <proposalId> <support>`
 
@@ -227,11 +299,20 @@ dac deal vote proposal 1 true --deal 0x<deal>
 > **Vote smallest first when quorum is close.** Once quorum is met, subsequent votes
 > are rejected. If multiple voters are participating, sort by voting power ascending.
 
+> **Same-second votes revert.** Deal proposals snapshot at the creation timestamp; a
+> vote landing in the same second fails with `ERC5805FutureLookup`. Relevant when
+> batching propose + vote.
+
 ### `execute <proposalId>`
 
 ```bash
 dac deal execute 1 --deal 0x<deal>
 ```
+
+Besides `txHash`, the output carries IDs decoded from the receipt when present:
+`dacProposalId`, `trancheId`, `childProposalId`, `childVoteProposalId`, and — for
+agent-deal proposals that emitted `HostDealCreated` / `HostProposalCreated` —
+`hostDealCell`, `hostDealId`, `hostProposalId`.
 
 ## Evaluation and Claims
 
@@ -255,7 +336,13 @@ dac deal evaluate --deal 0x<deal> --evaluator-id 0
 
 Multi-milestone deals evaluate each milestone independently in a single call. To
 test sequential evaluation, give each milestone a different `expectedReturn` so
-deposits can't satisfy them simultaneously.
+a single return can't satisfy them simultaneously.
+
+**What counts as progress.** In holdings mode the milestone evaluator reads only
+kernel-recorded returned capital (`DealCell.getReturnedCapital`). A raw token balance
+sitting on the DealCell does **not** count. For treasury deals, record returns by
+passing `toggle-early-returns true` and then `return-capital <token> <amount>` (funds
+come from the deal's managed treasury).
 
 ### `claim [evaluatorId]`
 
@@ -385,12 +472,26 @@ dac execute <id> --dac 0x<dac>
 | `proposals` | List deal governance proposals (with challenge info) |
 | `positions` | Per-agent staking positions (stake, slash, release, claim) |
 | `treasury-actions` | Deal treasury action history |
+| `funding-tokens` | Tokens the DAC actually settled into the deal, with invested / returned amounts. Empty until the first tranche settles |
+| `related-contracts` | Related contracts by role (managed treasury, child / host DAC and tokens) |
+| `agent-deal` | `core:agent-deal` only — the AgentDeal record (host DAC, host tokens) plus its host positions |
+| `agent-actions` | `core:agent-deal` only — host-side action log |
+| `terms` | Full `DealParams` read **on-chain** from `DealManager.state(dealCell).initParams`, with provenance checks |
 
 ```bash
 dac deal view deal --deal 0x<deal>
 dac deal view positions --deal 0x<deal>
 dac deal view proposals --deal 0x<deal>
+dac deal view terms --deal 0x<deal>
 ```
+
+**`view terms`.** An `APPROVE_DEAL` DAC proposal binds only `(dealId, trancheId,
+rewardsLimit)`; `terms` shows what the vote actually approves. Output: `initParams`
+(the decoded `DealParams`), `dacDealConfig` (decoded for `core:dac-deal`),
+`dealTargetDac`, `governanceFactoryAccepted`, `controlledAddressBudget`
+(`{used, max, remaining}` — a module may register at most 3 controlled addresses per
+deal), and `warnings` for a non-canonical `dacFactory`, an unknown or non-canonical
+`dealTarget`, or a governance factory the module rejects.
 
 ## Related
 

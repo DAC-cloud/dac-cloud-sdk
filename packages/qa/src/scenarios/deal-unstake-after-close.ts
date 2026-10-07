@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, transferErc20} from "./fixtures/index.js";
+import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, returnCapitalViaDeal} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Unstake After Close — Multi-Agent
@@ -124,19 +124,14 @@ export const dealUnstakeAfterCloseScenario: Scenario = {
     // Mint treasury tokens for the founder (fresh anvil may have zero balance)
     await mintMockToken(h, {token: ctx.treasuryToken, to: ctx.founderAddress, amount: "10000000000000000000000"}); // 10k
 
-    h.log(`Depositing ${depositAmount} tokens to deal 1 cell ${ctx.dealCell}...`);
+    h.log(`Depositing ${depositAmount} tokens through deal 1 ${ctx.dealAddress}...`);
 
     await step(h, "deposit-deal-1", async () => {
-      const txHash = await transferErc20(h, {
-        token: ctx.treasuryToken,
-        from: ctx.founderAddress,
-        to: ctx.dealCell,
-        amount: depositAmount,
-      });
-      assert.defined(txHash, "transfer tx hash");
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: ctx.dealAddress, token: ctx.treasuryToken, amount: depositAmount, extraVoterRoles: ["agent1"]});
+      assert.defined(txHash, "return-capital tx hash");
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer", ctx.treasuryToken, ctx.dealCell, depositAmount],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 

@@ -3,7 +3,7 @@ import {join} from "node:path";
 import {tmpdir} from "node:os";
 import {step} from "../../harness/index.js";
 import type {Harness} from "../../harness/types.js";
-import {getChainTimestamp, mintMockToken, resolveUnderlyingToken, ZERO_ADDR} from "./common.js";
+import {FALLBACK_WARMUP_BLOCKS, getChainTimestamp, mintMockToken, passFallbackWarmup, resolveUnderlyingToken, ZERO_ADDR} from "./common.js";
 import type {DealContext, DealSetupOptions, MilestoneConfig} from "./setup-native-dac-deal.js";
 
 export interface ExistingTokenDealContext extends DealContext {
@@ -14,11 +14,11 @@ export interface ExistingTokenDealContext extends DealContext {
 /**
  * Propose → vote → execute a DAC proposal on an existing-token DAC using the fallback voting path.
  *
- * Key difference from native `proposeVoteExecute`: existing-token proposals start in
- * AwaitingOracleSnapshot phase. We must advance past oracle-publish-deadline + fallback-warmup
- * before the first vote auto-transitions the proposal to FallbackVoting.
+ * Key difference from native `proposeVoteExecute`: a wrapped-only proposal starts in
+ * FallbackWarmup, whose end is a block (the fallback snapshot), not a timestamp. We mine
+ * past it before the first vote, which lazily transitions the proposal to FallbackVoting.
  *
- * Assumes the DAC was created with oracle-publish-deadline=30, fallback-warmup-duration=10.
+ * Assumes the DAC was created with --fallback-warmup-blocks FALLBACK_WARMUP_BLOCKS.
  */
 export async function existingTokenProposeVoteExecute(
   h: Harness,
@@ -37,8 +37,9 @@ export async function existingTokenProposeVoteExecute(
 
   await h.syncIndexer();
 
-  // Advance past oracle-publish-deadline (30s) + fallback-warmup (10s) + buffer
+  // Advance past oracle-publish-deadline (30s), then mine past the fallback warmup blocks
   await h.advanceTime(45);
+  await passFallbackWarmup(h);
 
   // Vote — first vote auto-transitions from AwaitingOracleSnapshot → FallbackVoting
   await h.cli([
@@ -68,7 +69,7 @@ export async function existingTokenProposeVoteExecute(
  *       (fallback voting) → create deal → stake → approve deal (fallback voting) → verify active.
  *
  * Uses fallback voting path (no oracle configured). The DAC is created with short
- * oracle-publish-deadline (30s) and fallback-warmup (10s) for fast test execution.
+ * oracle-publish-deadline (30s) and a few fallback-warmup blocks for fast test execution.
  */
 export async function setupExistingTokenDacWithDeal(h: Harness, opts: DealSetupOptions = {}): Promise<ExistingTokenDealContext> {
   const {assert, config} = h;
@@ -99,7 +100,7 @@ export async function setupExistingTokenDacWithDeal(h: Harness, opts: DealSetupO
     "--qualification", "0",
     "--execution-validity-duration", "86400",
     "--oracle-publish-deadline", "30",
-    "--fallback-warmup-duration", "10",
+    "--fallback-warmup-blocks", String(FALLBACK_WARMUP_BLOCKS),
     "--fallback-duration", "3600",
     "--auto-delegate",
     "--auto-approve",
@@ -284,6 +285,7 @@ export async function setupExistingTokenDacWithDeal(h: Harness, opts: DealSetupO
 
   // Advance past oracle-publish-deadline + fallback-warmup + buffer
   await h.advanceTime(45);
+  await passFallbackWarmup(h);
 
   await h.cli([
     "vote", "proposal", dealProposalId, "true", "--dac", dacAddress,

@@ -1,7 +1,8 @@
 import {encodeAbiParameters, numberToHex, type Address, type Hex} from "viem";
 import {CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE, CORE_TREASURY_PROPOSAL_TYPE} from "./selectors";
 import {VENUE_SNAPSHOT_V1, type SnapshotV1Payload, type TreasurySpendAllowance} from "./types";
-import type {ProposalParams} from "../../types";
+import {DEAL_PARAMS_ABI_COMPONENTS} from "../../encoding";
+import type {DealParams, ProposalParams} from "../../types";
 
 function toBytes32FromUint(value: bigint): Hex {
   return numberToHex(value, {size: 32});
@@ -283,4 +284,153 @@ export function encodeSnapshotV1Payload(p: SnapshotV1Payload): Hex {
 
 export function buildSnapshotV1VoteSignProposal(p: SnapshotV1Payload): ProposalParams {
   return buildExternalVoteSignProposal(VENUE_SNAPSHOT_V1, encodeSnapshotV1Payload(p));
+}
+
+// ---- AgentDeal (home DAC acts as an agent inside a host DAC) ----
+//
+// `hostDealCell` is always the DealCell address of a deal registered in the
+// bound host DAC; the contract validates it at proposal creation and again at
+// execution (InvalidDealAddress otherwise).
+
+const HOST_DEAL_AMOUNT_ABI = [
+  {name: "hostDealCell", type: "address"},
+  {name: "amount", type: "uint256"},
+] as const;
+
+// Pre-approval staking: moves host agent tokens held by the AgentDeal into the
+// host deal and self-delegates the resulting StakedAgent. High quorum, veto.
+export function buildHostStakeProposal(hostDealCell: Address, amount: bigint): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.HOST_STAKE,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(HOST_DEAL_AMOUNT_ABI, [hostDealCell, amount]),
+  };
+}
+
+// Post-approval staking: approves the host deal to pull stake through a host
+// ADD_STAKE proposal and delegates the future stake. High quorum, veto.
+export function buildHostApproveStakeProposal(hostDealCell: Address, amount: bigint): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.HOST_APPROVE_STAKE,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(HOST_DEAL_AMOUNT_ABI, [hostDealCell, amount]),
+  };
+}
+
+// Originates a new deal in the host DAC. `proposer` is overwritten on-chain
+// with the AgentDeal address; `governanceFactory` must be accepted by the host
+// deal's module (see `dealAcceptsGovernanceFactory`). High quorum, veto.
+export function buildHostCreateDealProposal(hostDealParams: DealParams): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.HOST_CREATE_DEAL,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [{name: "hostDealParams", type: "tuple", components: DEAL_PARAMS_ABI_COMPONENTS}],
+      [hostDealParams],
+    ),
+  };
+}
+
+export function buildHostCreateProposalProposal(hostDealCell: Address, hostParams: ProposalParams): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.HOST_CREATE_PROPOSAL,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [
+        {name: "hostDealCell", type: "address"},
+        {
+          name: "hostParams",
+          type: "tuple",
+          components: [
+            {name: "typ", type: "bytes4"},
+            {name: "target", type: "address"},
+            {name: "i", type: "bytes32"},
+            {name: "data", type: "bytes"},
+          ],
+        },
+      ],
+      [hostDealCell, hostParams],
+    ),
+  };
+}
+
+export function buildHostVoteProposal(
+  hostDealCell: Address,
+  hostProposalId: bigint,
+  support: boolean,
+): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.HOST_VOTE,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [
+        {name: "hostDealCell", type: "address"},
+        {name: "hostProposalId", type: "uint256"},
+        {name: "support", type: "bool"},
+      ],
+      [hostDealCell, hostProposalId, support],
+    ),
+  };
+}
+
+// Claims host main-token rewards onto the AgentDeal; route them home with
+// buildReturnAssetToDacProposal.
+export function buildHostClaimRewardProposal(hostDealCell: Address, evaluatorId: bigint): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.HOST_CLAIM_REWARD,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [
+        {name: "hostDealCell", type: "address"},
+        {name: "evaluatorId", type: "uint256"},
+      ],
+      [hostDealCell, evaluatorId],
+    ),
+  };
+}
+
+export function buildHostUnstakeProposal(hostDealCell: Address): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.HOST_UNSTAKE,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters([{name: "hostDealCell", type: "address"}], [hostDealCell]),
+  };
+}
+
+export function buildHostInviteProposal(
+  hostDealCell: Address,
+  invitee: Address,
+  grantInviteRight: boolean,
+): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.HOST_INVITE,
+    target: ZERO_ADDRESS,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters(
+      [
+        {name: "hostDealCell", type: "address"},
+        {name: "invitee", type: "address"},
+        {name: "grantInviteRight", type: "bool"},
+      ],
+      [hostDealCell, invitee, grantInviteRight],
+    ),
+  };
+}
+
+// Routes an earned (foreign) asset held by the AgentDeal to the home treasury.
+// The home main token is refused on-chain (NotAllowed).
+export function buildReturnAssetToDacProposal(token: Address, amount: bigint): ProposalParams {
+  return {
+    typ: CORE_DEAL_MANAGEMENT_PROPOSAL_TYPE.RETURN_ASSET_TO_DAC,
+    target: token,
+    i: toBytes32FromUint(0n),
+    data: encodeAbiParameters([{name: "amount", type: "uint256"}], [amount]),
+  };
 }

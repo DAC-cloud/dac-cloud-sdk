@@ -136,6 +136,8 @@ export interface Harness {
   advanceTime(seconds: number): Promise<void>;
   /** Mine a block (local chain only) */
   mineBlock(): Promise<void>;
+  /** Mine several blocks at once (local chain only) */
+  mineBlocks(count: number): Promise<void>;
   /** Wait for indexer to index up to a given block or just settle */
   syncIndexer(opts?: {timeoutMs?: number}): Promise<void>;
   /** Query indexer via CLI view command */

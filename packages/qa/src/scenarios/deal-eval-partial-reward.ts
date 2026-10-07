@@ -1,11 +1,11 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, transferErc20, verifyDealAccountingInvariants} from "./fixtures/index.js";
+import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, returnCapitalViaDeal, verifyDealAccountingInvariants} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Evaluation — Partial Reward
  *
- * Creates a deal, deposits ~50% of expectedReturn to the deal cell,
+ * Creates a deal, returns ~50% of expectedReturn to the DAC through the deal,
  * then evaluates. The milestone evaluator sees 50% progress:
  * - rewardCurve=[1e18] → 50% reward (proportional to progress)
  *   Actually with constant curve [1e18], evaluateCurve(progress=0.5) = 1e18 (constant!).
@@ -42,25 +42,20 @@ export const dealEvalPartialRewardScenario: Scenario = {
       }],
     });
 
-    // ── Deposit tokens to deal cell to simulate 50% returns ──────
+    // ── Return capital through the deal to record 50% returns ──────
 
     // Mint treasury tokens for the founder (fresh anvil may have zero balance)
     await mintMockToken(h, {token: ctx.treasuryToken, to: ctx.founderAddress, amount: "10000000000000000000000"}); // 10k
 
-    h.log(`Depositing ${halfReturn} tokens to deal cell ${ctx.dealCell}...`);
+    h.log(`Depositing ${halfReturn} tokens through deal ${ctx.dealAddress}...`);
 
     // The founder (account[0]) has mock ERC20 tokens from the Hardhat deploy
     await step(h, "deposit-tokens-to-cell", async () => {
-      const txHash = await transferErc20(h, {
-        token: ctx.treasuryToken,
-        from: ctx.founderAddress,
-        to: ctx.dealCell,
-        amount: halfReturn,
-      });
-      assert.defined(txHash, "transfer tx hash present");
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: ctx.dealAddress, token: ctx.treasuryToken, amount: halfReturn});
+      assert.defined(txHash, "return-capital tx hash present");
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer", ctx.treasuryToken, ctx.dealCell, halfReturn],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 

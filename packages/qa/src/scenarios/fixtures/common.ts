@@ -31,6 +31,22 @@ export async function getBlockNumber(h: Harness): Promise<number> {
 }
 
 /**
+ * Hybrid fallback warmup used by every existing-token DAC the QA suite creates.
+ * It is a block count: the fallback snapshot is `creation block + warmup blocks`
+ * and wrapped voting opens on the block after it.
+ */
+export const FALLBACK_WARMUP_BLOCKS = 3;
+
+/**
+ * Mine past a hybrid proposal's fallback warmup so the next vote lands in
+ * FallbackVoting (the vote itself performs the lazy phase transition).
+ * Advancing time is not enough — the warmup ends at a block, not a timestamp.
+ */
+export async function passFallbackWarmup(h: Harness): Promise<void> {
+  await h.mineBlocks(FALLBACK_WARMUP_BLOCKS + 1);
+}
+
+/**
  * Resolve the primary treasury/underlying token address from config.
  * Reads from DAC_TREASURY_TOKEN env var (configured in config.env).
  */
@@ -229,6 +245,102 @@ export async function dealProposeVoteExecute(
   ]);
 
   return proposalId;
+}
+
+/**
+ * Propose → vote → execute a deal proposal where several stakers may be needed for quorum.
+ * The founder (default wallet) proposes and votes first, then each extra role votes.
+ *
+ * Executes ~100s after voting: deal proposals resolve as soon as quorum is met and the
+ * execution window runs from that moment, not from the end of the voting period. An
+ * extra vote that arrives after the proposal already resolved is tolerated.
+ */
+export async function dealProposeVoteExecuteQuorum(
+  h: Harness,
+  dealAddress: string,
+  proposeArgs: string[],
+  extraVoterRoles: string[] = [],
+): Promise<{proposalId: string; executeTxHash: string}> {
+  const {config} = h;
+
+  const proposeCli = await h.cli([
+    ...proposeArgs,
+    "--deal-address", dealAddress,
+    "--config", config.configPath,
+    "--pretty-print",
+  ]);
+  const proposalId = String(proposeCli.data.proposalId ?? proposeCli.data.id ?? "");
+
+  await h.syncIndexer();
+  await h.advanceTime(10);
+
+  await h.cli([
+    "deal", "vote", "proposal", proposalId, "true",
+    "--deal-address", dealAddress,
+    "--config", config.configPath,
+    "--pretty-print",
+  ]);
+
+  for (const role of extraVoterRoles) {
+    await h.cliAs(role, [
+      "deal", "vote", "proposal", proposalId, "true",
+      "--deal-address", dealAddress,
+      "--config", config.configPath,
+      "--pretty-print",
+    ], {allowFailure: true});
+  }
+
+  await h.advanceTime(100);
+
+  const executeCli = await h.cli([
+    "deal", "execute", proposalId,
+    "--deal-address", dealAddress,
+    "--config", config.configPath,
+    "--pretty-print",
+  ]);
+
+  return {proposalId, executeTxHash: String(executeCli.data.txHash ?? "")};
+}
+
+/**
+ * Make a treasury deal return capital to its DAC — the only returns the evaluators count.
+ *
+ * Evaluators read `DealCell.getReturnedCapital(token)`, which the kernel bumps when the
+ * deal pushes capital home. A token balance sitting on the DealCell is ignored (it could
+ * only be a donation), so returns cannot be simulated with a plain transfer to the cell.
+ *
+ * Flow: mint `amount` into the deal's managed treasury → enable early returns once
+ * (RETURN_CAPITAL_TO_DAC requires them) → pass a return-capital proposal.
+ *
+ * Returns the tx hash of the return-capital execution.
+ */
+export async function returnCapitalViaDeal(
+  h: Harness,
+  opts: {dealAddress: string; token: string; amount: string; extraVoterRoles?: string[]},
+): Promise<string> {
+  const {dealAddress, token, amount, extraVoterRoles = []} = opts;
+
+  await h.syncIndexer();
+  const dealCli = await h.dealView("deal", ["--deal-address", dealAddress]);
+  const deal = dealCli.data.deal as Record<string, unknown> | undefined;
+  const treasury = deal?.managedTreasuryAddress as string | undefined;
+  if (!treasury) {
+    throw new Error(`Deal ${dealAddress} has no managed treasury — returnCapitalViaDeal needs a treasury deal`);
+  }
+
+  await mintMockToken(h, {token, to: treasury, amount});
+
+  if (deal?.earlyReturnsEnabled !== true) {
+    await dealProposeVoteExecuteQuorum(h, dealAddress, [
+      "deal", "propose", "toggle-early-returns", "true",
+    ], extraVoterRoles);
+  }
+
+  const {executeTxHash} = await dealProposeVoteExecuteQuorum(h, dealAddress, [
+    "deal", "propose", "return-capital", token, amount,
+  ], extraVoterRoles);
+
+  return executeTxHash;
 }
 
 /**

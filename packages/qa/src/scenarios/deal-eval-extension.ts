@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, transferErc20} from "./fixtures/index.js";
+import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, returnCapitalViaDeal} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Evaluation — Milestone Extension
@@ -56,16 +56,11 @@ export const dealEvalExtensionScenario: Scenario = {
     h.log(`Depositing ${partialDeposit} tokens (60% of expected)...`);
 
     await step(h, "deposit-partial", async () => {
-      const txHash = await transferErc20(h, {
-        token: ctx.treasuryToken,
-        from: ctx.founderAddress,
-        to: ctx.dealCell,
-        amount: partialDeposit,
-      });
-      assert.defined(txHash, "transfer tx hash");
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: ctx.dealAddress, token: ctx.treasuryToken, amount: partialDeposit});
+      assert.defined(txHash, "return-capital tx hash");
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer", ctx.treasuryToken, ctx.dealCell, partialDeposit],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 
@@ -113,16 +108,11 @@ export const dealEvalExtensionScenario: Scenario = {
     h.log(`Topping up ${topUpDeposit} tokens to exceed expected return...`);
 
     await step(h, "deposit-topup", async () => {
-      const txHash = await transferErc20(h, {
-        token: ctx.treasuryToken,
-        from: ctx.founderAddress,
-        to: ctx.dealCell,
-        amount: topUpDeposit,
-      });
-      assert.defined(txHash, "transfer tx hash");
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: ctx.dealAddress, token: ctx.treasuryToken, amount: topUpDeposit});
+      assert.defined(txHash, "return-capital tx hash");
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer", ctx.treasuryToken, ctx.dealCell, topUpDeposit],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 

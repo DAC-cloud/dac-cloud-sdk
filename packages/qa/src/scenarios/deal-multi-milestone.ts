@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, transferErc20, verifyDealAccountingInvariants} from "./fixtures/index.js";
+import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, returnCapitalViaDeal, verifyDealAccountingInvariants} from "./fixtures/index.js";
 
 /**
  * Scenario: Deal Multi-Milestone — Sequential Evaluation
@@ -10,7 +10,7 @@ import {getChainTimestamp, mintMockToken, setupNativeDacWithDeal, transferErc20,
  * - Milestone 2: expectedReturn=3000, rewardPercentage=50%, timestamp=+14d
  *
  * Important: milestones share the same token, so the evaluator checks
- * `balanceOf(cell) / expectedReturn` for each. If progress >= SCALE (100%),
+ * `returnedCapital / expectedReturn` for each. If progress >= SCALE (100%),
  * the milestone triggers immediately regardless of deadline. To test sequential
  * evaluation, milestone 2 needs a higher expectedReturn so the first deposit
  * doesn't accidentally satisfy both.
@@ -86,16 +86,11 @@ export const dealMultiMilestoneScenario: Scenario = {
     h.log(`Depositing ${deposit1} for milestone 1 (120% of m1, 40% of m2)...`);
 
     await step(h, "deposit-milestone-1", async () => {
-      const txHash = await transferErc20(h, {
-        token: ctx.treasuryToken,
-        from: ctx.founderAddress,
-        to: ctx.dealCell,
-        amount: deposit1,
-      });
-      assert.defined(txHash, "transfer tx hash");
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: ctx.dealAddress, token: ctx.treasuryToken, amount: deposit1, extraVoterRoles: ["agent1", "agent2"]});
+      assert.defined(txHash, "return-capital tx hash");
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer"],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 
@@ -143,16 +138,11 @@ export const dealMultiMilestoneScenario: Scenario = {
     h.log(`Depositing ${deposit2} for milestone 2 (total will be 3200 → 106% of m2)...`);
 
     await step(h, "deposit-milestone-2", async () => {
-      const txHash = await transferErc20(h, {
-        token: ctx.treasuryToken,
-        from: ctx.founderAddress,
-        to: ctx.dealCell,
-        amount: deposit2,
-      });
-      assert.defined(txHash, "transfer tx hash");
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: ctx.dealAddress, token: ctx.treasuryToken, amount: deposit2, extraVoterRoles: ["agent1", "agent2"]});
+      assert.defined(txHash, "return-capital tx hash");
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer"],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 

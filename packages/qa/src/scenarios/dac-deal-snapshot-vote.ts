@@ -8,11 +8,13 @@ import type {Harness, Scenario} from "../harness/types.js";
 import {
   dealProposeVoteExecute,
   getChainTimestamp,
+  FALLBACK_WARMUP_BLOCKS,
   mintMockToken,
-  proposeVoteExecute,
+  passFallbackWarmup,
   resolveUnderlyingToken,
   ZERO_ADDR,
 } from "./fixtures/common.js";
+import {existingTokenProposeVoteExecute} from "./fixtures/setup-existing-token-dac-deal.js";
 
 // Local: propose → vote → execute a DAC-level proposal as a non-default wallet
 // role. Mirrors the private helper of the same name in dac-investment.ts; kept
@@ -142,7 +144,7 @@ export const dacDealSnapshotVoteScenario: Scenario = {
         "--treasury-seed-amount", "100000000000000000000000",
         "--quorum-percent", "50", "--blocking-percent", "25", "--high-quorum-percent", "75",
         "--voting-duration", "7200", "--qualification", "0", "--execution-validity-duration", "86400",
-        "--oracle-publish-deadline", "600", "--fallback-warmup-duration", "10", "--fallback-duration", "3600",
+        "--oracle-publish-deadline", "600", "--fallback-warmup-blocks", String(FALLBACK_WARMUP_BLOCKS), "--fallback-duration", "3600",
         "--auto-delegate", "--auto-approve",
         "--config", config.configPath, "--pretty-print",
       ]);
@@ -157,7 +159,7 @@ export const dacDealSnapshotVoteScenario: Scenario = {
       "--dac", investorDacAddress!, "--auto-approve",
       "--config", config.configPath, "--pretty-print",
     ]);
-    await proposeVoteExecute(h, investorDacAddress!, [
+    await existingTokenProposeVoteExecute(h, investorDacAddress!, [
       "propose", "mint-agent-tokens", "100000000000000000000000", founderA.address,
     ]);
     await h.cli([
@@ -282,6 +284,7 @@ export const dacDealSnapshotVoteScenario: Scenario = {
       "--config", config.configPath, "--pretty-print",
     ]);
     await h.advanceTime(10);
+    await passFallbackWarmup(h);
     await h.cli([
       "vote", "proposal", dealDacProposalId!, "true",
       "--dac", investorDacAddress!,

@@ -35,7 +35,7 @@ dac
 │   ├── trigger-fallback <id>
 │   ├── activate-fallback <id>
 │   ├── vote-merkle <id> <support> <index> <amount> <proof>
-│   └── state <id>                  Read-only phase + deadlines
+│   └── state <id>                  Read-only phase + deadlines (time and block)
 │
 ├── oracle                          Governance oracle management
 │   ├── deploy <admin> [publisher]
@@ -46,7 +46,8 @@ dac
 │
 ├── join                            Fulfill a capital call
 ├── recover-treasury                Recover treasury accounting for a token
-├── deposit-treasury                Donate ERC20 to DAC treasury (transfer + recover)
+├── recover-erc20                   Credit tokens on the DACCell to treasury (permissionless)
+├── deposit-treasury                Donate ERC20 to DAC treasury (transfer + recover-erc20)
 ├── claim-dividend <proofFile>      Claim Merkle-tree dividends
 │
 ├── legal-message <messageFile>     Send legal-wrapper message via DACCell
@@ -77,8 +78,13 @@ dac
     ├── legal-message [dealNumericId] <messageFile>   Send legal-wrapper message via DealManager
     ├── withdraw <dealNumericId>    Force return capital after deadline
     │
-    └── view [resource] [id]        Query deal indexer state
+    └── view [resource] [id]        Query deal state (indexer; `terms` reads on-chain)
 ```
+
+`deal propose` covers kernel types, core treasury / child-DAC types, and the
+`core:agent-deal` types (`host-stake`, `host-approve-stake`, `host-create-deal`,
+`host-create-proposal`, `host-vote`, `host-claim-reward`, `host-unstake`, `host-invite`,
+`return-asset`) — see [Deal Commands](./deal-commands.md#propose-proposaltype-args).
 
 ## Global Flags
 
@@ -205,7 +211,8 @@ dac deal view deal --deal 0x<deal>
 dac deal view positions --deal 0x<deal>
 ```
 
-All `view` resources hit the backend GraphQL proxy. See command pages for the full list.
+All `view` resources hit the backend GraphQL proxy (except `dac deal view terms`, which
+also reads the deal's `DealParams` on-chain). See command pages for the full list.
 
 ### Dry-run
 

@@ -5,7 +5,7 @@ import {
   mintMockToken,
   proposeVoteExecute,
   setupNativeDacWithDeal,
-  transferErc20,
+  returnCapitalViaDeal,
   verifyDealAccountingInvariants,
 } from "./fixtures/index.js";
 
@@ -455,16 +455,11 @@ export const dealActiveStakingScenario: Scenario = {
     await mintMockToken(h, {token: underlyingToken, to: founderWallet.address, amount: "10000000000000000000000"});
 
     await step(h, "phase4-deposit", async () => {
-      const txHash = await transferErc20(h, {
-        token: underlyingToken,
-        from: founderWallet.address,
-        to: ctx.dealCell,
-        amount: "1500000000000000000000", // 1500 tokens (150% of 1000 expectedReturn)
-      });
-      assert.defined(txHash, "transfer tx");
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: ctx.dealAddress, token: underlyingToken, amount: "1500000000000000000000", extraVoterRoles: ["agent1", "agent2"]});
+      assert.defined(txHash, "return-capital tx");
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer"],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 

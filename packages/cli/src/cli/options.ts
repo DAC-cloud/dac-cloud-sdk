@@ -28,7 +28,7 @@ const OPTION_SPECS = {
   qualification: {flags: "--qualification <percent>", description: "Proposal qualification threshold percent (e.g. 1 for 1%)"},
   "execution-validity-duration": {flags: "--execution-validity-duration <uint256>", description: "Execution validity duration in seconds"},
   "oracle-publish-deadline": {flags: "--oracle-publish-deadline <uint256>", description: "Hybrid oracle publish deadline in seconds"},
-  "fallback-warmup-duration": {flags: "--fallback-warmup-duration <uint256>", description: "Hybrid fallback warmup duration in seconds"},
+  "fallback-warmup-blocks": {flags: "--fallback-warmup-blocks <uint256>", description: "Hybrid fallback warmup length in blocks (the fallback snapshot is the warmup's last block)"},
   "fallback-duration": {flags: "--fallback-duration <uint256>", description: "Hybrid fallback voting duration in seconds"},
   "blocking-on-all-proposals": {flags: "--blocking-on-all-proposals", description: "Apply blocking logic on all proposal types (hybrid, default: off)"},
   "blocking-on-high-quorum": {flags: "--blocking-on-high-quorum", description: "Apply blocking on high-quorum proposals (hybrid, default: off)"},

@@ -94,7 +94,7 @@ dac
 ├── proposal {activate-primary, begin-warmup, trigger-fallback, activate-fallback,
 │              vote-merkle, state}
 ├── oracle {deploy, set-publisher, publish, deactivate, status}
-├── join | recover-treasury | deposit-treasury | claim-dividend
+├── join | recover-treasury | recover-erc20 | deposit-treasury | claim-dividend
 ├── legal-message
 ├── view [resource] [id]
 └── deal
@@ -148,10 +148,18 @@ dac discover                                # list DACs the wallet belongs to
 `child-vote-proposal`, `child-return-profits`, `child-reinvest-profits`,
 `approve-venue-version`, `snapshot-vote-sign`, `external-vote-sign`.
 
+**Agent-deal** (`core:agent-deal` only): `host-stake`, `host-approve-stake`,
+`host-create-deal` (`--input deal.json`, same format as `deal create`),
+`host-create-proposal`, `host-vote`, `host-claim-reward`, `host-unstake`, `host-invite`,
+`return-asset` (alias `return-asset-to-dac`). `<hostDeal>` arguments accept the host
+deal's Deal or DealCell address.
+
 ## Deal Kinds (Core Module)
 
 - `core:permit2-treasury` (aliases: `permit2-treasury`, `treasury-deal`)
 - `core:dac-deal` (alias: `dac-deal`)
+- `core:agent-deal` (alias: `agent-deal`) — the home DAC acts as an agent inside one
+  host DAC; `dealTarget` (host DACCell) is required and must differ from the home DAC
 
 ## Evaluator Kinds
 
@@ -192,6 +200,11 @@ approve-agent-spend`, etc.
 
 Deadline defaults: `evaluationDeadline` → `dealDeadline`; `dealDeadline` → `now + 30d`;
 `approveDeadline` → `now + 7d`.
+
+`governanceFactory` is optional: core deals accept only
+`CoreModuleFactory.dealGovernanceFactory()`, which `deal create` reads on-chain (falling
+back to the manifest's `coreDealGovernanceFactory`) and prints in its output. Milestone
+and revenue-schedule configs accept an optional `excludePrincipal` (default `false`).
 
 ### Legal message JSON
 

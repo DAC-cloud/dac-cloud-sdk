@@ -5,10 +5,12 @@ import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
 import {
   existingTokenProposeVoteExecute,
+  FALLBACK_WARMUP_BLOCKS,
   getChainTimestamp,
   mintMockToken,
+  passFallbackWarmup,
   resolveUnderlyingToken,
-  transferErc20,
+  returnCapitalViaDeal,
   verifyDealAccountingInvariants,
   ZERO_ADDR,
 } from "./fixtures/index.js";
@@ -170,7 +172,7 @@ export const dealMultiDealWrappedRewardsScenario: Scenario = {
       "--qualification", "0",
       "--execution-validity-duration", "86400",
       "--oracle-publish-deadline", "30",
-      "--fallback-warmup-duration", "10",
+      "--fallback-warmup-blocks", String(FALLBACK_WARMUP_BLOCKS),
       "--fallback-duration", "3600",
       "--auto-delegate",
       "--auto-approve",
@@ -308,6 +310,7 @@ export const dealMultiDealWrappedRewardsScenario: Scenario = {
     // Approve Deal A via fallback voting
     h.log("Approving Deal A via fallback voting...");
     await h.advanceTime(45);
+    await passFallbackWarmup(h);
     await h.cli([
       "vote", "proposal", dealAProposalId, "true", "--dac", dacAddress,
       "--config", config.configPath, "--pretty-print",
@@ -394,6 +397,7 @@ export const dealMultiDealWrappedRewardsScenario: Scenario = {
     // Approve Deal B via fallback voting
     h.log("Approving Deal B via fallback voting...");
     await h.advanceTime(45);
+    await passFallbackWarmup(h);
     await h.cli([
       "vote", "proposal", dealBProposalId, "true", "--dac", dacAddress,
       "--config", config.configPath, "--pretty-print",
@@ -459,15 +463,10 @@ export const dealMultiDealWrappedRewardsScenario: Scenario = {
     h.log("Phase 2: Evaluating Deal A milestone 1 (60% progress)...");
 
     await step(h, "phase2-deposit-a", async () => {
-      const txHash = await transferErc20(h, {
-        token: underlyingToken,
-        from: founderWallet.address,
-        to: dealACell,
-        amount: "600000000000000000000", // 600 tokens = 60% of 1k
-      });
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: dealAAddress, token: underlyingToken, amount: "600000000000000000000", extraVoterRoles: ["agent1"]});
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer"],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 
@@ -582,15 +581,10 @@ export const dealMultiDealWrappedRewardsScenario: Scenario = {
     h.log("Phase 4: Evaluating Deal B (100%+ progress → close)...");
 
     await step(h, "phase4-deposit-b", async () => {
-      const txHash = await transferErc20(h, {
-        token: underlyingToken,
-        from: founderWallet.address,
-        to: dealBCell,
-        amount: "1500000000000000000000", // 1500 tokens (150% of 1k)
-      });
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: dealBAddress, token: underlyingToken, amount: "1500000000000000000000", extraVoterRoles: ["agent1"]});
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer"],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 
@@ -697,15 +691,10 @@ export const dealMultiDealWrappedRewardsScenario: Scenario = {
     h.log("Phase 6: Evaluating Deal A milestone 2 (100%+ progress)...");
 
     await step(h, "phase6-deposit-a2", async () => {
-      const txHash = await transferErc20(h, {
-        token: underlyingToken,
-        from: founderWallet.address,
-        to: dealACell,
-        amount: "3000000000000000000000", // 3k (150% of 2k)
-      });
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: dealAAddress, token: underlyingToken, amount: "3000000000000000000000", extraVoterRoles: ["agent1"]});
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer"],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 

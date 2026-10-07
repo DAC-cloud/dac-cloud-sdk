@@ -15,7 +15,7 @@ TypeScript SDK and CLI for the DAC Cloud protocol — EVM smart contracts for De
 | [Governance Guide](./cli/governance.md) | Propose/vote/execute, validity windows, hybrid flows, veto |
 | **SDK Reference** | |
 | [SDK Overview](./sdk/overview.md) | Package structure, install, build |
-| [Core Client API](./sdk/core-client.md) | `DacCoreClient` — full method reference (45 methods) |
+| [Core Client API](./sdk/core-client.md) | `DacCoreClient` — full method reference (54 methods) |
 | [Indexer Client API](./sdk/indexer-client.md) | GraphQL client — namespaces, entities, queries |
 | [Manifests](./sdk/manifests.md) | Protocol manifest schema and loader |
 | [Transaction Builder](./sdk/transaction-builder.md) | Unsigned-tx flows for multisig and external signers |
@@ -50,7 +50,7 @@ Dependency flow: `cli → core → manifests`, `cli → indexer`. The CLI also d
 | **DealCell** | Per-deal state: stake, whitelist, evaluator, rewards |
 | **GovernanceOracle** | Bridge for existing-token DACs — publishes Merkle snapshots for primary voting |
 | **AssetController** | Treasury custody, capital calls, dividends, agent distributors |
-| **CoreModule** | Default deal-kind module — `permit2-treasury`, `dac-deal` selectors, treasury proposal types |
+| **CoreModule** | Default deal-kind module — `permit2-treasury`, `dac-deal`, `agent-deal` selectors, treasury and agent-deal proposal types |
 | **LegalWrapper** | Off-chain legal entity wrapper; carries operating agreement + message log |
 
 ### Two DAC Modes
@@ -58,10 +58,11 @@ Dependency flow: `cli → core → manifests`, `cli → indexer`. The CLI also d
 - **Native DAC** (`dac create`) — Fresh MainToken/AgentToken pair, founder allocation upfront, straightforward governance with `defaultQuorum`/`mainTokenMaxSupply`.
 - **Existing-Token DAC** (`dac create-existing-token`) — Wraps an existing ERC20 (1:1) and uses a GovernanceOracle for hybrid voting. Founder receives no tokens at creation; must `wrap` to gain voting power.
 
-### Two Deal Kinds (Core Module)
+### Three Deal Kinds (Core Module)
 
 - **`core:permit2-treasury`** — Treasury deal funded via Permit2; standard agent staking, claims, slashing.
 - **`core:dac-deal`** — Cross-DAC investment vehicle that holds child-DAC tokens; supports child-DAC governance forwarding, Snapshot.org ERC-1271, dividends.
+- **`core:agent-deal`** — Cross-DAC agency: the home DAC acts as an agent inside one host DAC (creates, stakes into, and governs host deals; routes earned rewards home).
 
 ### Two Evaluators
 

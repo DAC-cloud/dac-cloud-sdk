@@ -15,6 +15,7 @@ import {
 import {privateKeyToAccount} from "viem/accounts";
 import type {ProtocolManifest} from "@dac-cloud/manifests";
 import {
+  agentDealAbi,
   agentTokenAbi,
   dacFactoryAbi,
   dacCellAbi,
@@ -25,11 +26,12 @@ import {
   erc20VotesAbi,
   governanceOracleAbi,
   hybridDacManagementProposalAbi,
+  moduleFactoryAbi,
   permit2TreasuryAbi,
   votingProposalAbi,
   wrappedMainTokenAbi,
 } from "./abi";
-import {encodeExistingTokenConfig} from "./encoding";
+import {decodeDealParams, encodeExistingTokenConfig} from "./encoding";
 import {resolveSalt} from "./salt";
 import type {
   CapitalCall,
@@ -37,6 +39,7 @@ import type {
   DealParams,
   ExistingTokenDacConfig,
   ProposalParams,
+  VotingConfig,
 } from "./types";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
@@ -105,7 +108,7 @@ export interface DacCoreClient {
   recoverProfits(args: {dealAddress: Address; token: Address}): Promise<Hex>;
   executeAgentSpend(args: {treasuryAddress: Address; token: Address; destination: Address; amount: bigint}): Promise<Hex>;
   executeReceivePermit2(args: {treasuryAddress: Address; token: Address; source: Address; amount: bigint}): Promise<Hex>;
-  executeDealProposalDetailed(args: {dealAddress: Address; proposalId: bigint}): Promise<{txHash: Hex; dacProposalId?: bigint; trancheId?: bigint; childProposalId?: bigint; childVoteProposalId?: bigint}>;
+  executeDealProposalDetailed(args: {dealAddress: Address; proposalId: bigint}): Promise<{txHash: Hex; dacProposalId?: bigint; trancheId?: bigint; childProposalId?: bigint; childVoteProposalId?: bigint; hostDealCell?: Address; hostDealId?: bigint; hostProposalId?: bigint}>;
   evaluateDeal(args: {dealManager: Address; dealId: bigint; evaluatorId: bigint}): Promise<Hex>;
   forceReturnCapital(args: {dealManager: Address; dealId: bigint}): Promise<Hex>;
   sendDacLegalWrapperMessage(args: {dacCell: Address; kind: Hex; message: Hex}): Promise<Hex>;
@@ -114,11 +117,30 @@ export interface DacCoreClient {
   fulfillCapitalCall(args: {dacCell: Address; call: CapitalCall}): Promise<Hex>;
   depositTreasury(args: {dacCell: Address; token: Address; amount: bigint}): Promise<Hex>;
   recoverTreasury(args: {dacCell: Address; token: Address}): Promise<Hex>;
+  /** Permissionless: credits tokens sitting on the DACCell to its treasury. */
+  recoverErc20(args: {dacCell: Address; token: Address}): Promise<Hex>;
   approveErc20(args: {token: Address; spender: Address; amount: bigint}): Promise<Hex>;
   transferErc20(args: {token: Address; to: Address; amount: bigint}): Promise<Hex>;
   delegateVotes(args: {token: Address; delegatee: Address}): Promise<Hex>;
   getErc20Allowance(args: {token: Address; owner: Address; spender: Address}): Promise<bigint>;
   getErc20Balance(args: {token: Address; holder: Address}): Promise<bigint>;
+  /** Timestamp of the latest block: the clock on-chain deadline checks run against. */
+  getChainTime(): Promise<bigint>;
+  /** `CoreModuleFactory.dealGovernanceFactory()`; undefined when the module does not expose it. */
+  getDealGovernanceFactory(args: {moduleFactory: Address}): Promise<Address | undefined>;
+  /** `IModuleFactory.dealAcceptsGovernanceFactory`; undefined when the module predates the check. */
+  dealAcceptsGovernanceFactory(args: {moduleFactory: Address; dealKind: Hex; governanceFactory: Address}): Promise<boolean | undefined>;
+  /** Module-registered controlled addresses of a deal against the kernel cap. */
+  getControlledAddressBudget(args: {dealManager: Address; dealCell: Address}): Promise<{used: bigint; max: bigint; remaining: bigint}>;
+  /** Full `DealParams` the deal was created with, decoded from `DealManager.state(dealCell).initParams`. */
+  getDealInitParams(args: {dealManager: Address; dealCell: Address}): Promise<DealParams>;
+  getDealVotingConfig(args: {dealAddress: Address}): Promise<VotingConfig>;
+  getAgentDealHost(args: {dealAddress: Address}): Promise<{hostDac: Address; hostAgentToken: Address; hostMainToken: Address}>;
+  /**
+   * Simulated `isResolved()` then `outcome()`. `outcome` is undefined while unresolved:
+   * hybrid proposals revert `NotResolved` before a voting phase is active.
+   */
+  getProposalResolution(args: {proposalAddress: Address}): Promise<{resolved: boolean; outcome?: boolean}>;
 }
 
 export function accountFromPrivateKey(privateKey: Hex): PrivateKeyAccount {
@@ -200,6 +222,38 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       );
     }
     return receipt;
+  }
+
+  async function readDealAcceptsGovernanceFactory(
+    moduleFactory: Address,
+    dealKind: Hex,
+    governanceFactory: Address,
+  ): Promise<boolean | undefined> {
+    try {
+      return await publicClient.readContract({
+        address: moduleFactory,
+        abi: moduleFactoryAbi,
+        functionName: "dealAcceptsGovernanceFactory",
+        args: [dealKind, governanceFactory],
+      });
+    } catch {
+      // Module deployed before the allow-list existed (or a non-module address):
+      // let the kernel decide.
+      return undefined;
+    }
+  }
+
+  // The kernel reverts GovernanceFactoryNotAccepted for a factory the deal's
+  // module does not vouch for; fail before spending gas, with the fix spelled out.
+  async function assertGovernanceFactoryAccepted(params: DealParams): Promise<void> {
+    const accepted = await readDealAcceptsGovernanceFactory(params.moduleFactory, params.dealKind, params.governanceFactory);
+    if (accepted === false) {
+      throw new Error(
+        `GovernanceFactoryNotAccepted: module ${params.moduleFactory} does not accept governanceFactory `
+        + `${params.governanceFactory} for deal kind ${params.dealKind}. `
+        + `Core deals only accept CoreModuleFactory.dealGovernanceFactory().`,
+      );
+    }
   }
 
   return {
@@ -370,6 +424,7 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
     },
 
     async createDealProposal({dealManager, params}) {
+      await assertGovernanceFactoryAccepted(params);
       const receipt = await submitWrite({
         address: dealManager,
         abi: dealManagerAbi,
@@ -380,6 +435,7 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
     },
 
     async createDealProposalDetailed({dealManager, params}) {
+      await assertGovernanceFactoryAccepted(params);
       const receipt = await submitWrite({
         address: dealManager,
         abi: dealManagerAbi,
@@ -668,7 +724,36 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         }
       }
 
-      return {txHash, dacProposalId, trancheId, childProposalId, childVoteProposalId};
+      let hostDealCell: Address | undefined;
+      let hostDealId: bigint | undefined;
+      let hostProposalId: bigint | undefined;
+
+      for (const log of receipt.logs) {
+        if (log.address.toLowerCase() !== dealAddress.toLowerCase()) {
+          continue;
+        }
+        try {
+          const decoded = decodeEventLog({
+            abi: agentDealAbi,
+            data: log.data,
+            topics: log.topics,
+          });
+          if (decoded.eventName === "HostDealCreated") {
+            hostDealCell = decoded.args.hostDealCell;
+            hostDealId = decoded.args.hostDealId;
+            break;
+          }
+          if (decoded.eventName === "HostProposalCreated") {
+            hostDealCell = decoded.args.hostDealCell;
+            hostProposalId = decoded.args.hostProposalId;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      return {txHash, dacProposalId, trancheId, childProposalId, childVoteProposalId, hostDealCell, hostDealId, hostProposalId};
     },
 
     async claimDealRewardPool({dealAddress, evaluatorId}) {
@@ -801,6 +886,16 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       return receipt.transactionHash;
     },
 
+    async recoverErc20({dacCell, token}) {
+      const receipt = await submitWrite({
+        address: dacCell,
+        abi: dacCellAbi,
+        functionName: "recoverERC20",
+        args: [token],
+      });
+      return receipt.transactionHash;
+    },
+
     async approveErc20({token, spender, amount}) {
       const receipt = await submitWrite({
         address: token,
@@ -847,6 +942,90 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         functionName: "balanceOf",
         args: [holder],
       });
+    },
+
+    async getChainTime() {
+      const block = await publicClient.getBlock({blockTag: "latest"});
+      return block.timestamp;
+    },
+
+    async getDealGovernanceFactory({moduleFactory}) {
+      try {
+        return await publicClient.readContract({
+          address: moduleFactory,
+          abi: moduleFactoryAbi,
+          functionName: "dealGovernanceFactory",
+        });
+      } catch {
+        return undefined;
+      }
+    },
+
+    async dealAcceptsGovernanceFactory({moduleFactory, dealKind, governanceFactory}) {
+      return readDealAcceptsGovernanceFactory(moduleFactory, dealKind, governanceFactory);
+    },
+
+    async getControlledAddressBudget({dealManager, dealCell}) {
+      const [used, max] = await Promise.all([
+        publicClient.readContract({
+          address: dealManager,
+          abi: dealManagerAbi,
+          functionName: "moduleControlledCount",
+          args: [dealCell],
+        }),
+        publicClient.readContract({
+          address: dealManager,
+          abi: dealManagerAbi,
+          functionName: "MAX_MODULE_CONTROLLED_ADDRESSES",
+        }),
+      ]);
+      return {used, max, remaining: max > used ? max - used : 0n};
+    },
+
+    async getDealInitParams({dealManager, dealCell}) {
+      const state = await publicClient.readContract({
+        address: dealManager,
+        abi: dealManagerAbi,
+        functionName: "state",
+        args: [dealCell],
+      });
+      if (state.id === 0n) {
+        throw new Error(`Deal cell ${dealCell} is not registered in deal manager ${dealManager}`);
+      }
+      return decodeDealParams(state.initParams);
+    },
+
+    async getDealVotingConfig({dealAddress}) {
+      return publicClient.readContract({
+        address: dealAddress,
+        abi: dealAbi,
+        functionName: "votingConfig",
+      });
+    },
+
+    async getAgentDealHost({dealAddress}) {
+      const [hostDac, hostDNA] = await Promise.all([
+        publicClient.readContract({address: dealAddress, abi: agentDealAbi, functionName: "managedEntity"}),
+        publicClient.readContract({address: dealAddress, abi: agentDealAbi, functionName: "hostDNA"}),
+      ]);
+      return {hostDac, hostAgentToken: hostDNA[0], hostMainToken: hostDNA[1]};
+    },
+
+    async getProposalResolution({proposalAddress}) {
+      const {result: resolved} = await publicClient.simulateContract({
+        address: proposalAddress,
+        abi: votingProposalAbi,
+        functionName: "isResolved",
+      });
+      if (!resolved) {
+        return {resolved};
+      }
+      const {result: outcome} = await publicClient.simulateContract({
+        address: proposalAddress,
+        abi: votingProposalAbi,
+        functionName: "outcome",
+      });
+      return {resolved, outcome};
     },
   };
 }

@@ -1,0 +1,82 @@
+fragment AgentDealViewFields on AgentDeal {
+  id
+  chainId
+  dealId
+  hostDacAddress
+  hostDacId
+  hostAgentTokenAddress
+  hostMainTokenAddress
+  createdBlockNumber
+  updatedBlockNumber
+}
+
+fragment AgentDealHostPositionViewFields on AgentDealHostPosition {
+  id
+  chainId
+  agentDealId
+  dealId
+  hostDealCellAddress
+  hostDealId
+  hostDealNumericId
+  stakedAmount
+  approvedStakeAmount
+  originatedByAgent
+  proposalsCreatedCount
+  votesCastCount
+  rewardsClaimedCount
+  invitesSentCount
+  unstaked
+  createdBlockNumber
+  updatedBlockNumber
+}
+
+fragment AgentDealActionViewFields on AgentDealAction {
+  id
+  chainId
+  dealId
+  agentDealId
+  hostDealCellAddress
+  hostDealId
+  actionType
+  amount
+  hostDealNumericId
+  hostProposalNumericId
+  proposalTypeSelector
+  proposalTypeName
+  support
+  evaluatorNumericId
+  inviteeAddress
+  grantInviteRight
+  tokenAddress
+  createdBlockNumber
+  createdBlockTimestamp
+  createdTransactionHash
+}
+
+query GetAgentDealByDeal($dealId: String!) {
+  AgentDeal(where: {dealId: {_eq: $dealId}}, limit: 1) {
+    ...AgentDealViewFields
+  }
+}
+
+query ListAgentDealHostPositionsByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
+  AgentDealHostPosition(
+    where: {dealId: {_eq: $dealId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{createdBlockNumber: desc}]
+  ) {
+    ...AgentDealHostPositionViewFields
+  }
+}
+
+query ListAgentDealActionsByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
+  AgentDealAction(
+    where: {dealId: {_eq: $dealId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{createdBlockNumber: desc}]
+  ) {
+    ...AgentDealActionViewFields
+  }
+}

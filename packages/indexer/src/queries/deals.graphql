@@ -35,6 +35,10 @@ fragment DealViewFields on Deal {
   childDacId
   childMainTokenAddress
   childAgentTokenAddress
+  hostDacAddress
+  hostDacId
+  hostAgentTokenAddress
+  hostMainTokenAddress
   active
   closed
   recovered
@@ -178,5 +182,29 @@ query ListDealAgentPositionsByDeal($dealId: String!, $limit: Int!, $offset: Int!
     order_by: [{currentStakedAmount: desc}, {updatedBlockNumber: desc}]
   ) {
     ...DealAgentPositionViewFields
+  }
+}
+
+fragment DealFundingTokenViewFields on DealFundingToken {
+  id
+  chainId
+  dealId
+  dacId
+  tokenAddress
+  isFundingToken
+  investedAmount
+  returnedAmount
+  netInvestedAmount
+  updatedBlockNumber
+}
+
+query ListDealFundingTokensByDeal($dealId: String!, $limit: Int!, $offset: Int!) {
+  DealFundingToken(
+    where: {dealId: {_eq: $dealId}}
+    limit: $limit
+    offset: $offset
+    order_by: [{updatedBlockNumber: desc}]
+  ) {
+    ...DealFundingTokenViewFields
   }
 }

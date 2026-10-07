@@ -8,6 +8,8 @@ export const PROTOCOL_MANIFEST_CORE_ADDRESS_KEYS = [
 
 export type ProtocolManifestCoreAddressKey = typeof PROTOCOL_MANIFEST_CORE_ADDRESS_KEYS[number];
 export const PROTOCOL_MANIFEST_ADDRESS_KEYS = [
+  "agentDealFactory",
+  "agentDealImpl",
   "agentTokenFactory",
   "agentTokenImpl",
   "assetControllerFactory",
@@ -60,6 +62,8 @@ export interface ProtocolManifest {
   chainId: number;
   blockNumber?: number;
   deployer?: ProtocolAddress;
+  agentDealFactory?: ProtocolAddress;
+  agentDealImpl?: ProtocolAddress;
   agentTokenFactory?: ProtocolAddress;
   agentTokenImpl?: ProtocolAddress;
   assetControllerFactory?: ProtocolAddress;

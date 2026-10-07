@@ -196,7 +196,8 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
     qualification: resolvePercent(resolver, "qualification", 0),
     executionValidityDuration: resolver.resolveBigInt("execution-validity-duration", 7n * 24n * 60n * 60n) ?? 7n * 24n * 60n * 60n,
     oraclePublishDeadline: resolver.resolveBigInt("oracle-publish-deadline", 24n * 60n * 60n) ?? 24n * 60n * 60n,
-    fallbackWarmupDuration: resolver.resolveBigInt("fallback-warmup-duration", 24n * 60n * 60n) ?? 24n * 60n * 60n,
+    // Blocks, not seconds: 43200 blocks is about a day at Base's 2s block time.
+    fallbackWarmupBlocks: resolver.resolveBigInt("fallback-warmup-blocks", 43_200n) ?? 43_200n,
     fallbackDuration: resolver.resolveBigInt("fallback-duration", 7n * 24n * 60n * 60n) ?? 7n * 24n * 60n * 60n,
     blockingOnAllProposals: resolver.resolveBoolean("blocking-on-all-proposals", false),
     blockingOnHighQuorum: resolver.resolveBoolean("blocking-on-high-quorum", false),
@@ -443,7 +444,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
     const qualification = normalizePercentInput(args[4] ?? (input?.qualification !== undefined ? String(readBigIntField(input, "qualification", "--input")) : "0"));
     const executionValidityDuration = args[5] !== undefined ? BigInt(args[5]) : readBigIntField(input, "executionValidityDuration", "--input");
     const oraclePublishDeadline = args[6] !== undefined ? BigInt(args[6]) : readBigIntField(input, "oraclePublishDeadline", "--input");
-    const fallbackWarmupDuration = args[7] !== undefined ? BigInt(args[7]) : readBigIntField(input, "fallbackWarmupDuration", "--input");
+    const fallbackWarmupBlocks = args[7] !== undefined ? BigInt(args[7]) : readBigIntField(input, "fallbackWarmupBlocks", "--input");
     const fallbackDuration = args[8] !== undefined ? BigInt(args[8]) : readBigIntField(input, "fallbackDuration", "--input");
     const blockingOnAllProposals = args[9] !== undefined ? parseBoolText(args[9]) : (input?.blockingOnAllProposals !== undefined ? readBoolField(input, "blockingOnAllProposals", "--input") : false);
     const blockingOnHighQuorum = args[10] !== undefined ? parseBoolText(args[10]) : (input?.blockingOnHighQuorum !== undefined ? readBoolField(input, "blockingOnHighQuorum", "--input") : true);
@@ -456,7 +457,7 @@ async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, arg
       qualification,
       executionValidityDuration,
       oraclePublishDeadline,
-      fallbackWarmupDuration,
+      fallbackWarmupBlocks,
       fallbackDuration,
       blockingOnAllProposals,
       blockingOnHighQuorum,
@@ -887,7 +888,10 @@ async function cmdProposalState(resolver: OptionResolver, proposalIdText: string
     proposalVariant: proposal.proposalVariant,
     currentPhase: proposal.currentPhase,
     phaseStartTime: proposal.phaseStartTime,
+    // phaseEndTime is 0 during FallbackWarmup: that phase ends at phaseEndBlock.
     phaseEndTime: proposal.phaseEndTime,
+    phaseEndBlock: proposal.phaseEndBlock,
+    phaseEndTimeEstimate: proposal.phaseEndTimeEstimate,
     snapshotBlock: proposal.currentPhaseSnapshotBlock,
     totalVotingPower: proposal.totalVotingPower,
     quorum: proposal.quorum,
@@ -900,6 +904,7 @@ async function cmdProposalState(resolver: OptionResolver, proposalIdText: string
     passed: proposal.passed,
     executed: proposal.executed,
     executionExpired: proposal.executionExpired,
+    resolvedWithoutElectorate: proposal.resolvedWithoutElectorate,
     resolutionTime: proposal.resolutionTime,
     executionDeadline: proposal.executionDeadline,
   });
@@ -1133,6 +1138,22 @@ async function cmdRecoverTreasury(resolver: OptionResolver): Promise<void> {
   printJson({action: "dac.recover-treasury", caller: account.address, dac, token, txHash});
 }
 
+async function cmdRecoverErc20(resolver: OptionResolver): Promise<void> {
+  const dac = resolveDacAddressOrThrow(resolver);
+  const token = asAddress(resolver.requireString("token", "--token is required for dac recover-erc20"), "Token");
+
+  if (isDryRun(resolver)) {
+    const ctx = await makeDryRunContext(resolver);
+    const transaction = ctx.txBuilder.recoverErc20({dacCell: dac, token});
+    printJson({action: "dac.recover-erc20", dryRun: true, dac, token, transaction});
+    return;
+  }
+
+  const {account, core} = await makeCoreContext(resolver);
+  const txHash = await core.recoverErc20({dacCell: dac, token});
+  printJson({action: "dac.recover-erc20", caller: account.address, dac, token, txHash});
+}
+
 async function cmdDepositTreasury(resolver: OptionResolver): Promise<void> {
   const dac = resolveDacAddressOrThrow(resolver);
   const token = asAddress(resolver.requireString("token", "--token is required for dac deposit-treasury"), "Token");
@@ -1141,20 +1162,19 @@ async function cmdDepositTreasury(resolver: OptionResolver): Promise<void> {
   // The protocol restricts DACCell.depositTreasury to deals (capital return path).
   // For donations / treasury top-ups by EOAs, the proper flow is:
   //   1. Transfer tokens directly to the DACCell address (regular ERC20 transfer)
-  //   2. Call recoverTreasury, which sweeps the held balance into the asset controller's
-  //      accounting. recoverTreasury is callable by any holder/manager; the sync uses
-  //      the qualification check inside the asset controller.
+  //   2. Call recoverERC20, which sweeps the held balance into the asset controller's
+  //      accounting. It is permissionless, so the donor does not need to be a holder.
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
     const transferTx = ctx.txBuilder.transferErc20({token, to: dac, amount});
-    const recoverTx = ctx.txBuilder.recoverTreasury({dacCell: dac, token});
+    const recoverTx = ctx.txBuilder.recoverErc20({dacCell: dac, token});
     printJson({action: "dac.deposit-treasury", dryRun: true, dac, token, amount, transactions: [transferTx, recoverTx]});
     return;
   }
 
   const {account, core} = await makeCoreContext(resolver);
   const transferTx = await core.transferErc20({token, to: dac, amount});
-  const recoverTx = await core.recoverTreasury({dacCell: dac, token});
+  const recoverTx = await core.recoverErc20({dacCell: dac, token});
   printJson({action: "dac.deposit-treasury", caller: account.address, dac, token, amount, transferTx, recoverTx});
 }
 
@@ -1440,7 +1460,7 @@ export function registerDacCommands(program: Command, resolverFactory: (options:
     "qualification",
     "execution-validity-duration",
     "oracle-publish-deadline",
-    "fallback-warmup-duration",
+    "fallback-warmup-blocks",
     "fallback-duration",
     "blocking-on-all-proposals",
     "blocking-on-high-quorum",
@@ -1745,6 +1765,23 @@ Raw proposal (3rd party modules):
     await cmdRecoverTreasury(resolver);
   });
 
+  const recoverErc20 = program.command("recover-erc20").description("Credit tokens sitting on the DACCell to its treasury (permissionless)");
+  applyOptions(recoverErc20, ["cell-address", "dac-address", "dac", "token"]);
+  addCommandHelp(recoverErc20, {
+    requirements: [
+      {mode: "oneOf", options: ["cell-address", "dac-address", "dac"], label: "DAC selector"},
+      {mode: "allOf", options: ["token"]},
+    ],
+    notes: [
+      "Any address may call it. Reverts NotEnoughBalance when the DACCell holds none of the token.",
+      "Use `recover-treasury` (holders only) to additionally re-sync treasury accounting.",
+    ],
+  });
+  recoverErc20.action(async function handleRecoverErc20() {
+    const resolver = await resolverFactory(this.optsWithGlobals());
+    await cmdRecoverErc20(resolver);
+  });
+
   const depositTreasury = program.command("deposit-treasury").description("Donate tokens to a DAC's treasury (transfer + recover)");
   applyOptions(depositTreasury, ["cell-address", "dac-address", "dac", "token", "amount"]);
   addCommandHelp(depositTreasury, {
@@ -1753,8 +1790,8 @@ Raw proposal (3rd party modules):
       {mode: "allOf", options: ["token", "amount"]},
     ],
     notes: [
-      "Two-step flow: transfers tokens from caller directly to the DAC cell address, then calls `recoverTreasury` to sync the asset controller's accounting.",
-      "Caller must be a qualified holder (per the DAC's voting qualification) to call `recoverTreasury`.",
+      "Two-step flow: transfers tokens from caller directly to the DAC cell address, then calls `recoverERC20` to credit them to the treasury.",
+      "`recoverERC20` is permissionless: the caller does not need to hold the DAC's token.",
     ],
   });
   depositTreasury.action(async function handleDepositTreasury() {

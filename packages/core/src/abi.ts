@@ -26,6 +26,7 @@ export const dacCellAbi = parseAbi([
   "function getVotingConfig() view returns ((uint256 quorumPercent, uint256 blockingPercent, uint256 highQuorumPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration))",
   "function depositTreasury(address token, uint256 amount)",
   "function recoverTreasury(address token)",
+  "function recoverERC20(address token)",
   "function createManagementProposal((bytes4 typ,address target,bytes32 i,bytes data) params) returns (uint256 id)",
   "function fulfillCapitalCall((address treasuryToken, uint256 nonce, address tokenRecipient, uint256 tokenAmount, uint256 cashAmount) call) returns (bool)",
   "function logLegalWrapperMessage(bytes4 kind, bytes message)",
@@ -53,7 +54,7 @@ export const governanceSchemaAbi = parseAbi([
   ...commonErrorSignatures,
   "function getVotingConfig() view returns ((uint256 quorumPercent, uint256 blockingPercent, uint256 highQuorumPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration))",
   "function getDealCreationConfig() view returns ((uint256 minAgentBalance, uint256 minInitialAgentStake))",
-  "function getStrategyConfig() view returns ((uint256 quorumPercent, uint256 highQuorumPercent, uint256 blockingPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration, uint256 oraclePublishDeadline, uint256 fallbackWarmupDuration, uint256 fallbackDuration, bool blockingOnAllProposals, bool blockingOnHighQuorum, bool oraclePrimaryEnabled))",
+  "function getStrategyConfig() view returns ((uint256 quorumPercent, uint256 highQuorumPercent, uint256 blockingPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration, uint256 oraclePublishDeadline, uint256 fallbackWarmupBlocks, uint256 fallbackDuration, bool blockingOnAllProposals, bool blockingOnHighQuorum, bool oraclePrimaryEnabled))",
   "function getGovernanceOracle() view returns (address oracle)",
   "function getProposal(uint256 id) view returns (address proposal)"
 ]);
@@ -74,6 +75,9 @@ export const dealManagerAbi = parseAbi([
   "event TrancheCreated(address indexed dac, uint256 indexed id, uint256 indexed proposalId, uint256 trancheId)",
   "function createDealProposal((bytes4 dealKind,string name,string description,string linkHash,address moduleFactory,address governanceFactory,address dealTarget,address proposer,bool vetoEnabled,address fundingToken,uint256 fundingAmount,uint256 rewardsLimit,uint256 dealRewardPoolPercent,uint256 approveDeadline,uint256 evaluationDeadline,uint256 dealDeadline,bytes dealConfig,bytes4 evaluatorSelector,bytes evaluatorConfig,address evaluatorModuleFactory,uint256 agentsLimit,uint256 minimalStake) params) returns (uint256 id, address dealCell, address dealAddr, address evaluatorAddr)",
   "function deals(uint256 id) view returns (address)",
+  "function state(address dealCell) view returns ((uint256 id, address deal, address module, bool active, bool liquidated, uint256 rewardsLimit, uint256 rewardsUnlocked, uint256 rewardsPaid, address[] evaluators, bytes initParams))",
+  "function MAX_MODULE_CONTROLLED_ADDRESSES() view returns (uint256)",
+  "function moduleControlledCount(address dealCell) view returns (uint256)",
   "function isRecoverable(uint256 id) view returns (bool)",
   "function evaluateDeal(uint256 id, uint256 evaluatorId)",
   "function legalWrapperMessage(uint256 id, bytes4 kind, bytes message)",
@@ -83,8 +87,9 @@ export const dealManagerAbi = parseAbi([
 export const votingProposalAbi = parseAbi([
   ...commonErrorSignatures,
   "function vote(bool support)",
-  "function isResolved() view returns (bool)",
-  "function outcome() view returns (bool)"
+  // Not `view`: these settle resolution lazily. Read them via simulateContract.
+  "function isResolved() returns (bool)",
+  "function outcome() returns (bool)"
 ]);
 
 export const hybridDacManagementProposalAbi = parseAbi([
@@ -107,19 +112,23 @@ export const hybridDacManagementProposalAbi = parseAbi([
   "function resolutionTime() view returns (uint256)",
   "function oracleMerkleRoot() view returns (bytes32)",
   "function totalUnderlyingVotingPower() view returns (uint256)",
-  "function getStrategy() view returns ((uint256 quorumPercent, uint256 highQuorumPercent, uint256 blockingPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration, uint256 oraclePublishDeadline, uint256 fallbackWarmupDuration, uint256 fallbackDuration, bool blockingOnAllProposals, bool blockingOnHighQuorum, bool oraclePrimaryEnabled))",
+  "function getStrategy() view returns ((uint256 quorumPercent, uint256 highQuorumPercent, uint256 blockingPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration, uint256 oraclePublishDeadline, uint256 fallbackWarmupBlocks, uint256 fallbackDuration, bool blockingOnAllProposals, bool blockingOnHighQuorum, bool oraclePrimaryEnabled))",
   "function activatePrimaryVoting()",
   "function beginFallbackWarmup()",
   "function triggerEmergencyFallback()",
   "function activateFallbackVoting()",
   "function voteWrapped(bool support)",
   "function voteMerkle(bool support, uint256 index, uint256 amount, bytes32[] proof)",
-  "function isResolved() view returns (bool)",
-  "function outcome() view returns (bool)",
-  "function isExecutableNow() view returns (bool)",
-  "function isExecutionExpired() view returns (bool)",
+  // Not `view`: any of these can lazily move the proposal into FallbackWarmup /
+  // FallbackVoting or resolve it. Read them via simulateContract and follow
+  // ProposalPhaseTransition events rather than assuming explicit transition calls.
+  // `outcome()` reverts NotResolved before a voting phase is active.
+  "function isResolved() returns (bool)",
+  "function outcome() returns (bool)",
+  "function isExecutableNow() returns (bool)",
+  "function isExecutionExpired() returns (bool)",
   "function isExecuted() view returns (bool)",
-  "function executionDeadline() view returns (uint256)"
+  "function executionDeadline() returns (uint256)"
 ]);
 
 export const erc20VotesAbi = parseAbi([
@@ -150,6 +159,9 @@ export const dealCellAbi = parseAbi([
   "function unstake()",
   "function claimMainToken(uint256 evaluatorId)",
   "function dealRewardPoolPercent() view returns (uint256)",
+  "function fundingTokens() view returns (address[])",
+  "function isApproved() view returns (bool)",
+  "function isClosed() view returns (bool)",
   "event AgentStruckOut(address indexed dac, uint256 indexed id, address indexed deal, address agent, uint256 amount)",
   "event DealRewardPoolAllocated(address indexed dac, uint256 indexed id, address indexed deal, uint256 amount)",
   "event DealRewardClaimed(address indexed dac, uint256 indexed id, address indexed deal, uint256 amount)"
@@ -165,6 +177,8 @@ export const dealAbi = parseAbi([
   "function createStakedAgentProposal((bytes4 typ,address target,bytes32 i,bytes data) params) returns (uint256 proposalId)",
   "function executeStakedAgentProposal(uint256 proposalId)",
   "function getProposal(uint256 proposalId) view returns (address)",
+  "function votingConfig() view returns ((uint256 quorumPercent, uint256 blockingPercent, uint256 highQuorumPercent, uint256 duration, uint256 qualification, uint256 executionValidityDuration))",
+  "function managedEntity() view returns (address)",
   "function claimDealRewardPool(uint256 evaluatorId)",
   "function setRootCapitalCallID(uint256 capitalCallId)",
   "function recoverProfits(address token) returns (uint256)",
@@ -177,4 +191,32 @@ export const permit2TreasuryAbi = parseAbi([
   "function executeAgentSpend(address token, address destination, uint160 amount)",
   "function executeReceivePermit2(address token, address source, uint160 amount)",
   "function executeReceivePermit2Signature(((address token, uint256 amount) permitted, uint256 nonce, uint256 deadline) permit, (address to, uint256 requestedAmount) transferDetails, address source, bytes signature)",
+]);
+
+export const moduleFactoryAbi = parseAbi([
+  ...commonErrorSignatures,
+  "error DealKindNotSupported(bytes4 dealKind)",
+  "error EvaluatorKindNotSupported(bytes4 dealKind)",
+  "function moduleId() view returns (bytes32)",
+  "function supportedDealKinds() view returns (bytes4[])",
+  "function supportedEvaluatorKinds() view returns (bytes4[])",
+  "function supportsDealKind(bytes4 dealKind) view returns (bool)",
+  "function dealAcceptsGovernanceFactory(bytes4 dealKind, address governanceFactory) view returns (bool)",
+  // CoreModuleFactory only: the single deal-proposal factory core deals accept.
+  "function dealGovernanceFactory() view returns (address)",
+]);
+
+export const agentDealAbi = parseAbi([
+  ...commonErrorSignatures,
+  "event HostStaked(address indexed hostDealCell, uint256 amount)",
+  "event HostStakeApproved(address indexed hostDealCell, uint256 amount)",
+  "event HostDealCreated(address indexed hostDealCell, uint256 indexed hostDealId)",
+  "event HostProposalCreated(address indexed hostDealCell, uint256 indexed hostProposalId, bytes4 typ)",
+  "event HostVoteCast(address indexed hostDealCell, uint256 indexed hostProposalId, bool support)",
+  "event HostRewardClaimed(address indexed hostDealCell, uint256 evaluatorId)",
+  "event HostUnstaked(address indexed hostDealCell)",
+  "event HostInvited(address indexed hostDealCell, address indexed invitee, bool grantInviteRight)",
+  "event AssetReturnedToDAC(address indexed token, uint256 amount)",
+  "function managedEntity() view returns (address)",
+  "function hostDNA() view returns (address hostAgentToken, address hostMainToken)",
 ]);

@@ -1,5 +1,7 @@
 import {resolve as resolvePath} from "node:path";
 import {
+  CORE_DEAL_KIND,
+  coreModule,
   DEAL_PROPOSAL_TYPE,
   buildEnableDealChallengeRightProposal,
   buildStrikeOutAgentProposal,
@@ -24,16 +26,15 @@ import {
   resolvePage,
   viewProposalByIdOrThrow,
 } from "./shared";
+import {parseDealFile} from "./deal-params";
 import {
   listKnownModuleDealProposalTypes,
-  resolveDealKindSpec,
   resolveKernelDealProposalHook,
   resolveDealProposalType,
-  resolveEvaluatorKindSpec,
 } from "../modules/registry";
 import {addCommandHelp, applyOptions} from "../cli/options";
 import type {OptionResolver} from "../runtime/config";
-import {makeCoreContext, makeDryRunContext, makeIndexer} from "../runtime/chain";
+import {makeCoreContext, makeDryRunContext, makeIndexer, makeReadOnlyCoreContext} from "../runtime/chain";
 import {printJson, readJsonFile} from "../runtime/io";
 
 function isDryRun(resolver: OptionResolver): boolean {
@@ -44,22 +45,6 @@ function requireNArgs(args: string[], expected: number, hint: string): void {
   if (args.length !== expected) {
     throw new Error(`${hint}. Expected ${expected} args, got ${args.length}.`);
   }
-}
-
-function parseBigNumberish(value: unknown, label: string): bigint {
-  if (typeof value === "bigint") {
-    return value;
-  }
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) {
-      throw new Error(`${label} must be a finite number`);
-    }
-    return BigInt(Math.trunc(value));
-  }
-  if (typeof value === "string") {
-    return BigInt(value);
-  }
-  throw new Error(`${label} must be bigint-compatible`);
 }
 
 function readStringField(input: Record<string, unknown> | undefined, key: string, label: string): string {
@@ -100,76 +85,26 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
   const dealManager = dacRecord.dealManagerAddress;
 
   const content = await readJsonFile<Record<string, unknown>>(resolvePath(dealFile));
+  const dealFileSpec = parseDealFile(content);
+  const {dealKind, evaluator} = dealFileSpec;
 
-  const schema = z.object({
-    dealKind: z.string(),
-    name: z.string(),
-    description: z.string(),
-    linkHash: z.string(),
-    moduleFactory: z.string().optional(),
-    governanceFactory: z.string().optional(),
-    dealTarget: z.string().optional(),
-    proposer: z.string().optional(),
-    vetoEnabled: z.boolean().optional(),
-    fundingToken: z.string(),
-    fundingAmount: z.union([z.string(), z.number(), z.bigint()]),
-    rewardsLimit: z.union([z.string(), z.number(), z.bigint()]).optional(),
-    dealRewardPoolPercent: z.union([z.string(), z.number(), z.bigint()]).optional(),
-    approveDeadline: z.union([z.string(), z.number(), z.bigint()]).optional(),
-    evaluationDeadline: z.union([z.string(), z.number(), z.bigint()]).optional(),
-    dealDeadline: z.union([z.string(), z.number(), z.bigint()]).optional(),
-    dealConfig: z.unknown(),
-    evaluatorSelector: z.string(),
-    evaluatorConfig: z.unknown(),
-    evaluatorModuleFactory: z.string().optional(),
-    agentsLimit: z.union([z.string(), z.number(), z.bigint()]).optional(),
-    minimalStake: z.union([z.string(), z.number(), z.bigint()]).optional(),
-  });
-
-  const parsed = schema.parse(content);
-  const now = BigInt(Math.floor(Date.now() / 1000));
-
-  const dealKind = resolveDealKindSpec(parsed.dealKind);
-  const evaluator = resolveEvaluatorKindSpec(parsed.evaluatorSelector);
-  const dealConfig = dealKind.encodeConfig(parsed.dealConfig);
-  const evaluatorConfig = evaluator.encodeConfig(parsed.evaluatorConfig);
-
-  if (evaluator.moduleId === "custom" && !parsed.evaluatorModuleFactory) {
-    throw new Error("'evaluatorModuleFactory' is required in deal JSON for custom evaluator kinds.");
-  }
-
-  function buildDealParams(protocol: {coreModuleFactory: unknown; coreDealGovernanceFactory?: unknown}, proposerAddress: string): DealParams {
-    const moduleFactory = parsed.moduleFactory ?? dealKind.defaultModuleFactory?.(protocol as never);
-    if (!moduleFactory) {
-      throw new Error("'moduleFactory' is required in deal JSON for custom deal kinds.");
+  // AgentDeal binds one host DAC at creation: it must be set and differ from the home DAC.
+  function assertDealTarget(dealParams: DealParams): void {
+    if (dealKind.selector !== CORE_DEAL_KIND.AGENT_DEAL) {
+      return;
     }
-    const governanceFactory = parsed.governanceFactory ?? dealKind.defaultGovernanceFactory?.(protocol as never);
-    if (!governanceFactory) {
-      throw new Error("'governanceFactory' is required in deal JSON for custom deal kinds. Provide 'governanceFactory' in deal JSON.");
+    if (/^0x0{40}$/.test(dealParams.dealTarget)) {
+      throw new Error("agent-deal requires 'dealTarget' (the host DACCell address) in deal JSON.");
     }
-    const resolvedDealDeadline = parsed.dealDeadline ? parseBigNumberish(parsed.dealDeadline, "dealDeadline") : now + 30n * 24n * 60n * 60n;
-    const resolvedEvaluationDeadline = parsed.evaluationDeadline ? parseBigNumberish(parsed.evaluationDeadline, "evaluationDeadline") : resolvedDealDeadline;
-    return {
-      dealKind: dealKind.selector, name: parsed.name, description: parsed.description, linkHash: parsed.linkHash,
-      moduleFactory: asAddress(moduleFactory, "moduleFactory"), governanceFactory: asAddress(governanceFactory, "governanceFactory"),
-      dealTarget: asAddress(parsed.dealTarget ?? "0x0000000000000000000000000000000000000000", "dealTarget"),
-      proposer: asAddress(parsed.proposer ?? proposerAddress, "proposer"),
-      vetoEnabled: parsed.vetoEnabled ?? false, fundingToken: asAddress(parsed.fundingToken, "fundingToken"),
-      fundingAmount: parseBigNumberish(parsed.fundingAmount, "fundingAmount"),
-      rewardsLimit: parsed.rewardsLimit ? parseBigNumberish(parsed.rewardsLimit, "rewardsLimit") : 500_000_000n,
-      dealRewardPoolPercent: parsed.dealRewardPoolPercent ? parseBigNumberish(parsed.dealRewardPoolPercent, "dealRewardPoolPercent") : 0n,
-      approveDeadline: parsed.approveDeadline ? parseBigNumberish(parsed.approveDeadline, "approveDeadline") : now + 7n * 24n * 60n * 60n,
-      evaluationDeadline: resolvedEvaluationDeadline, dealDeadline: resolvedDealDeadline,
-      dealConfig, evaluatorSelector: evaluator.selector, evaluatorConfig,
-      evaluatorModuleFactory: asAddress(parsed.evaluatorModuleFactory ?? "0x0000000000000000000000000000000000000000", "evaluatorModuleFactory"),
-      agentsLimit: parsed.agentsLimit ? parseBigNumberish(parsed.agentsLimit, "agentsLimit") : 0n,
-      minimalStake: parsed.minimalStake ? parseBigNumberish(parsed.minimalStake, "minimalStake") : 0n,
-    };
+    if (dealParams.dealTarget.toLowerCase() === dac.toLowerCase()) {
+      throw new Error("agent-deal 'dealTarget' must be a different DAC: a DAC cannot be an agent inside itself.");
+    }
   }
 
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
-    const dealParams = buildDealParams(ctx.protocol, ctx.fromAddress);
+    const dealParams = dealFileSpec.build(ctx.protocol, ctx.fromAddress);
+    assertDealTarget(dealParams);
     const transaction = ctx.txBuilder.createDealProposal({dealManager, params: dealParams});
     printJson({action: "deal.create", dryRun: true, dac, dealManager, transaction,
       moduleId: dealKind.moduleId, evaluatorModuleId: evaluator.moduleId});
@@ -177,7 +112,15 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
   }
 
   const {account, core, protocol} = await makeCoreContext(resolver);
-  const dealParams = buildDealParams(protocol, account.address);
+
+  // Core deals accept exactly one deal-proposal factory; prefer the module's own
+  // answer over the manifest so a stale manifest cannot produce a doomed tx.
+  const moduleFactoryRaw = dealFileSpec.explicitModuleFactory ?? dealKind.defaultModuleFactory?.(protocol);
+  const onchainGovernanceFactory = !dealFileSpec.explicitGovernanceFactory && moduleFactoryRaw
+    ? await core.getDealGovernanceFactory({moduleFactory: asAddress(moduleFactoryRaw, "moduleFactory")})
+    : undefined;
+  const dealParams = dealFileSpec.build(protocol, account.address, {governanceFactory: onchainGovernanceFactory});
+  assertDealTarget(dealParams);
 
   const created = await core.createDealProposalDetailed({dealManager, params: dealParams});
 
@@ -186,6 +129,7 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
     txHash: created.txHash, dealId: created.dealId, dacProposalId: created.proposalId,
     dealCell: created.dealCell, dealAddress: created.dealAddress, evaluatorAddress: created.evaluatorAddress,
     moduleId: dealKind.moduleId, evaluatorModuleId: evaluator.moduleId,
+    governanceFactory: dealParams.governanceFactory,
     approveDeadline: dealParams.approveDeadline, evaluationDeadline: dealParams.evaluationDeadline,
     dealDeadline: dealParams.dealDeadline, rewardsLimit: dealParams.rewardsLimit,
   });
@@ -606,6 +550,7 @@ async function cmdExecute(resolver: OptionResolver, proposalIdText: string): Pro
     action: "deal.execute", deal: dealAddress, proposalId, proposalAddress,
     txHash: details.txHash, dacProposalId: details.dacProposalId, trancheId: details.trancheId,
     childProposalId: details.childProposalId, childVoteProposalId: details.childVoteProposalId,
+    hostDealCell: details.hostDealCell, hostDealId: details.hostDealId, hostProposalId: details.hostProposalId,
   });
 }
 
@@ -833,11 +778,86 @@ async function cmdWithdraw(resolver: OptionResolver, dealNumericIdText: string):
   });
 }
 
+// Full on-chain deal terms for APPROVE_DEAL voters. The DAC proposal itself binds only
+// (dealId, trancheId, rewardsLimit); everything else is read back from the kernel here,
+// with provenance flags the kernel deliberately does not enforce.
+async function cmdViewTerms(resolver: OptionResolver): Promise<void> {
+  const resolved = await resolveDealRecordOrThrow(resolver);
+  const client = await makeIndexer(resolver);
+  const dacAddress = dacAddressFromCompositeId(resolved.dacId);
+  const dacRecord = await client.dacs.getByAddress(dacAddress);
+  if (!dacRecord?.dealManagerAddress) {
+    throw new Error("DAC deal manager address is missing in indexer.");
+  }
+  const dealManager = asAddress(dacRecord.dealManagerAddress, "Deal manager");
+
+  const {core, protocol} = await makeReadOnlyCoreContext(resolver);
+  const initParams = await core.getDealInitParams({dealManager, dealCell: resolved.cellAddress});
+  const [governanceFactoryAccepted, controlledAddressBudget] = await Promise.all([
+    core.dealAcceptsGovernanceFactory({
+      moduleFactory: initParams.moduleFactory,
+      dealKind: initParams.dealKind,
+      governanceFactory: initParams.governanceFactory,
+    }),
+    core.getControlledAddressBudget({dealManager, dealCell: resolved.cellAddress}),
+  ]);
+
+  const warnings: string[] = [];
+  const hasTarget = !/^0x0{40}$/.test(initParams.dealTarget);
+
+  let dealTargetDac: {id: string; canonical: boolean; factoryAddress?: string | null} | undefined;
+  if (hasTarget) {
+    const target = await client.dacs.getByAddress(initParams.dealTarget);
+    if (target) {
+      dealTargetDac = {id: target.id, canonical: target.canonical, factoryAddress: target.factoryAddress};
+    }
+    const targetsDac = initParams.dealKind === CORE_DEAL_KIND.DAC_DEAL || initParams.dealKind === CORE_DEAL_KIND.AGENT_DEAL;
+    if (targetsDac && !target) {
+      warnings.push(`dealTarget ${initParams.dealTarget} is not a DAC known to the indexer.`);
+    } else if (targetsDac && target && !target.canonical) {
+      warnings.push(`dealTarget ${initParams.dealTarget} was not deployed by the canonical DACFactory.`);
+    }
+  }
+
+  let dacDealConfig: ReturnType<typeof coreModule.decodeDacDealConfig> | undefined;
+  if (initParams.dealKind === CORE_DEAL_KIND.DAC_DEAL) {
+    try {
+      dacDealConfig = coreModule.decodeDacDealConfig(initParams.dealConfig, {spawnsChild: !hasTarget});
+    } catch {
+      warnings.push("dealConfig could not be decoded as DACDealConfig.");
+    }
+    const spawnFactory = dacDealConfig?.spawn?.dacFactory;
+    if (spawnFactory && spawnFactory.toLowerCase() !== protocol.dacFactory.toLowerCase()) {
+      warnings.push(`DACDeal spawns its child through dacFactory ${spawnFactory}, not the canonical ${protocol.dacFactory}.`);
+    }
+  }
+
+  if (governanceFactoryAccepted === false) {
+    warnings.push(`governanceFactory ${initParams.governanceFactory} is not accepted by module ${initParams.moduleFactory}.`);
+  }
+
+  printJson({
+    action: "deal.view.terms",
+    dealId: resolved.id,
+    deal: resolved.dealAddress,
+    dealCell: resolved.cellAddress,
+    initParams,
+    dacDealConfig,
+    dealTargetDac,
+    governanceFactoryAccepted,
+    controlledAddressBudget,
+    warnings,
+  });
+}
+
 async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: string): Promise<void> {
   const client = await makeIndexer(resolver);
   const page = resolvePage(resolver);
 
-  const resource = z.enum(["deal", "proposal", "proposals", "positions", "treasury-actions"]).catch("deal").parse(resourceRaw ?? "deal");
+  const resource = z.enum([
+    "deal", "proposal", "proposals", "positions", "treasury-actions",
+    "funding-tokens", "related-contracts", "agent-deal", "agent-actions", "terms",
+  ]).catch("deal").parse(resourceRaw ?? "deal");
 
   if (resource === "deal") {
     const dealId = id ?? resolver.resolveString(["deal-id", "id"]);
@@ -877,6 +897,43 @@ async function cmdView(resolver: OptionResolver, resourceRaw?: string, id?: stri
     const dealId = await resolveDealIdOrThrow(resolver);
     const positions = await client.deals.listAgentPositions(dealId, page);
     printJson({action: "deal.view.positions", dealId, count: positions.length, positions});
+    return;
+  }
+
+  if (resource === "funding-tokens") {
+    const dealId = await resolveDealIdOrThrow(resolver);
+    const fundingTokens = await client.deals.listFundingTokens(dealId, page);
+    printJson({action: "deal.view.funding-tokens", dealId, count: fundingTokens.length, fundingTokens});
+    return;
+  }
+
+  if (resource === "related-contracts") {
+    const dealId = await resolveDealIdOrThrow(resolver);
+    const relatedContracts = await client.deals.listRelatedContracts(dealId, page);
+    printJson({action: "deal.view.related-contracts", dealId, count: relatedContracts.length, relatedContracts});
+    return;
+  }
+
+  if (resource === "agent-deal") {
+    const dealId = await resolveDealIdOrThrow(resolver);
+    const agentDeal = await client.agentDeals.getByDeal(dealId);
+    if (!agentDeal) {
+      throw new Error("AgentDeal record not found in indexer (is this deal an agent-deal?)");
+    }
+    const hostPositions = await client.agentDeals.listHostPositions(dealId, page);
+    printJson({action: "deal.view.agent-deal", dealId, agentDeal, count: hostPositions.length, hostPositions});
+    return;
+  }
+
+  if (resource === "agent-actions") {
+    const dealId = await resolveDealIdOrThrow(resolver);
+    const agentActions = await client.agentDeals.listActions(dealId, page);
+    printJson({action: "deal.view.agent-actions", dealId, count: agentActions.length, agentActions});
+    return;
+  }
+
+  if (resource === "terms") {
+    await cmdViewTerms(resolver);
     return;
   }
 
@@ -1001,6 +1058,16 @@ Kernel deal proposal types:
 
 Known module deal proposal types:
   ${moduleTypes}
+
+AgentDeal (agent-deal) types act inside the host DAC:
+  host-stake <hostDeal> <amount>             host-approve-stake <hostDeal> <amount>
+  host-create-deal --input deal.json         (same JSON as \`dac deal create\`)
+  host-create-proposal <hostDeal> <typ> <target> <i> <data>
+  host-vote <hostDeal> <hostProposalId> <support>
+  host-claim-reward <hostDeal> [evaluatorId] host-unstake <hostDeal>
+  host-invite <hostDeal> <invitee> [grantInviteRight]
+  return-asset <token> <amount>
+  <hostDeal> accepts the host deal's Deal or DealCell address.
 
 Request-tranche usage:
   Generic: dac deal propose request-tranche <token> <amount> [rewards]
@@ -1188,8 +1255,12 @@ Complex payloads can use --input <json> (for example update-voting-config, treas
   applyOptions(view, ["deal-id", "id", "deal-address", "address", "query-limit", "query-offset", "limit", "offset"]);
   addCommandHelp(view, {
     notes: [
+      "Resources: deal, proposal, proposals, positions, treasury-actions, funding-tokens, related-contracts, agent-deal, agent-actions, terms.",
       "For resource=deal, provide deal id/address using positional [id], --deal-id, --deal-address, or --address.",
-      "For resource=proposals/treasury-actions, deal id is resolved from --deal-id or deal address options.",
+      "For the list resources, deal id is resolved from --deal-id or deal address options.",
+      "funding-tokens lists only tokens the DAC actually settled: it is empty until the first tranche settles.",
+      "agent-deal / agent-actions show an AgentDeal's host DAC, host positions and host-side action log.",
+      "terms reads the full DealParams on-chain (what an APPROVE_DEAL vote actually approves) and flags a non-canonical dacFactory, an unknown dealTarget, or a rejected governanceFactory.",
     ],
   });
   view.action(async function handleView(resource: string | undefined, id: string | undefined) {

@@ -5,6 +5,15 @@ import {
   buildChildDacReturnProfitsProposal,
   buildChildDacVoteProposalProposal,
   buildExternalVoteSignProposal,
+  buildHostApproveStakeProposal,
+  buildHostClaimRewardProposal,
+  buildHostCreateDealProposal,
+  buildHostCreateProposalProposal,
+  buildHostInviteProposal,
+  buildHostStakeProposal,
+  buildHostUnstakeProposal,
+  buildHostVoteProposal,
+  buildReturnAssetToDacProposal,
   buildSnapshotV1VoteSignProposal,
   buildTreasuryApproveAgentSpendProposal,
   buildTreasuryAssignClaimerProposal,
@@ -21,6 +30,7 @@ import {
 } from "@dac-cloud/core";
 const {VENUE_SNAPSHOT_V1} = coreModule;
 const {
+  encodeAgentDealConfigFromJson,
   encodeDacDealConfigFromJson,
   encodePermit2TreasuryDealConfigFromJson,
   encodeMilestoneEvaluatorConfigFromJson,
@@ -29,6 +39,7 @@ const {
 import type {ProtocolManifest} from "@dac-cloud/manifests";
 import {encodeAbiParameters, numberToHex, type Address, type Hex} from "viem";
 import {z} from "zod";
+import {parseDealFile} from "../actions/deal-params";
 import {asAddress, asBytes32, asBytes4, parseBoolText} from "../actions/shared";
 import type {CliModuleSpec, ModuleDealProposalBuildContext} from "./types";
 
@@ -206,13 +217,29 @@ function buildDirectSpendProposal(context: ModuleDealProposalBuildContext): Prop
   return buildTreasuryDirectSpendProposal(asAddress(token, "token"), asAddress(destination, "destination"), amount);
 }
 
-function buildPermit2SpendProposal(context: ModuleDealProposalBuildContext): ProposalParams {
-  const {args, input} = context;
+async function buildPermit2SpendProposal(context: ModuleDealProposalBuildContext): Promise<ProposalParams> {
+  const {args, input, core, resolvedDeal} = context;
   ensureArgsOrInput(args, input, 4, "deal propose permit2-spend");
   const token = args[0] ?? readStringField(input, "token", "--input");
   const spender = args[1] ?? readStringField(input, "spender", "--input");
   const amount = args[2] !== undefined ? BigInt(args[2]) : readBigIntField(input, "amount", "--input");
   const expiration = args[3] !== undefined ? BigInt(args[3]) : readBigIntField(input, "expiration", "--input");
+
+  // The allowance must outlive the vote: the contract reverts PermitExpirationTooShort
+  // unless expiration > block.timestamp + votingConfig.duration. Checked against chain
+  // time, which is what the contract compares to.
+  const [votingConfig, chainTime] = await Promise.all([
+    core.getDealVotingConfig({dealAddress: resolvedDeal.dealAddress}),
+    core.getChainTime(),
+  ]);
+  const minExpiration = chainTime + votingConfig.duration;
+  if (expiration <= minExpiration) {
+    throw new Error(
+      `PermitExpirationTooShort: expiration ${expiration} must be greater than chain time ${chainTime} `
+      + `+ deal voting duration ${votingConfig.duration} (= ${minExpiration}).`,
+    );
+  }
+
   return buildTreasuryPermit2SpendProposal(
     asAddress(token, "token"),
     asAddress(spender, "spender"),
@@ -411,6 +438,126 @@ function buildExternalVoteSignCmd(context: ModuleDealProposalBuildContext): Prop
   );
 }
 
+// ---- AgentDeal ----
+
+// Host deals are addressed by DealCell on-chain; accept the Deal address too and
+// map it through the indexer.
+async function resolveHostDealCell(context: ModuleDealProposalBuildContext, raw: string): Promise<Address> {
+  const address = asAddress(raw, "hostDealCell");
+  const found = await context.indexer.deals.getByAddress(address);
+  return found?.cellAddress ? asAddress(found.cellAddress, "hostDealCell") : address;
+}
+
+async function buildHostStakeCmd(context: ModuleDealProposalBuildContext): Promise<ProposalParams> {
+  const {args, input} = context;
+  ensureArgsOrInput(args, input, 2, "deal propose host-stake");
+  const hostDealCell = await resolveHostDealCell(context, args[0] ?? readStringField(input, "hostDealCell", "--input"));
+  const amount = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "amount", "--input");
+  return buildHostStakeProposal(hostDealCell, amount);
+}
+
+async function buildHostApproveStakeCmd(context: ModuleDealProposalBuildContext): Promise<ProposalParams> {
+  const {args, input} = context;
+  ensureArgsOrInput(args, input, 2, "deal propose host-approve-stake");
+  const hostDealCell = await resolveHostDealCell(context, args[0] ?? readStringField(input, "hostDealCell", "--input"));
+  const amount = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "amount", "--input");
+  return buildHostApproveStakeProposal(hostDealCell, amount);
+}
+
+async function buildHostCreateDealCmd(context: ModuleDealProposalBuildContext): Promise<ProposalParams> {
+  const {input, core, resolvedDeal} = context;
+  if (!input) {
+    throw new Error("deal propose host-create-deal requires --input <deal.json> (same format as `dac deal create`)");
+  }
+  const dealFile = parseDealFile(input);
+  const moduleFactoryRaw = dealFile.explicitModuleFactory ?? dealFile.dealKind.defaultModuleFactory?.(core.protocol);
+  const onchainGovernanceFactory = !dealFile.explicitGovernanceFactory && moduleFactoryRaw
+    ? await core.getDealGovernanceFactory({moduleFactory: asAddress(moduleFactoryRaw, "moduleFactory")})
+    : undefined;
+  // `proposer` is overwritten on-chain with the AgentDeal address; set it here so the
+  // encoded params read the same as what the host deal manager will receive.
+  const hostDealParams = dealFile.build(core.protocol, resolvedDeal.dealAddress, {governanceFactory: onchainGovernanceFactory});
+  hostDealParams.proposer = resolvedDeal.dealAddress;
+
+  const accepted = await core.dealAcceptsGovernanceFactory({
+    moduleFactory: hostDealParams.moduleFactory,
+    dealKind: hostDealParams.dealKind,
+    governanceFactory: hostDealParams.governanceFactory,
+  });
+  if (accepted === false) {
+    throw new Error(
+      `GovernanceFactoryNotAccepted: module ${hostDealParams.moduleFactory} does not accept governanceFactory `
+      + `${hostDealParams.governanceFactory} for the host deal.`,
+    );
+  }
+  return buildHostCreateDealProposal(hostDealParams);
+}
+
+async function buildHostCreateProposalCmd(context: ModuleDealProposalBuildContext): Promise<ProposalParams> {
+  const {args, input} = context;
+  ensureArgsOrInput(args, input, 5, "deal propose host-create-proposal");
+  const hostDealCell = await resolveHostDealCell(context, args[0] ?? readStringField(input, "hostDealCell", "--input"));
+  const typ = args[1] ?? readStringField(input, "typ", "--input");
+  const target = args[2] ?? readStringField(input, "target", "--input");
+  const iValue = args[3] ?? readStringField(input, "i", "--input");
+  const data = args[4] ?? readStringField(input, "data", "--input");
+  return buildHostCreateProposalProposal(hostDealCell, {
+    typ: asBytes4(typ, "host typ") as Hex,
+    target: asAddress(target, "host target"),
+    i: toBytes32FromNumberish(iValue),
+    data: normalizeHexData(data, "host data"),
+  });
+}
+
+async function buildHostVoteCmd(context: ModuleDealProposalBuildContext): Promise<ProposalParams> {
+  const {args, input} = context;
+  ensureArgsOrInput(args, input, 3, "deal propose host-vote");
+  const hostDealCell = await resolveHostDealCell(context, args[0] ?? readStringField(input, "hostDealCell", "--input"));
+  const hostProposalId = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "hostProposalId", "--input");
+  const support = args[2] !== undefined ? parseBoolText(args[2]) : readBoolField(input, "support", "--input");
+  return buildHostVoteProposal(hostDealCell, hostProposalId, support);
+}
+
+async function buildHostClaimRewardCmd(context: ModuleDealProposalBuildContext): Promise<ProposalParams> {
+  const {args, input} = context;
+  if (args.length !== 1 && args.length !== 2 && !input) {
+    throw new Error("deal propose host-claim-reward requires <hostDeal> [evaluatorId] or --input json");
+  }
+  const hostDealCell = await resolveHostDealCell(context, args[0] ?? readStringField(input, "hostDealCell", "--input"));
+  const evaluatorId = args[1] !== undefined
+    ? BigInt(args[1])
+    : input?.evaluatorId !== undefined ? readBigIntField(input, "evaluatorId", "--input") : 0n;
+  return buildHostClaimRewardProposal(hostDealCell, evaluatorId);
+}
+
+async function buildHostUnstakeCmd(context: ModuleDealProposalBuildContext): Promise<ProposalParams> {
+  const {args, input} = context;
+  ensureArgsOrInput(args, input, 1, "deal propose host-unstake");
+  const hostDealCell = await resolveHostDealCell(context, args[0] ?? readStringField(input, "hostDealCell", "--input"));
+  return buildHostUnstakeProposal(hostDealCell);
+}
+
+async function buildHostInviteCmd(context: ModuleDealProposalBuildContext): Promise<ProposalParams> {
+  const {args, input} = context;
+  if (args.length !== 2 && args.length !== 3 && !input) {
+    throw new Error("deal propose host-invite requires <hostDeal> <invitee> [grantInviteRight] or --input json");
+  }
+  const hostDealCell = await resolveHostDealCell(context, args[0] ?? readStringField(input, "hostDealCell", "--input"));
+  const invitee = args[1] ?? readStringField(input, "invitee", "--input");
+  const grantInviteRight = args[2] !== undefined
+    ? parseBoolText(args[2])
+    : input?.grantInviteRight !== undefined ? readBoolField(input, "grantInviteRight", "--input") : false;
+  return buildHostInviteProposal(hostDealCell, asAddress(invitee, "invitee"), grantInviteRight);
+}
+
+function buildReturnAssetCmd(context: ModuleDealProposalBuildContext): ProposalParams {
+  const {args, input} = context;
+  ensureArgsOrInput(args, input, 2, "deal propose return-asset");
+  const token = args[0] ?? readStringField(input, "token", "--input");
+  const amount = args[1] !== undefined ? BigInt(args[1]) : readBigIntField(input, "amount", "--input");
+  return buildReturnAssetToDacProposal(asAddress(token, "token"), amount);
+}
+
 export const coreCliModule: CliModuleSpec = {
   moduleId: "core",
   dealKinds: [
@@ -429,6 +576,15 @@ export const coreCliModule: CliModuleSpec = {
       selector: CORE_DEAL_KIND.DAC_DEAL,
       aliases: ["dac-deal", "dac_deal"],
       encodeConfig: encodeDacDealConfigFromJson,
+      defaultModuleFactory: (protocol) => readAddressFromManifest(protocol, "coreModuleFactory", "coreModuleFactory"),
+      defaultGovernanceFactory: (protocol) => readAddressFromManifest(protocol, "coreDealGovernanceFactory", "coreDealGovernanceFactory"),
+    },
+    {
+      moduleId: "core",
+      key: "agent-deal",
+      selector: CORE_DEAL_KIND.AGENT_DEAL,
+      aliases: ["agent-deal", "agent_deal"],
+      encodeConfig: encodeAgentDealConfigFromJson,
       defaultModuleFactory: (protocol) => readAddressFromManifest(protocol, "coreModuleFactory", "coreModuleFactory"),
       defaultGovernanceFactory: (protocol) => readAddressFromManifest(protocol, "coreDealGovernanceFactory", "coreDealGovernanceFactory"),
     },
@@ -464,6 +620,15 @@ export const coreCliModule: CliModuleSpec = {
     {moduleId: "core", key: "approve-venue-version", aliases: ["approve-venue-version", "approve-snapshot-version"], build: buildApproveVenueVersionCmd},
     {moduleId: "core", key: "snapshot-vote-sign", aliases: ["snapshot-vote-sign", "snapshot-v1-vote"], build: buildSnapshotVoteSignCmd},
     {moduleId: "core", key: "external-vote-sign", aliases: ["external-vote-sign"], build: buildExternalVoteSignCmd},
+    {moduleId: "core", key: "host-stake", aliases: ["host-stake"], build: buildHostStakeCmd},
+    {moduleId: "core", key: "host-approve-stake", aliases: ["host-approve-stake"], build: buildHostApproveStakeCmd},
+    {moduleId: "core", key: "host-create-deal", aliases: ["host-create-deal"], build: buildHostCreateDealCmd},
+    {moduleId: "core", key: "host-create-proposal", aliases: ["host-create-proposal"], build: buildHostCreateProposalCmd},
+    {moduleId: "core", key: "host-vote", aliases: ["host-vote"], build: buildHostVoteCmd},
+    {moduleId: "core", key: "host-claim-reward", aliases: ["host-claim-reward"], build: buildHostClaimRewardCmd},
+    {moduleId: "core", key: "host-unstake", aliases: ["host-unstake"], build: buildHostUnstakeCmd},
+    {moduleId: "core", key: "host-invite", aliases: ["host-invite"], build: buildHostInviteCmd},
+    {moduleId: "core", key: "return-asset", aliases: ["return-asset", "return-asset-to-dac"], build: buildReturnAssetCmd},
   ],
   kernelDealProposalHooks: [
     {

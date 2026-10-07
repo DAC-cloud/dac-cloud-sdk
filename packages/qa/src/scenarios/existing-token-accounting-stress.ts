@@ -3,8 +3,9 @@ import type {Harness, Scenario} from "../harness/types.js";
 import {
   getChainTimestamp,
   mintMockToken,
+  passFallbackWarmup,
   setupExistingTokenDacWithDeal,
-  transferErc20,
+  returnCapitalViaDeal,
   verifyDealAccountingInvariants,
   verifyTxReceipt,
 } from "./fixtures/index.js";
@@ -140,7 +141,7 @@ export const existingTokenAccountingStressScenario: Scenario = {
     // SETUP: Existing-token DAC + funded deal (skipApproval)
     // ══════════════════════════════════════════════════════════════
 
-    // Mint extra underlying tokens for treasury deposit + deal cell transfers
+    // Mint extra underlying tokens for treasury deposits
     const underlyingToken = h.config.tokens.treasury;
     await mintMockToken(h, {token: underlyingToken, to: founderWallet.address, amount: "50000000000000000000000"}); // 50k extra
 
@@ -287,6 +288,7 @@ export const existingTokenAccountingStressScenario: Scenario = {
 
     h.log("Approving deal via fallback voting...");
     await h.advanceTime(45); // past oracle-publish-deadline + fallback-warmup
+    await passFallbackWarmup(h);
     await h.cli([
       "vote", "proposal", ctx.dealProposalId, "true", "--dac", ctx.dacAddress,
       "--config", config.configPath, "--pretty-print",
@@ -351,20 +353,15 @@ export const existingTokenAccountingStressScenario: Scenario = {
     // PHASE 2: PARTIAL PROGRESS + FIRST EVALUATION (SLASHING)
     // ══════════════════════════════════════════════════════════════
 
-    // Transfer 1200 tokens to deal cell (60% of M1's 2000 expected)
+    // Return 1200 tokens through the deal (60% of M1's 2000 expected)
     h.log("Depositing 1200 tokens for 60% progress on milestone 1...");
 
     await step(h, "phase2-deposit-progress", async () => {
-      const txHash = await transferErc20(h, {
-        token: ctx.treasuryToken,
-        from: ctx.founderAddress,
-        to: ctx.dealCell,
-        amount: "1200000000000000000000", // 1200 tokens
-      });
-      assert.defined(txHash, "transfer tx hash");
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: ctx.dealAddress, token: ctx.treasuryToken, amount: "1200000000000000000000", extraVoterRoles: ["agent1", "agent2"]});
+      assert.defined(txHash, "return-capital tx hash");
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer"],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 
@@ -473,20 +470,15 @@ export const existingTokenAccountingStressScenario: Scenario = {
     // PHASE 4: MORE PROGRESS + SECOND EVALUATION (ACCUMULATION CHECK)
     // ══════════════════════════════════════════════════════════════
 
-    // Transfer 4300 more tokens to deal cell (total ~5500, 110% of M2's 5000)
+    // Return 4300 more tokens through the deal (total ~5500, 110% of M2's 5000)
     h.log("Depositing 4300 more tokens for 110% progress on milestone 2...");
 
     await step(h, "phase4-deposit-progress", async () => {
-      const txHash = await transferErc20(h, {
-        token: ctx.treasuryToken,
-        from: ctx.founderAddress,
-        to: ctx.dealCell,
-        amount: "4300000000000000000000", // 4300 tokens
-      });
-      assert.defined(txHash, "transfer tx hash");
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: ctx.dealAddress, token: ctx.treasuryToken, amount: "4300000000000000000000", extraVoterRoles: ["agent1", "agent2"]});
+      assert.defined(txHash, "return-capital tx hash");
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer"],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 

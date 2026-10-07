@@ -70,6 +70,17 @@ type ListQueryArgs = { limit?: number; offset?: number };
 | `listRelatedContracts(dealId, args?)` | `DealRelatedContract[]` |
 | `listGovernanceAccounts(dealId, args?)` | `DealGovernanceAccount[]` |
 | `listAgentPositions(dealId, args?)` | `DealAgentPosition[]` |
+| `listFundingTokens(dealId, args?)` | `DealFundingToken[]` — settlement-populated: empty until the deal's first tranche settles |
+
+### `client.agentDeals`
+
+For `core:agent-deal` deals (the home DAC acting as an agent inside a host DAC).
+
+| Method | Returns |
+|--------|---------|
+| `getByDeal(dealId)` | `AgentDeal` or `null` |
+| `listHostPositions(dealId, args?)` | `AgentDealHostPosition[]` |
+| `listActions(dealId, args?)` | `AgentDealAction[]` (host-side action log) |
 
 ### `client.proposals`
 
@@ -149,6 +160,8 @@ methods (e.g. `Dac.modules`, `Dac.agentDistributors`, `Dac.dividendPayouts`,
 Identity: `id`, `chainId`, `address`, `mode` (`NATIVE` | `EXISTING_TOKEN`), `name`,
 `description`, `symbol`.
 
+Provenance: `canonical` (deployed by the canonical `DACFactory`), `factoryAddress`.
+
 Addresses: `mainTokenAddress`, `wrappedMainTokenAddress`, `underlyingTokenAddress`,
 `agentTokenAddress`, `dealManagerAddress`, `moduleRegistryAddress`,
 `assetControllerAddress`, `governanceSchemaAddress`, `governanceOracleAddress`,
@@ -156,7 +169,8 @@ Addresses: `mainTokenAddress`, `wrappedMainTokenAddress`, `underlyingTokenAddres
 
 Governance params: `votingQuorumPercent`, `votingBlockingPercent`,
 `votingHighQuorumPercent`, `votingDuration`, `votingQualification`,
-`executionValidityDuration`, `fallbackWarmupDuration`, `fallbackDuration`,
+`executionValidityDuration`, `oraclePublishDeadline`, `fallbackWarmupBlocks` (a block
+count), `fallbackWarmupEstimatedSeconds`, `fallbackDuration`,
 `blockingOnAllProposals`, `blockingOnHighQuorum`, `oraclePrimaryEnabled`.
 
 Capabilities: `supportsMint`, `supportsBurn`, `supportsCapitalCall`, `supportsWrap`,
@@ -182,6 +196,9 @@ Staking aggregates: `totalAgentTokens`, `stakerCount`, `currentStakedAmount`,
 Child-DAC (for `core:dac-deal`): `childDacAddress`, `childDacId`, `childMainTokenAddress`,
 `childAgentTokenAddress`.
 
+Host DAC (for `core:agent-deal`): `hostDacAddress`, `hostDacId`, `hostAgentTokenAddress`,
+`hostMainTokenAddress`.
+
 Lifecycle: `active`, `closed`, `recovered`, `approveDeadline`, `evaluationDeadline`,
 `dealDeadline`.
 
@@ -206,14 +223,38 @@ Invariant: `currentStakedAmount + totalSlashedAmount + totalReleasedAmount == to
 voting power, quorum, snapshot info, lifecycle flags (`resolved`, `passed`, `executed`,
 `currentPhase`, `executionDeadline`).
 
+Phase timing: `phaseStartTime`, `phaseEndTime`, `phaseEndBlock`, `phaseEndTimeEstimate`.
+During a hybrid proposal's `FallbackWarmup`, `phaseEndTime` is `0` — the phase ends at
+`phaseEndBlock`. `resolvedWithoutElectorate` is `true` when the votable supply at the
+snapshot was zero (the proposal resolves as rejected).
+
 ### `DacProposal` / `DealProposal`
 
 Wrapper entities adding scope-specific fields:
 
-- `DacProposal` → nested `proposal`, `phaseEvents` (`ProposalPhaseEvent`),
-  `oracleSnapshots` (per-publisher snapshots), `merkleVotes`, `challengedDeals`.
+- `DacProposal` → nested `proposal`, `phaseEvents` (`ProposalPhaseEvent`, with
+  `endTime` / `endBlock` / `endTimeEstimate`), `oracleSnapshots` (per-publisher
+  snapshots), `merkleVotes`, `challengedDeals`.
 - `DealProposal` → `challengeable`, `challenged`, `challengeCount`, nested `challenges`
   (DAC challenge records).
+
+### `DealFundingToken`
+
+`tokenAddress`, `isFundingToken`, `investedAmount`, `returnedAmount`,
+`netInvestedAmount`. Rows appear only for tokens the DAC actually settled.
+
+### Agent-Deal Entities
+
+- **`AgentDeal`** — `dealId`, `hostDacAddress`, `hostDacId`, `hostAgentTokenAddress`,
+  `hostMainTokenAddress`.
+- **`AgentDealHostPosition`** — per host deal: `hostDealCellAddress`, `hostDealId`,
+  `hostDealNumericId`, `stakedAmount`, `approvedStakeAmount`, `originatedByAgent`,
+  `proposalsCreatedCount`, `votesCastCount`, `rewardsClaimedCount`, `invitesSentCount`,
+  `unstaked`.
+- **`AgentDealAction`** — `actionType`, `hostDealCellAddress`, `hostDealId`, `amount`,
+  `hostDealNumericId`, `hostProposalNumericId`, `proposalTypeSelector`,
+  `proposalTypeName`, `support`, `evaluatorNumericId`, `inviteeAddress`,
+  `grantInviteRight`, `tokenAddress`, block metadata.
 
 ### Treasury Entities
 
@@ -248,7 +289,8 @@ Queries live in `packages/indexer/src/queries/*.graphql`:
 | File | Operations |
 |------|------------|
 | `dacs.graphql` | `GetDacById`, `GetDacByAddress`, `ListDacs` |
-| `deals.graphql` | Deals + related contracts + governance accounts + agent positions |
+| `deals.graphql` | Deals + related contracts + governance accounts + agent positions + funding tokens |
+| `agent-deal.graphql` | `GetAgentDealByDeal`, host positions, host-side actions |
 | `governance.graphql` | All proposal queries (DAC/deal/composite views) |
 | `treasury.graphql` | Capital calls, holdings, movements, delegations, deal actions |
 | `oracle.graphql` | Governance oracles + wrapper actions |
@@ -256,10 +298,12 @@ Queries live in `packages/indexer/src/queries/*.graphql`:
 | `legal.graphql` | Legal-wrapper messages + states |
 | `deal-vote-sign.graphql` | Snapshot.org venue versions + external votes (not wired to client; use `rawQuery`) |
 
-After editing any `.graphql` file:
+After editing any `.graphql` file, run codegen against the **running Hasura endpoint**.
+The default `../dac-cloud-indexer/schema.graphql` is the Envio entity schema and cannot
+be loaded by graphql-codegen directly, so `INDEXER_SCHEMA_URL` is required:
 
 ```bash
-INDEXER_SCHEMA_URL=http://127.0.0.1:8080/v1/graphql \
+INDEXER_SCHEMA_URL=http://localhost:8080/v1/graphql \
   npm run codegen --workspace @dac-cloud/indexer
 ```
 

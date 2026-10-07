@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {mintMockToken} from "./fixtures/index.js";
+import {FALLBACK_WARMUP_BLOCKS, mintMockToken, passFallbackWarmup} from "./fixtures/index.js";
 
 /**
  * Scenario: Existing-Token DAC Full Lifecycle
@@ -53,7 +53,7 @@ export const existingTokenDacScenario: Scenario = {
         "--qualification", "0",
         "--execution-validity-duration", "86400",
         "--oracle-publish-deadline", "600",
-        "--fallback-warmup-duration", "10",
+        "--fallback-warmup-blocks", String(FALLBACK_WARMUP_BLOCKS),
         "--fallback-duration", "3600",
         "--auto-delegate",
         "--auto-approve",
@@ -146,14 +146,15 @@ export const existingTokenDacScenario: Scenario = {
 
     if (config.isLocalChain) {
       // On hybrid, we need fallback path if no oracle snapshot is published.
-      // Warmup: 10s, then activate fallback voting, then vote.
+      // Warmup is FALLBACK_WARMUP_BLOCKS blocks, then fallback voting opens.
 
       // In the contracts level, the first vote will attempt phase transition to accept vote, we're testing here this path
 
       await h.syncIndexer();
 
-      // Advance past fallback warmup duration (10s)
+      // Mine past the fallback warmup (a block count, not a duration)
       await h.advanceTime(15);
+      await passFallbackWarmup(h);
 
       // Now vote via wrapped tokens (fallback path)
       await step(h, "vote-fallback-wrapped", async () => {
@@ -249,6 +250,6 @@ function resolveUnderlyingToken(h: Harness): string {
     return "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
   }
 
-  // MockERC20 (local Hardhat)
-  return "0x4A679253410272dd5232B3Ff7cF5dbB88f295319";
+  // Mock token of the local deployment (DAC_TREASURY_TOKEN in .env)
+  return h.config.tokens.treasury;
 }

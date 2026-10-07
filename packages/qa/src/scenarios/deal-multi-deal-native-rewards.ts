@@ -8,7 +8,7 @@ import {
   mintMockToken,
   proposeVoteExecute,
   resolveUnderlyingToken,
-  transferErc20,
+  returnCapitalViaDeal,
   verifyDealAccountingInvariants,
   verifyTxReceipt,
   ZERO_ADDR,
@@ -445,15 +445,10 @@ export const dealMultiDealNativeRewardsScenario: Scenario = {
     h.log("Phase 2: Evaluating Deal A milestone 1 (60% progress)...");
 
     await step(h, "phase2-deposit-a", async () => {
-      const txHash = await transferErc20(h, {
-        token: treasuryToken,
-        from: founderWallet.address,
-        to: dealACell,
-        amount: "600000000000000000000", // 600 tokens = 60% of 1k
-      });
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: dealAAddress, token: treasuryToken, amount: "600000000000000000000", extraVoterRoles: ["agent1"]});
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer"],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 
@@ -571,15 +566,10 @@ export const dealMultiDealNativeRewardsScenario: Scenario = {
     h.log("Phase 4: Evaluating Deal B (100%+ progress → close)...");
 
     await step(h, "phase4-deposit-b", async () => {
-      const txHash = await transferErc20(h, {
-        token: treasuryToken,
-        from: founderWallet.address,
-        to: dealBCell,
-        amount: "1500000000000000000000", // 1500 tokens (150% of 1k)
-      });
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: dealBAddress, token: treasuryToken, amount: "1500000000000000000000", extraVoterRoles: ["agent1"]});
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer"],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 
@@ -694,15 +684,10 @@ export const dealMultiDealNativeRewardsScenario: Scenario = {
     h.log("Phase 6: Evaluating Deal A milestone 2 (100%+ progress)...");
 
     await step(h, "phase6-deposit-a2", async () => {
-      const txHash = await transferErc20(h, {
-        token: treasuryToken,
-        from: founderWallet.address,
-        to: dealACell,
-        amount: "3000000000000000000000", // 3k tokens (150% of 2k)
-      });
+      const txHash = await returnCapitalViaDeal(h, {dealAddress: dealAAddress, token: treasuryToken, amount: "3000000000000000000000", extraVoterRoles: ["agent1"]});
       return {
-        cli: {data: {action: "transfer", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
-        command: ["transfer"],
+        cli: {data: {action: "return-capital", txHash}, stdout: "", stderr: "", exitCode: 0, durationMs: 0},
+        command: ["deal", "propose", "return-capital"],
       };
     });
 

@@ -15,7 +15,7 @@ Existing ERC20  ───►  Wrap  ───►  WrappedMainToken (ERC20Votes)
 - **Wrapped holders** vote directly via their WrappedMainToken balance.
 - **Unwrapped holders** vote via Merkle proofs published by the oracle.
 - **Fallback** path: if no oracle publishes a snapshot in time, voting falls back to
-  wrapped-only after a warmup period.
+  wrapped-only after a warmup measured in **blocks**.
 
 ## Differences from Native DAC
 
@@ -39,8 +39,8 @@ dac oracle deploy 0x<admin-address> --config ./config.env --pretty-print
 
 Output includes the oracle address.
 
-If you skip the oracle, the DAC operates in **fallback-only** mode — wrapped holders
-vote directly after the fallback warmup elapses.
+If you skip the oracle, the DAC operates in **fallback-only** mode — proposals start
+directly in `FallbackWarmup` and wrapped holders vote once the warmup blocks have passed.
 
 ## 2. Create the DAC
 
@@ -58,7 +58,7 @@ dac create-existing-token \
   --qualification 0 \
   --execution-validity-duration 86400 \
   --oracle-publish-deadline 600 \
-  --fallback-warmup-duration 10 \
+  --fallback-warmup-blocks 300 \
   --fallback-duration 3600 \
   --governance-oracle 0x<oracle-address> \
   --auto-delegate --auto-approve \
@@ -73,7 +73,7 @@ Key flags:
 | `--treasury-seed-amount` | Underlying tokens wrapped into the DAC treasury at creation |
 | `--governance-oracle` | Oracle address (omit for fallback-only) |
 | `--oracle-publish-deadline` | Seconds the oracle has to publish after proposal creation |
-| `--fallback-warmup-duration` | Warmup after deadline before fallback voting opens |
+| `--fallback-warmup-blocks` | Warmup **in blocks** before fallback voting opens (default `43200` ≈ 1 day on Base at 2s blocks; `7200` ≈ 4h). The fallback snapshot is the warmup's last block |
 | `--fallback-duration` | Window during which fallback voting is open |
 | `--oracle-primary-enabled` | Set true if oracle voting is primary (else fallback-only) |
 | `--blocking-on-all-proposals` / `--blocking-on-high-quorum` | Apply blocking percent rule selectively |
@@ -143,9 +143,9 @@ dac execute <proposalId> --dac 0x<dac>
 # 1. (after oraclePublishDeadline) Begin fallback warmup
 dac proposal begin-warmup <proposalId> --dac 0x<dac>
 
-# 2. After fallback-warmup-duration elapses, fallback voting can be activated.
-#    Note: the first vote in fallback mode auto-attempts the phase transition,
-#    so step 3 is often optional.
+# 2. Once block.number > fallbackSnapshotBlock (trigger block + fallback-warmup-blocks),
+#    fallback voting can be activated. The first vote performs the transition
+#    lazily, so this call is optional.
 dac proposal activate-fallback <proposalId> --dac 0x<dac>   # optional
 
 # 3. Wrapped holders vote
@@ -154,6 +154,11 @@ dac vote proposal <proposalId> true --dac 0x<dac>
 # 4. Execute
 dac execute <proposalId> --dac 0x<dac>
 ```
+
+> **The warmup ends at a block, not a time.** During `FallbackWarmup`, `phaseEndTime`
+> is `0`; use `phaseEndBlock` / `phaseEndTimeEstimate` from `dac proposal state`. On a
+> local chain you must mine blocks — advancing time alone never opens fallback voting.
+> Wrapped-only DACs (no oracle) skip step 1: their proposals start in `FallbackWarmup`.
 
 ### Emergency Fallback
 
@@ -169,8 +174,12 @@ dac proposal trigger-fallback <proposalId> --dac 0x<dac>
 dac proposal state <proposalId> --dac 0x<dac>
 ```
 
-Returns current phase (`Created`, `PrimaryVoting`, `FallbackWarmup`, `FallbackVoting`,
-`Resolved`, `Executed`), deadlines, vote tallies, and whether execution is allowed.
+Returns current phase (`AwaitingOracleSnapshot`, `PrimaryVoting`, `FallbackWarmup`,
+`FallbackVoting`, `Resolved`), deadlines (`phaseEndTime`, `phaseEndBlock`,
+`phaseEndTimeEstimate`), vote tallies, and whether execution is allowed.
+
+If the votable supply at a phase's snapshot is zero, the proposal resolves as rejected
+and `resolvedWithoutElectorate` is `true`.
 
 ## 6. Oracle Management
 
@@ -225,7 +234,8 @@ The flow:
    # First wrap if you only hold the underlying
    dac wrap --amount 5000000000000000000000 --dac 0x<dac> --auto-approve
 
-   # Then deposit WMT to the treasury (transfers to DACCell + recoverTreasury sweeps it)
+   # Then deposit WMT to the treasury (transfers to DACCell + permissionless recoverERC20
+   # credits it — the donor does not need to be a qualified holder)
    dac deposit-treasury --token 0x<wrappedMainToken> --amount 5000000000000000000000 \
      --dac 0x<dac>
    ```

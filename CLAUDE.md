@@ -8,8 +8,10 @@ TypeScript monorepo: SDK and CLI for the DAC Cloud protocol (EVM smart contracts
 npm run build        # Build all packages (tsup)
 npm run typecheck    # Type-check all packages (tsc --noEmit)
 
-# After changing GraphQL queries:
-npm run codegen --workspace @dac-cloud/indexer
+# After changing GraphQL queries (run against the running Hasura endpoint — the local
+# ../dac-cloud-indexer/schema.graphql is the Envio entity schema and cannot be loaded
+# by graphql-codegen directly):
+INDEXER_SCHEMA_URL=http://localhost:8080/v1/graphql npm run codegen --workspace @dac-cloud/indexer
 ```
 
 Always run `npm run typecheck` after making changes to verify correctness.
@@ -22,7 +24,7 @@ packages/
   core/        @dac-cloud/core       — Viem-based contract client (ABIs, types, proposal builders, selectors)
   indexer/     @dac-cloud/indexer     — GraphQL client for Envio indexer read-model
   cli/         @dac-cloud/cli        — Commander.js CLI tool (bin: dac)
-  qa/          @dac-cloud/qa         — E2E QA harness (25 scenarios, accounting invariants, agent reviewer)
+  qa/          @dac-cloud/qa         — E2E QA harness (31 scenarios, accounting invariants, agent reviewer)
 ```
 
 Dependencies flow: `cli → core → manifests`, `cli → indexer`, `qa → cli`.

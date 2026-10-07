@@ -33,7 +33,9 @@ is optional.
 
 - `client.dacs` — `getById`, `getByAddress`, `list`
 - `client.deals` — `getById`, `getByAddress`, `listByDac`, `listRelatedContracts`,
-  `listGovernanceAccounts`, `listAgentPositions`
+  `listGovernanceAccounts`, `listAgentPositions`, `listFundingTokens`
+- `client.agentDeals` — `getByDeal`, `listHostPositions`, `listActions` (for
+  `core:agent-deal` deals)
 - `client.proposals` — DAC/deal proposal queries, by composite ID or numeric ID,
   with nested phase events / oracle snapshots / merkle votes / challenges
 - `client.accounts` — `getByAddress`
@@ -55,10 +57,12 @@ Indexer entities are keyed by `"{chainId}:{address}"` (e.g.
 
 ## Codegen
 
-After editing any `.graphql` file in `src/queries/`:
+After editing any `.graphql` file in `src/queries/`, run codegen against the running
+Hasura endpoint (the local `../dac-cloud-indexer/schema.graphql` is the Envio entity
+schema and cannot be loaded by graphql-codegen directly):
 
 ```bash
-INDEXER_SCHEMA_URL=http://127.0.0.1:8080/v1/graphql \
+INDEXER_SCHEMA_URL=http://localhost:8080/v1/graphql \
   npm run codegen --workspace @dac-cloud/indexer
 ```
 

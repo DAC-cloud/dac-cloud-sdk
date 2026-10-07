@@ -44,7 +44,7 @@ const { proposalId } = await core.createDacManagementProposal({
 });
 ```
 
-The client exposes 45 methods covering DAC deployment, token operations, DAC and deal
+The client exposes 54 methods covering DAC deployment, token operations, DAC and deal
 governance, hybrid (oracle) governance, deal lifecycle, treasury, and legal-wrapper
 messages. See [Core Client API](../../docs/sdk/core-client.md) for the full reference.
 
@@ -82,7 +82,9 @@ const params = buildMintAgentTokensProposal({
 await core.createDacManagementProposal({ dacCell: "0x...", params });
 ```
 
-30+ builders cover every DAC and deal proposal type — see
+30+ builders cover every DAC and deal proposal type, including the nine agent-deal
+types (`buildHostStakeProposal`, `buildHostCreateDealProposal`, `buildHostVoteProposal`,
+`buildReturnAssetToDacProposal`, …) — see
 [Core Client API → Proposal Builders](../../docs/sdk/core-client.md#proposal-builders).
 
 ### Selectors
@@ -94,11 +96,13 @@ import {
   CORE_DEAL_KIND,
   CORE_EVALUATOR_KIND,
   CORE_DEAL_PROPOSAL_TYPE,
+  CORE_AGENT_DEAL_PROPOSAL_TYPE,
 } from "@dac-cloud/core";
 
 DAC_PROPOSAL_TYPE.MINT_AGENT_TOKENS;     // bytes4 selector
 DEAL_PROPOSAL_TYPE.STRIKE_OUT_AGENT;
 CORE_DEAL_KIND.PERMIT2_TREASURY;
+CORE_DEAL_KIND.AGENT_DEAL;               // home DAC as an agent inside a host DAC
 CORE_EVALUATOR_KIND.MILESTONES_EVALUATOR;
 ```
 
@@ -110,6 +114,7 @@ import {
   governanceOracleAbi, votingProposalAbi, hybridDacManagementProposalAbi,
   permit2TreasuryAbi, wrappedMainTokenAbi, agentTokenAbi, erc20VotesAbi, erc20Abi,
   dacFactoryAbi, assetControllerAbi, governanceSchemaAbi,
+  moduleFactoryAbi, agentDealAbi,
 } from "@dac-cloud/core";
 
 import type {
@@ -134,6 +139,10 @@ const data = coreModule.encodeMilestoneEvaluatorConfigFromJson({
 // Snapshot.org ERC-1271 hash (matches DACDeal contract storage):
 const hash = coreModule.computeSnapshotV1FinalHash(payload);
 ```
+
+Milestones and revenue schedules take a trailing `excludePrincipal` flag (optional in
+JSON, default `false`). `decodeDealParams` / `coreModule.decodeDacDealConfig` decode the
+on-chain deal terms returned by `core.getDealInitParams`.
 
 ### Error decoding
 
@@ -172,6 +181,21 @@ need to check the receipt yourself.
 Methods like `createDealProposalDetailed`, `executeDealProposalDetailed` return
 additional decoded event data on top of the base tx hash. Use them when you need
 post-execution addresses (e.g. the deployed `dealCell` from a successful deal create).
+
+### Deal governance factory
+
+Core deals accept only `CoreModuleFactory.dealGovernanceFactory()` as
+`DealParams.governanceFactory`. `createDealProposal` / `createDealProposalDetailed`
+preflight `dealAcceptsGovernanceFactory` and throw before sending; resolve the right
+value with `core.getDealGovernanceFactory({ moduleFactory })`.
+
+### Non-`view` proposal getters
+
+`isResolved()`, `outcome()`, `isExecutableNow()`, `isExecutionExpired()` and
+`executionDeadline()` settle state lazily and are not `view`. Use
+`core.getProposalResolution({ proposalAddress })`, which simulates `isResolved()` then
+`outcome()` (`outcome()` reverts `NotResolved` on hybrid proposals before a voting phase
+is active).
 
 ## Build
 

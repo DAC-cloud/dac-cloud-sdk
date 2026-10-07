@@ -28,6 +28,13 @@ export async function mineBlock(config: QaConfig): Promise<void> {
   await rpcCall(config.localRpcUrl, "evm_mine");
 }
 
+export async function mineBlocks(config: QaConfig, count: number): Promise<void> {
+  if (!config.isLocalChain) {
+    throw new Error("mineBlocks is only available on local chains (Hardhat/Anvil)");
+  }
+  await rpcCall(config.localRpcUrl, "hardhat_mine", [`0x${count.toString(16)}`]);
+}
+
 export async function getBlockNumber(rpcUrl: string): Promise<bigint> {
   const result = await rpcCall(rpcUrl, "eth_blockNumber");
   return BigInt(result as string);

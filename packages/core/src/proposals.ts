@@ -180,7 +180,7 @@ export function buildUpdateGovernanceStrategyProposal(config: GovernanceStrategy
           {name: "qualification", type: "uint256"},
           {name: "executionValidityDuration", type: "uint256"},
           {name: "oraclePublishDeadline", type: "uint256"},
-          {name: "fallbackWarmupDuration", type: "uint256"},
+          {name: "fallbackWarmupBlocks", type: "uint256"},
           {name: "fallbackDuration", type: "uint256"},
           {name: "blockingOnAllProposals", type: "bool"},
           {name: "blockingOnHighQuorum", type: "bool"},
@@ -346,3 +346,15 @@ export function buildSnapshotV1VoteSignProposal(payload: SnapshotV1Payload): Pro
 export function encodeSnapshotV1Payload(payload: SnapshotV1Payload): Hex {
   return encodeSnapshotV1PayloadModule(payload);
 }
+
+export {
+  buildHostApproveStakeProposal,
+  buildHostClaimRewardProposal,
+  buildHostCreateDealProposal,
+  buildHostCreateProposalProposal,
+  buildHostInviteProposal,
+  buildHostStakeProposal,
+  buildHostUnstakeProposal,
+  buildHostVoteProposal,
+  buildReturnAssetToDacProposal,
+} from "./modules/core/proposals";

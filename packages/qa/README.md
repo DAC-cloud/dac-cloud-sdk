@@ -17,6 +17,10 @@ node packages/qa/dist/index.js --config ./config.env
 npx dac-qa --config ./config.env
 ```
 
+The mock treasury/underlying token is read from `DAC_TREASURY_TOKEN` in the repo-root
+`.env`. Its address changes whenever the local chain is re-seeded — update it before
+running.
+
 ### Filtering
 
 ```bash
@@ -38,7 +42,7 @@ consistency check.
 ANTHROPIC_API_KEY=sk-... node packages/qa/dist/index.js
 ```
 
-## Scenarios (29)
+## Scenarios (31)
 
 ### DAC Lifecycle
 
@@ -89,6 +93,13 @@ ANTHROPIC_API_KEY=sk-... node packages/qa/dist/index.js
 | `dac-investment` | dac-deal, investment, dividends | Existing-token DAC invests in native DAC, two tranches, child-vote, dividends |
 | `dac-deal-snapshot-vote` | dac-deal, snapshot, erc-1271 | Snapshot.org venue approval, vote sign, ERC-1271 verification |
 
+### Cross-DAC Agency
+
+| Scenario | Tags | Description |
+|----------|------|-------------|
+| `agent-deal-host-governance` | deal, agent-deal, cross-dac, governance | AgentDeal originates a host deal, stakes, invites, proposes and votes inside the host DAC |
+| `agent-deal-host-rewards` | deal, agent-deal, cross-dac, rewards | AgentDeal joins an approved host deal via approve-stake, claims host rewards, returns them home, unstakes |
+
 ### Oracle & Hybrid Governance
 
 | Scenario | Tags | Description |
@@ -137,6 +148,18 @@ the most important live in `src/scenarios/fixtures/common.ts`:
   execute within ~100s of quorum (not `votingDuration`)
 - `verifyTxReceipt` — checks `receipt.status === "0x1"` for paths where viem returns a
   hash on revert
+- `FALLBACK_WARMUP_BLOCKS` / `passFallbackWarmup` — the hybrid fallback warmup is a block
+  count, so existing-token flows must **mine** past it (`h.mineBlocks(n)`); advancing
+  time is not enough. The next vote performs the lazy transition to FallbackVoting
+- `returnCapitalViaDeal` — evaluators count only kernel-recorded returned capital, so
+  returns are simulated by minting into the deal's managed treasury and passing
+  `toggle-early-returns` + `return-capital` proposals, never by transferring tokens to
+  the DealCell
+
+Agent-deal helpers live in `src/scenarios/fixtures/agent-deal.ts`: `createNativeDacAs`,
+`createApprovedAgentDeal`, `proposeVoteExecuteAs` / `dealProposeVoteExecuteAs`
+(role-driven flows), `buildMilestoneDealJson`, and on-chain readers (`readErc20Balance`,
+`readErc20Allowance`, `readVotes`).
 
 User-facing distillations of these are in `docs/cli/governance.md` and
 `docs/guides/deal-lifecycle.md`.
@@ -148,8 +171,8 @@ packages/qa/src/
   config.ts            Config parsing from env/flags
   runner.ts            Scenario executor (sequential, no chain reset between runs)
   harness/
-    harness.ts         Test harness (cli, view, advanceTime, syncIndexer, assert)
-    chain.ts           EVM RPC helpers (advanceTime, mineBlock, snapshot)
+    harness.ts         Test harness (cli, view, advanceTime, mineBlocks, syncIndexer, assert)
+    chain.ts           EVM RPC helpers (advanceTime, mineBlock, mineBlocks, snapshot)
     cli-exec.ts        CLI process spawning
     indexer-sync.ts    Indexer polling
     assertions.ts      Assert API
@@ -157,11 +180,13 @@ packages/qa/src/
   scenarios/
     index.ts           ALL_SCENARIOS registry
     fixtures/
-      common.ts        Shared helpers (proposeVoteExecute, verifyDealAccountingInvariants, ...)
+      common.ts        Shared helpers (proposeVoteExecute, passFallbackWarmup, returnCapitalViaDeal, ...)
       setup-native-dac-deal.ts   DAC + deal setup fixture
+      setup-existing-token-dac-deal.ts   Existing-token DAC + deal setup (fallback voting)
+      agent-deal.ts    Agent-deal helpers (createNativeDacAs, createApprovedAgentDeal, ...)
       merkle.ts        Merkle tree builders (dividend + voting power)
       permit2.ts       Permit2 helpers
-    *.ts               Individual scenario files (29 total)
+    *.ts               Individual scenario files (31 total)
   review/
     reviewer.ts        Claude API integration for agent review
 ```
@@ -171,7 +196,8 @@ packages/qa/src/
 1. Create `packages/qa/src/scenarios/<name>.ts` exporting a `Scenario` object.
 2. Register in `packages/qa/src/scenarios/index.ts` (add to `ALL_SCENARIOS` + named export).
 3. Use existing fixtures (`setupNativeDacWithDeal`, `proposeVoteExecute`,
-   `dealProposeVoteExecuteQuorum`) — they encode the timing/sync rules.
+   `dealProposeVoteExecuteQuorum`, `passFallbackWarmup`, `returnCapitalViaDeal`) — they
+   encode the timing/sync rules.
 4. Add `verifyDealAccountingInvariants()` for scenarios that modify stake / reward state.
 5. Add `verifyTxReceipt()` for operations where the CLI doesn't itself check receipt status.
 6. Run with `--filter <your-scenario-name>` to iterate.

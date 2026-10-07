@@ -56,7 +56,7 @@ dac create-existing-token \
   --qualification 0 \
   --execution-validity-duration 86400 \
   --oracle-publish-deadline 600 \
-  --fallback-warmup-duration 10 \
+  --fallback-warmup-blocks 300 \
   --fallback-duration 3600 \
   --governance-oracle 0x<oracle> \
   --auto-delegate --auto-approve \
@@ -67,8 +67,11 @@ Required: `--name --description --underlying-token --treasury-seed-amount`.
 
 Hybrid strategy params: `--quorum-percent --blocking-percent --high-quorum-percent
 --voting-duration --qualification --execution-validity-duration --oracle-publish-deadline
---fallback-warmup-duration --fallback-duration --blocking-on-all-proposals
+--fallback-warmup-blocks --fallback-duration --blocking-on-all-proposals
 --blocking-on-high-quorum --oracle-primary-enabled --governance-oracle`.
+
+`--fallback-warmup-blocks` is a **block count**, not seconds (default `43200` ≈ 1 day on
+Base at 2s blocks; `7200` ≈ 4 hours). The other durations are in seconds.
 
 > **Existing-token quirks:**
 > - Founder gets **no tokens** at creation — must `dac wrap --amount ...` to acquire voting power.
@@ -118,9 +121,9 @@ propose/vote/execute pattern, quorum auto-resolution, and the execution validity
 | Type | Args | Description |
 |------|------|-------------|
 | `update-voting-config` | `<quorum> <blocking> <highQuorum> <duration> <qualification> [execDuration]` | Native DAC voting parameters |
-| `update-governance-strategy` | `--input` JSON | Full hybrid strategy (existing-token) — 12 fields |
+| `update-governance-strategy` | `--input` JSON | Full hybrid strategy (existing-token) — 12 fields. `fallbackWarmupBlocks` (8th positional arg) is a block count |
 | `update-deal-creation-config` | `<minAgentBalance> <minInitialAgentStake>` | Deal-creation gating |
-| `update-governance-oracle` | `<oracleAddress>` | Swap governance oracle |
+| `update-governance-oracle` | `<oracleAddress>` | Swap governance oracle (must be a contract) |
 | `update-legal-wrapper` | `--input` JSON | Legal-wrapper contract + operating-agreement IPFS hash |
 
 #### Token management
@@ -130,7 +133,7 @@ propose/vote/execute pattern, quorum auto-resolution, and the execution validity
 | `mint-agent-tokens` | `<amount> <recipient>` | Mint AgentTokens directly to an agent |
 | `mint-agent-tokens-distributor` | `<amount> <distributor>` | Mint into a distributor's inventory |
 | `disable-agent-distributor` | `<distributor>` | Revoke a distributor role |
-| `revoke-agent-tokens` | `<amount> <agent>` | Burn AgentTokens from an agent |
+| `revoke-agent-tokens` | `<amount> <agent>` | Burn AgentTokens from an agent. Reverts `NotAllowed` for controlled addresses (e.g. a DealCell) |
 | `mint-main-tokens` | `<amount>` | Mint into treasury reserve (high quorum) |
 | `burn-main-tokens` | `<amount>` | Burn from treasury reserve (high quorum) |
 
@@ -139,7 +142,7 @@ propose/vote/execute pattern, quorum auto-resolution, and the execution validity
 | Type | Args | Description |
 |------|------|-------------|
 | `toggle-dividends` | `<true\|false>` | Toggle dividend capability |
-| `dividend-payout` | `<token> <amount> <merkleRoot>` | Issue dividend Merkle tree |
+| `dividend-payout` | `<token> <amount> <merkleRoot>` | Issue dividend Merkle tree. Root and amount must be non-zero; cumulative claims are capped at the payout (`DividendPayoutExceeded`) |
 | `capital-call` | `<recipient> <treasuryToken> <tokenAmount> <cashAmount>` | Issue capital call (nonce = proposalId) |
 | `delegate-from-balance` | `<token> <delegatee> <amount>` | Delegate IVotes-compatible treasury holdings |
 
@@ -163,7 +166,7 @@ propose/vote/execute pattern, quorum auto-resolution, and the execution validity
 |------|------|-------------|
 | `recover-deal` | `<dealId> <liquidator> <liquidatorStake>` | Mint StakedAgent to a liquidator for a fully-slashed deal |
 | `deal-message` | `<dealId> <kind> <message>` | Send governance message to a deal |
-| `challenge-deal` | `<dealId> <dealProposalId>` | Veto a deal proposal (deal must have `vetoEnabled`) |
+| `challenge-deal` | `<dealId> <dealProposalId>` | Veto a deal proposal (deal must have `vetoEnabled`). Creator needs `max(qualification, 0.1%)` of votable supply; one challenge per deal proposal |
 | `cast-veto-deal` | (alias) | Alias of `challenge-deal` |
 
 #### Raw proposal type
@@ -203,12 +206,16 @@ holders can vote via Merkle proofs.
 ### `proposal begin-warmup <id>`
 
 After `oraclePublishDeadline` passes without a snapshot, begin the fallback warmup.
+Triggering fallback fixes `fallbackSnapshotBlock = current block + fallbackWarmupBlocks`.
+DACs without an oracle (wrapped-only) skip this — their proposals start directly in
+`FallbackWarmup`.
 
 ### `proposal activate-fallback <id>`
 
-After `fallbackWarmupDuration` elapses, activate the fallback voting phase. **Note:**
-the first vote in fallback mode auto-attempts the phase transition, so you typically
-don't need to call this explicitly if the warmup deadline has passed.
+Once `block.number > fallbackSnapshotBlock` (the warmup ends at a **block**, not a
+time), activate the fallback voting phase. **Note:** the first vote performs the phase
+transition lazily, so you typically don't need to call this explicitly once the warmup
+blocks have passed.
 
 ### `proposal trigger-fallback <id>`
 
@@ -223,6 +230,11 @@ JSON file containing the proof array.
 ### `proposal state <id>`
 
 Read-only — returns current phase, deadlines, vote tallies, and whether executable.
+
+During `FallbackWarmup`, `phaseEndTime` is `0`: the phase ends at `phaseEndBlock`, and
+`phaseEndTimeEstimate` gives the indexer's time estimate for that block.
+`resolvedWithoutElectorate` is `true` when the votable supply at the snapshot was zero —
+such a proposal resolves as rejected.
 
 ## Oracle Management
 
@@ -243,8 +255,8 @@ is a bytes32 hex.
 
 ### `oracle deactivate`
 
-Admin/publisher action — deactivates the oracle. Active proposals fall back to emergency
-fallback voting.
+Admin/publisher action — deactivates the oracle (irreversible for that DAC). Active
+proposals fall back to emergency fallback voting.
 
 ### `oracle status`
 
@@ -254,7 +266,9 @@ Read-only — shows oracle active state and publisher list from the indexer.
 
 ### `deposit-treasury`
 
-Deposit ERC20 tokens into the DAC treasury (transfer + `recover-treasury` in one step).
+Deposit ERC20 tokens into the DAC treasury: transfers them to the DACCell, then calls
+the permissionless `recoverERC20` (same as [`recover-erc20`](#recover-erc20)) to credit
+them. The caller does not need to hold the DAC's token.
 
 ```bash
 dac deposit-treasury --token 0x<erc20> --amount 5000000000000000000000 \
@@ -263,9 +277,20 @@ dac deposit-treasury --token 0x<erc20> --amount 5000000000000000000000 \
 
 `--auto-approve` runs the ERC20 approve to AssetController before the transfer.
 
+### `recover-erc20`
+
+Credit tokens sitting on the DACCell to its treasury (`DACCell.recoverERC20`).
+**Permissionless** — any address may call it. Reverts `NotEnoughBalance` when the
+DACCell holds none of the token.
+
+```bash
+dac recover-erc20 --token 0x<erc20> --dac 0x<dac>
+```
+
 ### `recover-treasury`
 
 Reconcile the treasury accounting for a token (no-op if balance and accounting agree).
+Holders only.
 
 ```bash
 dac recover-treasury --token 0x<erc20> --dac 0x<dac>
