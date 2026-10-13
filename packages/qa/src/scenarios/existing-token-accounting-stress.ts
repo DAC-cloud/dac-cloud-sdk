@@ -4,6 +4,7 @@ import {
   getChainTimestamp,
   mintMockToken,
   passFallbackWarmup,
+  readErc20Balance,
   setupExistingTokenDacWithDeal,
   returnCapitalViaDeal,
   verifyDealAccountingInvariants,
@@ -246,12 +247,19 @@ export const existingTokenAccountingStressScenario: Scenario = {
 
       // Unwrap half to test the reverse flow
       h.log("Unwrapping 1k tokens...");
+      const unwrapAmount = "1000000000000000000000"; // 1k
+      const wrappedBefore = await readErc20Balance(h, ctx.wrappedMainTokenAddress, founderWallet.address);
+      const underlyingBefore = await readErc20Balance(h, underlyingToken, founderWallet.address);
       const unwrapCli = await h.cli([
-        "unwrap", "--amount", "1000000000000000000000", // 1k
+        "unwrap", "--amount", unwrapAmount,
         "--dac", ctx.dacAddress,
         "--config", config.configPath, "--pretty-print",
       ]);
       assert.defined(unwrapCli.data.txHash, "unwrap tx hash");
+      const wrappedAfter = await readErc20Balance(h, ctx.wrappedMainTokenAddress, founderWallet.address);
+      const underlyingAfter = await readErc20Balance(h, underlyingToken, founderWallet.address);
+      assert.equal((wrappedBefore - wrappedAfter).toString(), unwrapAmount, "wrapped balance burned by unwrap amount");
+      assert.equal((underlyingAfter - underlyingBefore).toString(), unwrapAmount, "underlying returned 1:1");
 
       return {cli: wrapCli, command: ["dac", "wrap + unwrap"]};
     });

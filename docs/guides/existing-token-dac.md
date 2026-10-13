@@ -174,8 +174,8 @@ dac proposal trigger-fallback <proposalId> --dac 0x<dac>
 dac proposal state <proposalId> --dac 0x<dac>
 ```
 
-Returns current phase (`AwaitingOracleSnapshot`, `PrimaryVoting`, `FallbackWarmup`,
-`FallbackVoting`, `Resolved`), deadlines (`phaseEndTime`, `phaseEndBlock`,
+Returns current phase as reported by the indexer (`AWAITING_ORACLE_SNAPSHOT`, `PRIMARY_VOTING`,
+`FALLBACK_WARMUP`, `FALLBACK_VOTING`, `RESOLVED`), deadlines (`phaseEndTime`, `phaseEndBlock`,
 `phaseEndTimeEstimate`), vote tallies, and whether execution is allowed.
 
 If the votable supply at a phase's snapshot is zero, the proposal resolves as rejected

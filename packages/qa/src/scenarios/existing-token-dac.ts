@@ -1,6 +1,6 @@
 import {step} from "../harness/index.js";
 import type {Harness, Scenario} from "../harness/types.js";
-import {FALLBACK_WARMUP_BLOCKS, mintMockToken, passFallbackWarmup} from "./fixtures/index.js";
+import {FALLBACK_WARMUP_BLOCKS, mintMockToken, passFallbackWarmup, readErc20Balance, readVotes, sameAddress, transferErc20} from "./fixtures/index.js";
 
 /**
  * Scenario: Existing-Token DAC Full Lifecycle
@@ -12,6 +12,9 @@ import {FALLBACK_WARMUP_BLOCKS, mintMockToken, passFallbackWarmup} from "./fixtu
  * 4. Wrap additional tokens
  * 5. Create mint-agent-tokens proposal
  * 6. Vote on proposal (hybrid fallback path since no oracle publisher set up)
+ * 9. Unwrap: self-unwrap, unwrap to a third party, over-unwrap rejected, voting power follows
+ * 10. Third-party wrapTo does not auto-delegate the recipient
+ * 11. recover-erc20 (permissionless) credits stray DACCell tokens to the treasury
  * 7. Execute proposal
  * 8. Verify final state in indexer
  */
@@ -217,6 +220,136 @@ export const existingTokenDacScenario: Scenario = {
 
       return {cli, command: ["dac", "view", "dac"], indexerSnapshot: dac as Record<string, unknown>};
     });
+
+    // ── Step 9: Unwrap ────────────────────────────────────────────
+    // Founder holds 500 wrapped (self-delegated). Unwrap burns wrapped and pays
+    // the underlying to the caller (or a recipient), and voting power follows.
+
+    const thirdParty = config.wallets.agent3;
+    if (config.isLocalChain && thirdParty) {
+      const wrapped = wrappedMainTokenAddress!;
+      const unwrapSelf = "200000000000000000000";   // 200
+      const unwrapToOther = "100000000000000000000"; // 100
+
+      await step(h, "unwrap-self", async () => {
+        const wrappedBefore = await readErc20Balance(h, wrapped, founderWallet.address);
+        const underlyingBefore = await readErc20Balance(h, underlyingToken, founderWallet.address);
+        const votesBefore = await readVotes(h, wrapped, founderWallet.address);
+
+        const cli = await h.cli([
+          "unwrap", "--amount", unwrapSelf,
+          "--dac", dacAddress!,
+          "--config", config.configPath, "--pretty-print",
+        ]);
+        assert.defined(cli.data.txHash, "unwrap tx hash present");
+
+        const wrappedAfter = await readErc20Balance(h, wrapped, founderWallet.address);
+        const underlyingAfter = await readErc20Balance(h, underlyingToken, founderWallet.address);
+        const votesAfter = await readVotes(h, wrapped, founderWallet.address);
+        assert.equal((wrappedBefore - wrappedAfter).toString(), unwrapSelf, "wrapped balance burned by unwrap amount");
+        assert.equal((underlyingAfter - underlyingBefore).toString(), unwrapSelf, "underlying returned 1:1 to the caller");
+        assert.equal((votesBefore - votesAfter).toString(), unwrapSelf, "voting power drops with the unwrapped amount");
+        return {cli, command: ["dac", "unwrap"]};
+      });
+
+      await step(h, "unwrap-to-third-party", async () => {
+        const underlyingBefore = await readErc20Balance(h, underlyingToken, thirdParty.address);
+        const cli = await h.cli([
+          "unwrap", "--amount", unwrapToOther, "--recipient", thirdParty.address,
+          "--dac", dacAddress!,
+          "--config", config.configPath, "--pretty-print",
+        ]);
+        assert.defined(cli.data.txHash, "unwrapTo tx hash present");
+        assert.truthy(sameAddress(cli.data.recipient, thirdParty.address), "CLI reports the recipient");
+        const underlyingAfter = await readErc20Balance(h, underlyingToken, thirdParty.address);
+        assert.equal((underlyingAfter - underlyingBefore).toString(), unwrapToOther, "recipient received the underlying");
+        return {cli, command: ["dac", "unwrap", "--recipient"]};
+      });
+
+      await step(h, "unwrap-over-balance-rejected", async () => {
+        const balance = await readErc20Balance(h, wrapped, founderWallet.address);
+        const cli = await h.cli([
+          "unwrap", "--amount", (balance + 1n).toString(),
+          "--dac", dacAddress!,
+          "--config", config.configPath, "--pretty-print",
+        ], {allowFailure: true});
+        assert.notEqual(cli.exitCode, 0, "unwrapping more than the wrapped balance is rejected");
+        return {cli, command: ["dac", "unwrap", "(over balance)"]};
+      });
+
+      // ── Step 10: third-party wrapTo does not auto-delegate ─────────
+      // Only self-wraps auto-delegate; a recipient must delegate on their own,
+      // otherwise anyone could pre-set delegation on custody contracts.
+      await step(h, "wrap-to-third-party-no-auto-delegate", async () => {
+        const wrapTo = "50000000000000000000"; // 50
+        const cli = await h.cli([
+          "wrap", "--amount", wrapTo, "--recipient", thirdParty.address,
+          "--dac", dacAddress!, "--auto-approve",
+          "--config", config.configPath, "--pretty-print",
+        ]);
+        assert.defined(cli.data.txHash, "wrapTo tx hash present");
+        assert.equal((await readErc20Balance(h, wrapped, thirdParty.address)).toString(), wrapTo, "recipient holds the wrapped tokens");
+        assert.equal((await readVotes(h, wrapped, thirdParty.address)).toString(), "0", "third-party wrapTo leaves the recipient undelegated");
+
+        await h.cliAs("agent3", [
+          "delegate", "--delegatee", thirdParty.address, "--dac", dacAddress!,
+          "--config", config.configPath, "--pretty-print",
+        ]);
+        assert.equal((await readVotes(h, wrapped, thirdParty.address)).toString(), wrapTo, "explicit delegation activates the voting power");
+        return {cli, command: ["dac", "wrap", "--recipient"]};
+      });
+
+      await h.syncIndexer();
+
+      await step(h, "verify-wrapper-actions-indexed", async () => {
+        const cli = await h.view("wrapper-actions", ["--dac", dacAddress!, "--limit", "50"]);
+        const actions = (cli.data.wrapperActions as Array<Record<string, unknown>> | undefined) ?? [];
+        const unwraps = actions.filter((entry) => entry.actionType === "UNWRAPPED");
+        assert.gte(unwraps.length, 2, "two UNWRAPPED actions indexed");
+        assert.truthy(
+          unwraps.some((entry) => sameAddress(entry.recipient, thirdParty.address) && String(entry.amount) === unwrapToOther),
+          "unwrapTo recipient and amount indexed",
+        );
+        assert.truthy(
+          actions.some((entry) => entry.actionType === "WRAPPED" && sameAddress(entry.recipient, thirdParty.address)),
+          "third-party wrap indexed with its recipient",
+        );
+        return {cli, command: ["dac", "view", "wrapper-actions"], indexerSnapshot: {actions} as Record<string, unknown>};
+      });
+
+      // ── Step 11: recover-erc20 ─────────────────────────────────────
+      // Tokens sent straight to the DACCell are credited to the treasury by anyone.
+      await step(h, "recover-erc20", async () => {
+        const stray = "70000000000000000000"; // 70 underlying
+        await transferErc20(h, {token: underlyingToken, from: founderWallet.address, to: dacAddress!, amount: stray});
+
+        const holdingsBefore = await h.view("treasury-holdings", ["--dac", dacAddress!]);
+        const before = ((holdingsBefore.data.holdings as Array<Record<string, unknown>> | undefined) ?? [])
+          .find((entry) => sameAddress(entry.tokenAddress, underlyingToken));
+        const balanceBefore = BigInt(String(before?.balance ?? "0"));
+
+        // agent3 holds no DAC token: recoverERC20 is permissionless.
+        const cli = await h.cliAs("agent3", [
+          "recover-erc20", "--token", underlyingToken, "--dac", dacAddress!,
+          "--config", config.configPath, "--pretty-print",
+        ]);
+        assert.defined(cli.data.txHash, "recover-erc20 tx hash present");
+
+        await h.syncIndexer();
+        const holdingsAfter = await h.view("treasury-holdings", ["--dac", dacAddress!]);
+        const after = ((holdingsAfter.data.holdings as Array<Record<string, unknown>> | undefined) ?? [])
+          .find((entry) => sameAddress(entry.tokenAddress, underlyingToken));
+        assert.equal((BigInt(String(after?.balance ?? "0")) - balanceBefore).toString(), stray, "treasury holding credited with the recovered amount");
+
+        const again = await h.cliAs("agent3", [
+          "recover-erc20", "--token", underlyingToken, "--dac", dacAddress!,
+          "--config", config.configPath, "--pretty-print",
+        ], {allowFailure: true});
+        assert.notEqual(again.exitCode, 0, "nothing left to recover is rejected");
+        assert.includes(String(again.data.error ?? again.stdout), "NotEnoughBalance", "reverts NotEnoughBalance");
+        return {cli, command: ["dac", "recover-erc20"], indexerSnapshot: after};
+      });
+    }
 
     await step(h, "verify-proposals-in-indexer", async () => {
       const cli = await h.view("proposals", ["--dac", dacAddress!]);

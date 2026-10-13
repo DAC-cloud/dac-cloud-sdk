@@ -19,7 +19,8 @@ npx dac-qa --config ./config.env
 
 The mock treasury/underlying token is read from `DAC_TREASURY_TOKEN` in the repo-root
 `.env`. Its address changes whenever the local chain is re-seeded — update it before
-running.
+running. `DAC_SECONDARY_TOKEN` (optional, a second mintable mock) enables the
+`recover-profits` step of `deal-governance-toggles`.
 
 ### Filtering
 
@@ -42,13 +43,13 @@ consistency check.
 ANTHROPIC_API_KEY=sk-... node packages/qa/dist/index.js
 ```
 
-## Scenarios (31)
+## Scenarios (33)
 
 ### DAC Lifecycle
 
 | Scenario | Tags | Description |
 |----------|------|-------------|
-| `existing-token-dac-lifecycle` | dac, existing-token, hybrid | Oracle deploy, create, wrap, propose / vote / execute |
+| `existing-token-dac-lifecycle` | dac, existing-token, hybrid | Create, wrap, propose / vote / execute, unwrap (self + to third party), third-party `wrapTo` delegation, `recover-erc20` |
 | `dac-agent-distributor` | dac, agent-tokens, distributor | Approve distributor, mint inventory, disable, direct mint comparison |
 | `dac-burn-main-tokens` | dac, governance, mint, burn | Mint MainTokens to treasury, burn from treasury, verify balances |
 | `legal-wrapper` | dac, legal-wrapper, governance | Set legal-wrapper, verify role on login, send legal messages |
@@ -99,6 +100,13 @@ ANTHROPIC_API_KEY=sk-... node packages/qa/dist/index.js
 |----------|------|-------------|
 | `agent-deal-host-governance` | deal, agent-deal, cross-dac, governance | AgentDeal originates a host deal, stakes, invites, proposes and votes inside the host DAC |
 | `agent-deal-host-rewards` | deal, agent-deal, cross-dac, rewards | AgentDeal joins an approved host deal via approve-stake, claims host rewards, returns them home, unstakes |
+
+### Governance Edge Paths
+
+| Scenario | Tags | Description |
+|----------|------|-------------|
+| `hybrid-fallback-paths` | dac, existing-token, hybrid, oracle, fallback | Oracle outage handling: `begin-warmup`, `activate-fallback`, `oracle set-publisher` / `deactivate`, `trigger-fallback`, phase state fields |
+| `deal-governance-toggles` | deal, dac, governance, whitelist, veto, revoke, recovery | `toggle-whitelist`, `enable-veto-right`, `revoke-agent-tokens` (+ controlled-address refusal), `recover-treasury`, `recover-profits` |
 
 ### Oracle & Hybrid Governance
 
@@ -186,7 +194,7 @@ packages/qa/src/
       agent-deal.ts    Agent-deal helpers (createNativeDacAs, createApprovedAgentDeal, ...)
       merkle.ts        Merkle tree builders (dividend + voting power)
       permit2.ts       Permit2 helpers
-    *.ts               Individual scenario files (31 total)
+    *.ts               Individual scenario files (33 total)
   review/
     reviewer.ts        Claude API integration for agent review
 ```

@@ -30,6 +30,8 @@ import {dryRunLifecycleScenario} from "./dry-run-lifecycle.js";
 import {dryRunMultiTxScenario} from "./dry-run-multi-tx.js";
 import {agentDealHostGovernanceScenario} from "./agent-deal-host-governance.js";
 import {agentDealHostRewardsScenario} from "./agent-deal-host-rewards.js";
+import {hybridFallbackPathsScenario} from "./hybrid-fallback-paths.js";
+import {dealGovernanceTogglesScenario} from "./deal-governance-toggles.js";
 
 export const ALL_SCENARIOS: Scenario[] = [
   existingTokenDacScenario,
@@ -63,6 +65,8 @@ export const ALL_SCENARIOS: Scenario[] = [
   dryRunMultiTxScenario,
   agentDealHostGovernanceScenario,
   agentDealHostRewardsScenario,
+  hybridFallbackPathsScenario,
+  dealGovernanceTogglesScenario,
 ];
 
 export {
@@ -97,4 +101,6 @@ export {
   dryRunMultiTxScenario,
   agentDealHostGovernanceScenario,
   agentDealHostRewardsScenario,
+  hybridFallbackPathsScenario,
+  dealGovernanceTogglesScenario,
 };
