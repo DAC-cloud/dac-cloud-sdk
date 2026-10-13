@@ -103,7 +103,7 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
 
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
-    const dealParams = dealFileSpec.build(ctx.protocol, ctx.fromAddress);
+    const dealParams = dealFileSpec.build(ctx.protocol, ctx.actor);
     assertDealTarget(dealParams);
     const transaction = ctx.txBuilder.createDealProposal({dealManager, params: dealParams});
     printJson({action: "deal.create", dryRun: true, dac, dealManager, transaction,
@@ -111,7 +111,7 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
     return;
   }
 
-  const {account, core, protocol} = await makeCoreContext(resolver);
+  const {account, core, protocol, actor} = await makeCoreContext(resolver);
 
   // Core deals accept exactly one deal-proposal factory; prefer the module's own
   // answer over the manifest so a stale manifest cannot produce a doomed tx.
@@ -119,13 +119,13 @@ async function cmdCreate(resolver: OptionResolver, dealFile: string): Promise<vo
   const onchainGovernanceFactory = !dealFileSpec.explicitGovernanceFactory && moduleFactoryRaw
     ? await core.getDealGovernanceFactory({moduleFactory: asAddress(moduleFactoryRaw, "moduleFactory")})
     : undefined;
-  const dealParams = dealFileSpec.build(protocol, account.address, {governanceFactory: onchainGovernanceFactory});
+  const dealParams = dealFileSpec.build(protocol, actor, {governanceFactory: onchainGovernanceFactory});
   assertDealTarget(dealParams);
 
   const created = await core.createDealProposalDetailed({dealManager, params: dealParams});
 
   printJson({
-    action: "deal.create", dac, dealManager, proposer: account.address,
+    action: "deal.create", dac, dealManager, proposer: actor,
     txHash: created.txHash, dealId: created.dealId, dacProposalId: created.proposalId,
     dealCell: created.dealCell, dealAddress: created.dealAddress, evaluatorAddress: created.evaluatorAddress,
     moduleId: dealKind.moduleId, evaluatorModuleId: evaluator.moduleId,
@@ -148,10 +148,10 @@ async function cmdInvite(resolver: OptionResolver, inviteeText: string): Promise
     return;
   }
 
-  const {account, core} = await makeCoreContext(resolver);
+  const {account, core, actor} = await makeCoreContext(resolver);
   const txHash = await core.inviteAgentToDeal({dealCell, invitee, grantInviteRight});
 
-  printJson({action: "deal.invite", inviter: account.address, deal: dealRecord.dealAddress, dealCell, invitee, grantInviteRight, txHash,
+  printJson({action: "deal.invite", inviter: actor, deal: dealRecord.dealAddress, dealCell, invitee, grantInviteRight, txHash,
     nextStep: "Invited agent can now stake into the deal with `dac deal stake`."});
 }
 
@@ -175,13 +175,13 @@ async function cmdStake(resolver: OptionResolver, amountText: string): Promise<v
     const transactions = [ctx.txBuilder.stakeAgentToDeal({agentToken, dealCell, amount})];
     const stakeToken = dealRecord.stakeTokenAddress;
     if (resolver.resolveBoolean("auto-delegate", false) && stakeToken) {
-      transactions.push(ctx.txBuilder.delegateVotes({token: stakeToken, delegatee: ctx.fromAddress}));
+      transactions.push(ctx.txBuilder.delegateVotes({token: stakeToken, delegatee: ctx.actor}));
     }
     printJson({action: "deal.stake", dryRun: true, dac, dealCell, agentToken, amount, transactions});
     return;
   }
 
-  const {account, core} = await makeCoreContext(resolver);
+  const {account, core, actor} = await makeCoreContext(resolver);
   const txHash = await core.stakeAgentToDeal({agentToken, dealCell, amount});
   const stakeToken = resolver.resolveString("stake-token")
     ? asAddress(resolver.requireString("stake-token"), "stake token")
@@ -190,10 +190,10 @@ async function cmdStake(resolver: OptionResolver, amountText: string): Promise<v
   const autoDelegate = resolver.resolveBoolean("auto-delegate", false);
   let delegateTx: Hex | undefined;
   if (autoDelegate && stakeToken) {
-    delegateTx = await core.delegateVotes({token: stakeToken, delegatee: account.address});
+    delegateTx = await core.delegateVotes({token: stakeToken, delegatee: actor});
   }
 
-  printJson({action: "deal.stake", staker: account.address, dac, dealCell, agentToken, stakeToken, amount, txHash, delegateTx});
+  printJson({action: "deal.stake", staker: actor, dac, dealCell, agentToken, stakeToken, amount, txHash, delegateTx});
 }
 
 async function cmdUnstake(resolver: OptionResolver): Promise<void> {
@@ -207,13 +207,13 @@ async function cmdUnstake(resolver: OptionResolver): Promise<void> {
     return;
   }
 
-  const {account, core} = await makeCoreContext(resolver);
+  const {account, core, actor} = await makeCoreContext(resolver);
   const txHash = await core.unstakeFromDeal({dealCell});
-  printJson({action: "deal.unstake", staker: account.address, deal: resolved.dealAddress, dealCell, txHash});
+  printJson({action: "deal.unstake", staker: actor, deal: resolved.dealAddress, dealCell, txHash});
 }
 
 async function cmdDelegate(resolver: OptionResolver): Promise<void> {
-  const {account, core} = await makeCoreContext(resolver);
+  const {account, core, actor} = await makeCoreContext(resolver);
   const dealRecord = await resolveDealRecordOrThrow(resolver);
 
   const stakeTokenFromOption = resolver.resolveString("stake-token");
@@ -228,12 +228,12 @@ async function cmdDelegate(resolver: OptionResolver): Promise<void> {
     );
   }
 
-  const delegatee = asAddress(resolver.resolveString("delegatee", account.address) ?? account.address, "delegatee");
+  const delegatee = asAddress(resolver.resolveString("delegatee", actor) ?? actor, "delegatee");
   const txHash = await core.delegateVotes({token: stakeToken, delegatee});
 
   printJson({
     action: "deal.delegate",
-    delegator: account.address,
+    delegator: actor,
     deal: dealRecord.dealAddress,
     dealCell: dealRecord.cellAddress,
     stakeToken,
@@ -247,7 +247,7 @@ async function cmdRequest(resolver: OptionResolver, amountText: string): Promise
   try { amount = BigInt(amountText); } catch {
     throw new Error(`Invalid request amount "${amountText}". Provide a numeric value.`);
   }
-  const {core, account} = await makeCoreContext(resolver);
+  const {core, account, actor} = await makeCoreContext(resolver);
   const resolved = await resolveDealRecordOrThrow(resolver);
   const dacRecord = await resolveDacRecordOrThrow(resolver);
   const dacAddress = dacRecord.address;
@@ -265,7 +265,7 @@ async function cmdRequest(resolver: OptionResolver, amountText: string): Promise
 
   printJson({
     action: "deal.request",
-    requester: account.address,
+    requester: actor,
     dealId: resolved.id,
     deal: resolved.dealAddress,
     dealCell: resolved.cellAddress,
@@ -570,10 +570,10 @@ async function cmdEvaluate(resolver: OptionResolver, evaluatorIdText?: string): 
     return;
   }
 
-  const {core, account} = await makeCoreContext(resolver);
+  const {core, account, actor} = await makeCoreContext(resolver);
   const txHash = await core.evaluateDeal({dealManager, dealId: resolved.dealNumericId, evaluatorId});
   printJson({
-    action: "deal.evaluate", caller: account.address, dealId: resolved.id,
+    action: "deal.evaluate", caller: actor, dealId: resolved.id,
     dealNumericId: resolved.dealNumericId, dealAddress: resolved.dealAddress,
     dealCell: resolved.cellAddress, dealManager, evaluatorId, txHash,
   });
@@ -591,9 +591,9 @@ async function cmdClaim(resolver: OptionResolver, evaluatorIdText?: string): Pro
     return;
   }
 
-  const {core, account} = await makeCoreContext(resolver);
+  const {core, account, actor} = await makeCoreContext(resolver);
   const txHash = await core.claimMainToken({dealCell, evaluatorId});
-  printJson({action: "deal.claim", caller: account.address, deal: resolved.dealAddress, dealCell, evaluatorId, txHash});
+  printJson({action: "deal.claim", caller: actor, deal: resolved.dealAddress, dealCell, evaluatorId, txHash});
 }
 
 async function cmdClaimRewardPool(resolver: OptionResolver, evaluatorIdText?: string): Promise<void> {
@@ -608,9 +608,9 @@ async function cmdClaimRewardPool(resolver: OptionResolver, evaluatorIdText?: st
     return;
   }
 
-  const {core, account} = await makeCoreContext(resolver);
+  const {core, account, actor} = await makeCoreContext(resolver);
   const txHash = await core.claimDealRewardPool({dealAddress, evaluatorId});
-  printJson({action: "deal.claim-reward-pool", caller: account.address, deal: dealAddress, evaluatorId, txHash});
+  printJson({action: "deal.claim-reward-pool", caller: actor, deal: dealAddress, evaluatorId, txHash});
 }
 
 async function cmdLinkCapitalCall(resolver: OptionResolver, capitalCallIdText: string): Promise<void> {
@@ -625,9 +625,9 @@ async function cmdLinkCapitalCall(resolver: OptionResolver, capitalCallIdText: s
     return;
   }
 
-  const {core, account} = await makeCoreContext(resolver);
+  const {core, account, actor} = await makeCoreContext(resolver);
   const txHash = await core.setRootCapitalCallID({dealAddress, capitalCallId});
-  printJson({action: "deal.link-capital-call", caller: account.address, deal: dealAddress, capitalCallId, txHash});
+  printJson({action: "deal.link-capital-call", caller: actor, deal: dealAddress, capitalCallId, txHash});
 }
 
 async function cmdAgentSpend(resolver: OptionResolver, tokenText: string, destinationText: string, amountText: string): Promise<void> {
@@ -652,9 +652,9 @@ async function cmdAgentSpend(resolver: OptionResolver, tokenText: string, destin
     return;
   }
 
-  const {core, account} = await makeCoreContext(resolver);
+  const {core, account, actor} = await makeCoreContext(resolver);
   const txHash = await core.executeAgentSpend({treasuryAddress, token, destination, amount});
-  printJson({action: "deal.agent-spend", caller: account.address, deal: dealAddress, treasury: treasuryAddress, token, destination, amount, txHash});
+  printJson({action: "deal.agent-spend", caller: actor, deal: dealAddress, treasury: treasuryAddress, token, destination, amount, txHash});
 }
 
 async function cmdReceivePermit2(resolver: OptionResolver, tokenText: string, sourceText: string, amountText: string): Promise<void> {
@@ -678,9 +678,9 @@ async function cmdReceivePermit2(resolver: OptionResolver, tokenText: string, so
     return;
   }
 
-  const {core, account} = await makeCoreContext(resolver);
+  const {core, account, actor} = await makeCoreContext(resolver);
   const txHash = await core.executeReceivePermit2({treasuryAddress, token, source, amount});
-  printJson({action: "deal.receive-permit2", caller: account.address, deal: dealAddress, treasury: treasuryAddress, token, source, amount, txHash});
+  printJson({action: "deal.receive-permit2", caller: actor, deal: dealAddress, treasury: treasuryAddress, token, source, amount, txHash});
 }
 
 async function cmdRecoverProfits(resolver: OptionResolver, tokenText: string): Promise<void> {
@@ -695,13 +695,13 @@ async function cmdRecoverProfits(resolver: OptionResolver, tokenText: string): P
     return;
   }
 
-  const {core, account} = await makeCoreContext(resolver);
+  const {core, account, actor} = await makeCoreContext(resolver);
   const txHash = await core.recoverProfits({dealAddress, token});
-  printJson({action: "deal.recover-profits", caller: account.address, deal: dealAddress, token, txHash});
+  printJson({action: "deal.recover-profits", caller: actor, deal: dealAddress, token, txHash});
 }
 
 async function cmdLegalMessage(resolver: OptionResolver, messageFile: string, dealNumericIdText?: string): Promise<void> {
-  const {core, account} = await makeCoreContext(resolver);
+  const {core, account, actor} = await makeCoreContext(resolver);
   const payload = await readJsonFile<Record<string, unknown>>(resolvePath(messageFile));
 
   const kind = asBytes4(readStringField(payload, "kind", messageFile), "legal message kind");
@@ -744,7 +744,7 @@ async function cmdLegalMessage(resolver: OptionResolver, messageFile: string, de
 
   printJson({
     action: "deal.legal-message",
-    caller: account.address,
+    caller: actor,
     dac: dacAddress,
     dealManager,
     dealId,
@@ -755,7 +755,7 @@ async function cmdLegalMessage(resolver: OptionResolver, messageFile: string, de
 }
 
 async function cmdWithdraw(resolver: OptionResolver, dealNumericIdText: string): Promise<void> {
-  const {core, account} = await makeCoreContext(resolver);
+  const {core, account, actor} = await makeCoreContext(resolver);
   let dealId: bigint;
   try { dealId = BigInt(dealNumericIdText); } catch {
     throw new Error(`Invalid deal numeric ID "${dealNumericIdText}". Provide a numeric value.`);
@@ -770,7 +770,7 @@ async function cmdWithdraw(resolver: OptionResolver, dealNumericIdText: string):
 
   printJson({
     action: "deal.withdraw",
-    caller: account.address,
+    caller: actor,
     dac,
     dealManager,
     dealId,

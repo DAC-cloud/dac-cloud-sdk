@@ -32,6 +32,7 @@ import {agentDealHostGovernanceScenario} from "./agent-deal-host-governance.js";
 import {agentDealHostRewardsScenario} from "./agent-deal-host-rewards.js";
 import {hybridFallbackPathsScenario} from "./hybrid-fallback-paths.js";
 import {dealGovernanceTogglesScenario} from "./deal-governance-toggles.js";
+import {tbaAgentLifecycleScenario} from "./tba-agent-lifecycle.js";
 
 export const ALL_SCENARIOS: Scenario[] = [
   existingTokenDacScenario,
@@ -67,6 +68,7 @@ export const ALL_SCENARIOS: Scenario[] = [
   agentDealHostRewardsScenario,
   hybridFallbackPathsScenario,
   dealGovernanceTogglesScenario,
+  tbaAgentLifecycleScenario,
 ];
 
 export {
@@ -103,4 +105,5 @@ export {
   agentDealHostRewardsScenario,
   hybridFallbackPathsScenario,
   dealGovernanceTogglesScenario,
+  tbaAgentLifecycleScenario,
 };

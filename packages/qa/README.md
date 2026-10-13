@@ -43,7 +43,7 @@ consistency check.
 ANTHROPIC_API_KEY=sk-... node packages/qa/dist/index.js
 ```
 
-## Scenarios (33)
+## Scenarios (34)
 
 ### DAC Lifecycle
 
@@ -108,6 +108,12 @@ ANTHROPIC_API_KEY=sk-... node packages/qa/dist/index.js
 | `hybrid-fallback-paths` | dac, existing-token, hybrid, oracle, fallback | Oracle outage handling: `begin-warmup`, `activate-fallback`, `oracle set-publisher` / `deactivate`, `trigger-fallback`, phase state fields |
 | `deal-governance-toggles` | deal, dac, governance, whitelist, veto, revoke, recovery | `toggle-whitelist`, `enable-veto-right`, `revoke-agent-tokens` (+ controlled-address refusal), `recover-treasury`, `recover-profits` |
 
+### NFT Agents
+
+| Scenario | Tags | Description |
+|----------|------|-------------|
+| `tba-agent-lifecycle` | tba, erc6551, nft, deal, auth, dry-run | ERC-6551 account: `tba address/info/create`, ERC-6492 login, stake/delegate/propose/vote/execute via `--nft` in PK and dry-run modes, NFT transfer moves control |
+
 ### Oracle & Hybrid Governance
 
 | Scenario | Tags | Description |
@@ -169,6 +175,12 @@ Agent-deal helpers live in `src/scenarios/fixtures/agent-deal.ts`: `createNative
 (role-driven flows), `buildMilestoneDealJson`, and on-chain readers (`readErc20Balance`,
 `readErc20Allowance`, `readVotes`).
 
+ERC-6551 helpers live in `src/scenarios/fixtures/tba.ts`: `ensureErc6551Infrastructure`
+(installs the canonical registry and the reference implementation at their mainnet
+addresses via `anvil_setCode`), `deployMockNft` / `mintNft` / `transferNft`, and
+`setupTbaFixture`. Artifacts are vendored in `src/fixtures/erc6551.json`; sources and
+rebuild steps in `fixtures/erc6551/README.md`.
+
 User-facing distillations of these are in `docs/cli/governance.md` and
 `docs/guides/deal-lifecycle.md`.
 
@@ -185,6 +197,8 @@ packages/qa/src/
     indexer-sync.ts    Indexer polling
     assertions.ts      Assert API
     types.ts           TypeScript interfaces
+  fixtures/
+    erc6551.json       Vendored ERC-6551 registry / reference account / mock ERC-721 artifacts
   scenarios/
     index.ts           ALL_SCENARIOS registry
     fixtures/
@@ -194,7 +208,7 @@ packages/qa/src/
       agent-deal.ts    Agent-deal helpers (createNativeDacAs, createApprovedAgentDeal, ...)
       merkle.ts        Merkle tree builders (dividend + voting power)
       permit2.ts       Permit2 helpers
-    *.ts               Individual scenario files (33 total)
+    *.ts               Individual scenario files (34 total)
   review/
     reviewer.ts        Claude API integration for agent review
 ```

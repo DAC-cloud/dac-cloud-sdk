@@ -35,6 +35,16 @@ export async function mineBlocks(config: QaConfig, count: number): Promise<void>
   await rpcCall(config.localRpcUrl, "hardhat_mine", [`0x${count.toString(16)}`]);
 }
 
+/** Install runtime bytecode at an address (local chain only; anvil/hardhat dev RPC). */
+export async function setCode(config: QaConfig, address: string, code: string): Promise<void> {
+  if (!config.isLocalChain) {
+    throw new Error("setCode is only available on local chains (Hardhat/Anvil)");
+  }
+  await rpcCall(config.localRpcUrl, "anvil_setCode", [address, code]).catch(() =>
+    rpcCall(config.localRpcUrl, "hardhat_setCode", [address, code]),
+  );
+}
+
 export async function getBlockNumber(rpcUrl: string): Promise<bigint> {
   const result = await rpcCall(rpcUrl, "eth_blockNumber");
   return BigInt(result as string);

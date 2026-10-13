@@ -21,23 +21,50 @@ export async function autoAuth(opts: {
   chainId: number;
   account: PrivateKeyAccount;
   dacs: string[];
+  /**
+   * Session wallet when it is not the signer: an ERC-6551 account whose NFT
+   * owner (`account`) signs the SIWE message; the backend verifies it through
+   * the account's ERC-1271 `isValidSignature`.
+   */
+  sessionAddress?: string;
+  /**
+   * Post-processes the owner's signature, e.g. ERC-6492 wrapping so a
+   * counterfactual (not yet deployed) account can still be verified on-chain.
+   */
+  wrapSignature?: (signature: Hex) => Hex;
 }): Promise<VerifyResponse> {
   const {apiUrl, chainId, account, dacs} = opts;
+  const sessionWallet = opts.sessionAddress ?? account.address;
 
   // 1. Request nonce
-  const nonceRes = await requestNonce(apiUrl, account.address, chainId, dacs);
+  const nonceRes = await requestNonce(apiUrl, sessionWallet, chainId, dacs);
 
   // 2. Sign the SIWE message
-  const signature = await account.signMessage({message: nonceRes.message}) as Hex;
+  const rawSignature = await account.signMessage({message: nonceRes.message}) as Hex;
+  const signature = opts.wrapSignature ? opts.wrapSignature(rawSignature) : rawSignature;
 
   // 3. Verify with backend
-  const verifyRes = await verifySignature(apiUrl, nonceRes.message, signature);
+  let verifyRes: VerifyResponse;
+  try {
+    verifyRes = await verifySignature(apiUrl, nonceRes.message, signature);
+  } catch (error) {
+    // For a token-bound session the backend checks the owner's signature through the
+    // account's ERC-1271, so a rejected signature almost always means "not the owner".
+    if (opts.sessionAddress && error instanceof Error && /invalid_signature/.test(error.message)) {
+      throw new Error(
+        `Token-bound account ${sessionWallet} rejected the signature of ${account.address}: `
+        + `the signer is not the NFT owner (or the account's derivation parameters are wrong). `
+        + `Check with 'dac tba info'.`,
+      );
+    }
+    throw error;
+  }
 
   // 4. Cache the token
   writeCachedToken({
     token: verifyRes.token,
     expiresAt: verifyRes.expiresAt,
-    wallet: account.address,
+    wallet: sessionWallet,
     chainId,
     kind: verifyRes.session.kind,
   });
@@ -179,25 +206,29 @@ export async function resolveAuthToken(opts: {
   account?: PrivateKeyAccount;
   apiUrl: string;
   dacs: string[];
+  /** Session wallet when acting through an ERC-6551 account (see autoAuth). */
+  sessionAddress?: string;
+  wrapSignature?: (signature: Hex) => Hex;
 }): Promise<string> {
-  const {configToken, configTokenExpires, chainId, account, apiUrl, dacs} = opts;
+  const {configToken, configTokenExpires, chainId, account, apiUrl, dacs, sessionAddress, wrapSignature} = opts;
+  const sessionWallet = (sessionAddress ?? account?.address)?.toLowerCase();
   let staleTokenSeen = false;
 
   // 1. Try config token — only if it matches the current wallet (or no wallet specified)
   if (configToken && configTokenExpires) {
     const expires = new Date(configTokenExpires).getTime();
     if (expires > Date.now()) {
-      if (!account) {
+      if (!sessionWallet) {
         // No wallet to match against (dry-run without private key) — validate before use
         if (await validateToken(apiUrl, configToken)) return configToken;
         staleTokenSeen = true;
       } else {
         const tokenWallet = extractJwtSubject(configToken);
-        if (tokenWallet === account.address.toLowerCase()) {
+        if (tokenWallet === sessionWallet) {
           // Token matches wallet — but check if it's guest and we can promote to member
-          if (isGuestToken(configToken) && dacs.length > 0) {
+          if (account && isGuestToken(configToken) && dacs.length > 0) {
             // Guest token with DAC context available — re-auth as member
-            const result = await autoAuth({apiUrl, chainId, account, dacs});
+            const result = await autoAuth({apiUrl, chainId, account, dacs, sessionAddress, wrapSignature});
             return result.token;
           }
           if (await validateToken(apiUrl, configToken)) return configToken;
@@ -209,12 +240,12 @@ export async function resolveAuthToken(opts: {
   }
 
   // 2. Try cached token for this wallet
-  if (account) {
-    const cached = readCachedToken(chainId, account.address);
+  if (sessionWallet) {
+    const cached = readCachedToken(chainId, sessionWallet);
     if (cached) {
       // Promote guest → member if DAC context is available
-      if (cached.kind === "guest" && dacs.length > 0) {
-        const result = await autoAuth({apiUrl, chainId, account, dacs});
+      if (account && cached.kind === "guest" && dacs.length > 0) {
+        const result = await autoAuth({apiUrl, chainId, account, dacs, sessionAddress, wrapSignature});
         return result.token;
       }
       if (await validateToken(apiUrl, cached.token)) return cached.token;
@@ -224,7 +255,7 @@ export async function resolveAuthToken(opts: {
 
   // 3. Auto-auth if we have a private key
   if (account) {
-    const result = await autoAuth({apiUrl, chainId, account, dacs});
+    const result = await autoAuth({apiUrl, chainId, account, dacs, sessionAddress, wrapSignature});
     return result.token;
   }
 

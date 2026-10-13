@@ -85,6 +85,25 @@ export class OptionResolver {
     return undefined;
   }
 
+  /** A resolver that ignores the given option keys everywhere (CLI, config, env). */
+  public without(ignored: string[]): OptionResolver {
+    const child = new OptionResolver({
+      cliOptions: this.cliOptions,
+      providedConfig: this.providedConfig,
+      defaultConfig: this.defaultConfig,
+    });
+    const blocked = new Set(ignored);
+    const base = child.resolveString.bind(child);
+    child.resolveString = (key, fallback) => {
+      const keys = Array.isArray(key) ? key : [key];
+      if (keys.some((entry) => blocked.has(entry))) {
+        return fallback;
+      }
+      return base(key, fallback);
+    };
+    return child;
+  }
+
   public resolveString(key: string | string[], fallback?: string): string | undefined {
     const keys = Array.isArray(key) ? key : [key];
 

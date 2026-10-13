@@ -11,8 +11,9 @@ import {printJson} from "../runtime/io.js";
 import {getMe, logout as apiLogout} from "./api.js";
 import {autoAuth, requestChallenge, verifyChallenge, readExistingToken} from "./flows.js";
 import {removeCachedToken} from "./cache.js";
+import {resolveTbaSpec, tbaAuthOptions} from "../runtime/tba.js";
 
-const AUTH_OPTIONS: OptionKey[] = ["config", "chain-id", "api-url", "private-key", "pretty-print"];
+const AUTH_OPTIONS: OptionKey[] = ["config", "chain-id", "api-url", "private-key", "pretty-print", "tba", "nft", "tba-implementation", "tba-salt", "tba-registry"];
 
 function collectDacs(opts: Record<string, unknown>): string[] {
   const raw = opts.dac ?? opts.dacAddress ?? opts.cellAddress;
@@ -51,7 +52,11 @@ export function registerAuthCommands(
       dacs.push(configDac);
     }
 
-    const result = await autoAuth({apiUrl, chainId, account, dacs});
+    // Acting through an ERC-6551 account: the session wallet is the account,
+    // the NFT owner signs (backend verifies via the account's ERC-1271).
+    const tbaAuth = tbaAuthOptions(resolveTbaSpec(resolver, chainId), chainId);
+    const sessionAddress = tbaAuth.sessionAddress;
+    const result = await autoAuth({apiUrl, chainId, account, dacs, ...tbaAuth});
 
     // Write token back to config
     const configPath = resolver.resolveString("config") ?? "./config.env";
@@ -61,6 +66,7 @@ export function registerAuthCommands(
     printJson({
       ok: true,
       wallet: result.session.wallet,
+      signer: sessionAddress ? account.address : undefined,
       kind: result.session.kind,
       expiresAt: result.expiresAt,
       memberships: result.session.memberships,

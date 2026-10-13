@@ -1,7 +1,9 @@
 import {
   createPublicClient,
   createWalletClient,
+  decodeAbiParameters,
   decodeEventLog,
+  encodeFunctionData,
   http,
   type Abi,
   type Address,
@@ -24,6 +26,8 @@ import {
   dealManagerAbi,
   erc20Abi,
   erc20VotesAbi,
+  erc6551AccountAbi,
+  erc6551RegistryAbi,
   governanceOracleAbi,
   hybridDacManagementProposalAbi,
   moduleFactoryAbi,
@@ -32,6 +36,14 @@ import {
   wrappedMainTokenAbi,
 } from "./abi";
 import {decodeDealParams, encodeExistingTokenConfig} from "./encoding";
+import {
+  ERC6551_REGISTRY_ADDRESS,
+  ERC6551_VALID_SIGNER_MAGIC,
+  ERC6551_ZERO_SALT,
+  encodeErc6551Execute,
+  type Erc6551AccountInfo,
+  type TxExecutor,
+} from "./erc6551";
 import {resolveSalt} from "./salt";
 import type {
   CapitalCall,
@@ -51,6 +63,13 @@ export interface DacCoreOptions {
   account?: PrivateKeyAccount;
   /** Extra fetch options passed to viem's http transport (e.g. auth headers). */
   fetchOptions?: {headers?: Record<string, string>};
+  /**
+   * How writes are sent. Default: the account signs and sends directly. With an
+   * ERC-6551 executor every write becomes `account.execute(to, 0, data, CALL)`,
+   * signed by the NFT owner (`account`), so the token-bound account is the
+   * protocol-level actor (staker, voter, proposer, token holder).
+   */
+  executor?: TxExecutor;
 }
 
 export interface DeployDacResult {
@@ -77,6 +96,9 @@ export interface DeployExistingTokenDacResult {
 export interface DacCoreClient {
   walletClient?: WalletClient;
   protocol: ProtocolManifest;
+  /** The address the protocol sees as msg.sender: the ERC-6551 account when one is configured, else the signer. */
+  actor?: Address;
+  executor: TxExecutor;
   deployDac(args: {config: DACConfig; salt?: Hex; referralUid?: string; deferBirthRole?: Address}): Promise<DeployDacResult>;
   deployExistingTokenDac(args: {config: ExistingTokenDacConfig; salt?: Hex; referralUid?: string}): Promise<DeployExistingTokenDacResult>;
   deployGovernanceOracle(args: {admin: Address; initialPublisher: Address}): Promise<{txHash: Hex; oracleAddress?: Address}>;
@@ -141,6 +163,14 @@ export interface DacCoreClient {
    * hybrid proposals revert `NotResolved` before a voting phase is active.
    */
   getProposalResolution(args: {proposalAddress: Address}): Promise<{resolved: boolean; outcome?: boolean}>;
+  /** Registry-derived address of the account for an NFT (same math as `createAccount`). */
+  computeErc6551Account(args: {implementation: Address; salt?: Hex; chainId?: bigint; tokenContract: Address; tokenId: bigint; registry?: Address}): Promise<Address>;
+  /** On-chain facts about a token-bound account; `deployed: false` when there is no code yet. */
+  getErc6551AccountInfo(args: {account: Address}): Promise<Erc6551AccountInfo>;
+  /** Whether `signer` may act for the account (`isValidSigner` magic). */
+  isErc6551ValidSigner(args: {account: Address; signer: Address}): Promise<boolean>;
+  /** Permissionless `registry.createAccount`, sent by the signer directly (never through an executor). */
+  createErc6551Account(args: {implementation: Address; salt?: Hex; chainId?: bigint; tokenContract: Address; tokenId: bigint; registry?: Address}): Promise<{txHash: Hex; account: Address}>;
 }
 
 export function accountFromPrivateKey(privateKey: Hex): PrivateKeyAccount {
@@ -181,6 +211,11 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
   //      ERC20Votes.delegate() were observed OOG'ing on Base Sepolia with a
   //      ~22k estimate × 1.5 = ~33k limit, because the hook callback chain
   //      needed more than the 63/64 attrition left it.
+  //   3. ERC-6551 — with an executor configured the call is re-targeted to
+  //      `account.execute(to, 0, data, CALL)`; the inner events still carry
+  //      their emitting contract's address, so receipt decoding is unchanged.
+  const executor: TxExecutor = options.executor ?? {kind: "eoa"};
+
   async function submitWrite<TAbi extends Abi, TFunctionName extends ContractFunctionName<TAbi, "nonpayable" | "payable">>(
     params: {
       address: Address;
@@ -188,17 +223,29 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       functionName: TFunctionName;
       args?: readonly unknown[];
     },
+    opts: {direct?: boolean} = {},
   ): Promise<TransactionReceipt> {
     if (!walletClient || !walletClient.account) {
       throw new Error("Wallet client with account is required");
     }
     const account = walletClient.account;
 
+    const target = executor.kind === "erc6551" && !opts.direct
+      ? {
+          address: executor.account,
+          abi: erc6551AccountAbi,
+          functionName: "execute" as const,
+          args: [
+            params.address,
+            0n,
+            encodeFunctionData({abi: params.abi, functionName: params.functionName, args: params.args ?? []} as never),
+            0,
+          ] as const,
+        }
+      : {address: params.address, abi: params.abi, functionName: params.functionName, args: params.args ?? []};
+
     const gasEstimate = await publicClient.estimateContractGas({
-      address: params.address,
-      abi: params.abi,
-      functionName: params.functionName,
-      args: params.args ?? [],
+      ...target,
       account,
     } as Parameters<typeof publicClient.estimateContractGas>[0]);
 
@@ -207,10 +254,7 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
     const gas = buffered > floor ? buffered : floor;
 
     const txHash = await walletClient.writeContract({
-      address: params.address,
-      abi: params.abi,
-      functionName: params.functionName,
-      args: params.args ?? [],
+      ...target,
       account,
       gas,
     } as Parameters<typeof walletClient.writeContract>[0]);
@@ -222,6 +266,34 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
       );
     }
     return receipt;
+  }
+
+  // Same routing as submitWrite, for simulated calls whose return value matters.
+  async function simulateWriteResult<TAbi extends Abi, TFunctionName extends ContractFunctionName<TAbi, "nonpayable" | "payable">>(
+    params: {address: Address; abi: TAbi; functionName: TFunctionName; args?: readonly unknown[]},
+    resultTypes: readonly {type: string}[],
+  ): Promise<readonly unknown[]> {
+    if (!walletClient || !walletClient.account) {
+      throw new Error("Wallet client with account is required");
+    }
+    if (executor.kind === "erc6551") {
+      const {result} = await publicClient.simulateContract({
+        address: executor.account,
+        abi: erc6551AccountAbi,
+        functionName: "execute",
+        args: [params.address, 0n, encodeFunctionData({abi: params.abi, functionName: params.functionName, args: params.args ?? []} as never), 0],
+        account: walletClient.account,
+      });
+      return decodeAbiParameters(resultTypes as never, result);
+    }
+    const {result} = await publicClient.simulateContract({
+      address: params.address,
+      abi: params.abi,
+      functionName: params.functionName,
+      args: params.args ?? [],
+      account: walletClient.account,
+    } as Parameters<typeof publicClient.simulateContract>[0]);
+    return [result];
   }
 
   async function readDealAcceptsGovernanceFactory(
@@ -259,6 +331,8 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
   return {
     walletClient,
     protocol: options.protocol,
+    actor: executor.kind === "erc6551" ? executor.account : options.account?.address,
+    executor,
 
     async deployDac({config, salt, referralUid, deferBirthRole}) {
       const resolvedSalt = resolveSalt({salt, referralUid});
@@ -365,13 +439,12 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         throw new Error("Wallet client with account is required for deployGovernanceOracle");
       }
 
-      const {result: oracleAddress} = await publicClient.simulateContract({
+      const [oracleAddress] = await simulateWriteResult({
         address: options.protocol.dacFactory,
         abi: dacFactoryAbi,
         functionName: "deployGovernanceOracle",
         args: [admin, initialPublisher],
-        account: walletClient.account,
-      });
+      }, [{type: "address"}]);
 
       const receipt = await submitWrite({
         address: options.protocol.dacFactory,
@@ -1009,6 +1082,66 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         publicClient.readContract({address: dealAddress, abi: agentDealAbi, functionName: "hostDNA"}),
       ]);
       return {hostDac, hostAgentToken: hostDNA[0], hostMainToken: hostDNA[1]};
+    },
+
+    async computeErc6551Account({implementation, salt, chainId, tokenContract, tokenId, registry}) {
+      return publicClient.readContract({
+        address: registry ?? ERC6551_REGISTRY_ADDRESS,
+        abi: erc6551RegistryAbi,
+        functionName: "account",
+        args: [implementation, salt ?? ERC6551_ZERO_SALT, chainId ?? BigInt(options.chain.id), tokenContract, tokenId],
+      });
+    },
+
+    async getErc6551AccountInfo({account}) {
+      const code = await publicClient.getCode({address: account});
+      if (!code || code === "0x") {
+        return {account, deployed: false};
+      }
+      const [token, owner, state] = await Promise.all([
+        publicClient.readContract({address: account, abi: erc6551AccountAbi, functionName: "token"}),
+        publicClient.readContract({address: account, abi: erc6551AccountAbi, functionName: "owner"}),
+        publicClient.readContract({address: account, abi: erc6551AccountAbi, functionName: "state"}).catch(() => undefined),
+      ]);
+      return {
+        account,
+        deployed: true,
+        token: {chainId: token[0], tokenContract: token[1], tokenId: token[2]},
+        owner,
+        state,
+      };
+    },
+
+    async isErc6551ValidSigner({account, signer}) {
+      try {
+        const magic = await publicClient.readContract({
+          address: account,
+          abi: erc6551AccountAbi,
+          functionName: "isValidSigner",
+          args: [signer, "0x"],
+        });
+        return magic.toLowerCase() === ERC6551_VALID_SIGNER_MAGIC;
+      } catch {
+        return false;
+      }
+    },
+
+    async createErc6551Account({implementation, salt, chainId, tokenContract, tokenId, registry}) {
+      const registryAddress = registry ?? ERC6551_REGISTRY_ADDRESS;
+      const args = [implementation, salt ?? ERC6551_ZERO_SALT, chainId ?? BigInt(options.chain.id), tokenContract, tokenId] as const;
+      const account = await publicClient.readContract({
+        address: registryAddress,
+        abi: erc6551RegistryAbi,
+        functionName: "account",
+        args,
+      });
+      const receipt = await submitWrite({
+        address: registryAddress,
+        abi: erc6551RegistryAbi,
+        functionName: "createAccount",
+        args,
+      }, {direct: true});
+      return {txHash: receipt.transactionHash, account};
     },
 
     async getProposalResolution({proposalAddress}) {

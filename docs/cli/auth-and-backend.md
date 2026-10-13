@@ -243,3 +243,22 @@ const core = createDacCoreClient({
 
 The CLI's `packages/cli/src/auth/` module is a reference implementation if you want to
 embed the SIWE flow in your own tool.
+
+## Token-Bound Account Sessions (ERC-6551)
+
+With `--tba <address>` or `--nft <contract:tokenId>` the session wallet is the
+token-bound account, not the signing key:
+
+1. The CLI requests the nonce for the **account** address.
+2. The NFT owner's key signs the SIWE message. If the account is derived from `--nft`
+   the signature is ERC-6492-wrapped (registry + `createAccount` calldata) so it
+   verifies even before the account is deployed.
+3. The backend verifies through the account's ERC-1271 `isValidSignature` and issues a
+   JWT whose subject is the account. Tokens are cached per account address.
+4. Membership roles are evaluated on the account's balances: a member session needs the
+   account to hold DAC tokens; guest sessions work before that.
+5. Guest `eth_sendRawTransaction` must be `execute(to, value, data, 0)` on the account,
+   signed by a valid signer — exactly what the CLI emits.
+
+A signature from a non-owner is rejected by the backend as `invalid_signature`; the CLI
+reports it as "the signer is not the NFT owner". See [NFT Agents](../guides/nft-agents.md).

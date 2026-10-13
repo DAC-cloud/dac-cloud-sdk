@@ -220,3 +220,28 @@ export const agentDealAbi = parseAbi([
   "function managedEntity() view returns (address)",
   "function hostDNA() view returns (address hostAgentToken, address hostMainToken)",
 ]);
+
+// ERC-6551: NFT-bound accounts. The registry is the same address on every chain;
+// account implementations vary per collection (Loopers on Base use their own).
+export const erc6551RegistryAbi = parseAbi([
+  "event ERC6551AccountCreated(address account, address indexed implementation, bytes32 salt, uint256 chainId, address indexed tokenContract, uint256 indexed tokenId)",
+  "function account(address implementation, bytes32 salt, uint256 chainId, address tokenContract, uint256 tokenId) view returns (address)",
+  "function createAccount(address implementation, bytes32 salt, uint256 chainId, address tokenContract, uint256 tokenId) returns (address)",
+]);
+
+export const erc6551AccountAbi = parseAbi([
+  "function token() view returns (uint256 chainId, address tokenContract, uint256 tokenId)",
+  "function owner() view returns (address)",
+  "function state() view returns (uint256)",
+  "function isValidSigner(address signer, bytes context) view returns (bytes4)",
+  "function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)",
+  "function supportsInterface(bytes4 interfaceId) view returns (bool)",
+  "function execute(address to, uint256 value, bytes data, uint8 operation) payable returns (bytes)",
+]);
+
+export const erc721Abi = parseAbi([
+  "function ownerOf(uint256 tokenId) view returns (address)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function transferFrom(address from, address to, uint256 tokenId)",
+  "function safeTransferFrom(address from, address to, uint256 tokenId)",
+]);

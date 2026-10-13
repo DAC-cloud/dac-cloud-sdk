@@ -1,5 +1,6 @@
 import {encodeFunctionData, type Address, type Hex} from "viem";
 import type {ProtocolManifest} from "@dac-cloud/manifests";
+import {wrapCallForExecutor, type TxExecutor} from "./erc6551";
 import {resolveSalt} from "./salt";
 import {
   agentTokenAbi,
@@ -30,11 +31,17 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
 
 export interface DacTxBuilderOptions {
   chainId: number;
+  /** The signer: the NFT owner when an ERC-6551 executor is set. */
   fromAddress: Address;
   protocol: ProtocolManifest;
+  /** With an ERC-6551 executor every request targets `account.execute(...)`. */
+  executor?: TxExecutor;
 }
 
 export interface DacTransactionBuilder {
+  /** Address the protocol sees as msg.sender (the ERC-6551 account, or `fromAddress`). */
+  actor: Address;
+  executor: TxExecutor;
   deployDac(args: {config: DACConfig; salt?: Hex; referralUid?: string; deferBirthRole?: Address}): TransactionRequest;
   deployExistingTokenDac(args: {config: ExistingTokenDacConfig; salt?: Hex; referralUid?: string}): TransactionRequest;
   deployGovernanceOracle(args: {admin: Address; initialPublisher: Address}): TransactionRequest;
@@ -82,18 +89,25 @@ export interface DacTransactionBuilder {
 
 export function createDacTransactionBuilder(options: DacTxBuilderOptions): DacTransactionBuilder {
   const {chainId, fromAddress, protocol} = options;
+  const executor: TxExecutor = options.executor ?? {kind: "eoa"};
 
   function tx(to: Address, abi: Parameters<typeof encodeFunctionData>[0]["abi"], functionName: string, args?: readonly unknown[]): TransactionRequest {
-    return {
+    const call = wrapCallForExecutor(executor, {
       to,
-      from: fromAddress,
       data: encodeFunctionData({abi, functionName, args: args as never}),
-      value: 0n,
+    });
+    return {
+      to: call.to,
+      from: fromAddress,
+      data: call.data,
+      value: call.value ?? 0n,
       chainId,
     };
   }
 
   return {
+    actor: executor.kind === "erc6551" ? executor.account : fromAddress,
+    executor,
     deployDac({config, salt, referralUid, deferBirthRole}) {
       const resolvedSalt = resolveSalt({salt, referralUid});
       return tx(protocol.dacFactory, dacFactoryAbi, "deployDAC", [config, resolvedSalt, deferBirthRole ?? ZERO_ADDRESS]);

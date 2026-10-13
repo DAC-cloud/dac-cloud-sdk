@@ -81,6 +81,13 @@ dac
     └── view [resource] [id]        Query deal state (indexer; `terms` reads on-chain)
 ```
 
+```
+dac tba
+    ├── address                     Derive an NFT's token-bound account (off-chain)
+    ├── info                        Bound token, owner, deployment, signer validity
+    └── create                      Deploy the account via the ERC-6551 registry
+```
+
 `deal propose` covers kernel types, core treasury / child-DAC types, and the
 `core:agent-deal` types (`host-stake`, `host-approve-stake`, `host-create-deal`,
 `host-create-proposal`, `host-vote`, `host-claim-reward`, `host-unstake`, `host-invite`,
@@ -99,6 +106,12 @@ Set at the root command, inherited by all subcommands:
 | `--dry-run` | off | Output unsigned transaction data, don't broadcast |
 | `--from <address>` | — | Sender address (required with `--dry-run` if no private key) |
 | `--pretty-print` | off | Indent JSON output |
+| `--tba <address>` | — | Act through this ERC-6551 token-bound account (the NFT owner signs) |
+| `--nft <contract:tokenId>` | — | Act through the NFT's token-bound account, derived with `--tba-implementation` / `--tba-salt` / `--tba-registry` |
+
+With `--tba` / `--nft` every write is sent as `account.execute(...)`, the backend session
+is the account, and all "self" defaults (delegatee, recipients, proposer) are the account.
+See [NFT Agents](../guides/nft-agents.md).
 
 There is **no** `--rpc-url` or `--indexer-url` — both are derived from `--api-url` and
 `--chain-id` (`${apiUrl}/rpc/${chainId}` and `${apiUrl}/graphql`). See

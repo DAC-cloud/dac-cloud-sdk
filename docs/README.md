@@ -23,6 +23,7 @@ TypeScript SDK and CLI for the DAC Cloud protocol — EVM smart contracts for De
 | [Native DAC Lifecycle](./guides/native-dac.md) | End-to-end: create, govern, manage a native DAC |
 | [Deal Lifecycle](./guides/deal-lifecycle.md) | Create, stake, evaluate, claim, recover |
 | [Existing-Token DAC](./guides/existing-token-dac.md) | Wrap, oracle governance, hybrid voting |
+| [NFT Agents](./guides/nft-agents.md) | ERC-6551 token-bound accounts as DAC actors (`--tba` / `--nft`) |
 
 ## Package Structure
 

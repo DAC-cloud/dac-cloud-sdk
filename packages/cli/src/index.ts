@@ -4,6 +4,7 @@ import {Command} from "commander";
 import {registerDacCommands} from "./actions/dac";
 import {registerDealCommands} from "./actions/deal";
 import {registerAuthCommands} from "./auth/commands";
+import {registerTbaCommands} from "./actions/tba";
 import {applyOptions, GLOBAL_OPTION_KEYS} from "./cli/options";
 import {loadOptionResolver} from "./runtime/config";
 
@@ -51,6 +52,7 @@ All command outputs are JSON. Bigint values are serialized as decimal strings.
   registerAuthCommands(program, resolverFactory);
   registerDacCommands(program, resolverFactory);
   registerDealCommands(program, resolverFactory);
+  registerTbaCommands(program, resolverFactory);
 
   return program;
 }

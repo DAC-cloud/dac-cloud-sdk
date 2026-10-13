@@ -43,6 +43,7 @@ import type {OptionResolver} from "../runtime/config";
 import {makeCoreContext, makeDryRunContext, makeIndexer, resolveApiUrl} from "../runtime/chain";
 import {printJson, readJsonFile} from "../runtime/io";
 import {discover} from "../auth/api.js";
+import {resolveTbaSpec, tbaAuthOptions} from "../runtime/tba.js";
 import {resolveAuthToken} from "../auth/flows.js";
 
 function isDryRun(resolver: OptionResolver): boolean {
@@ -136,7 +137,7 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
     const ctx = await makeDryRunContext(resolver);
     const config: DACConfig = {
       symbol: symbol.slice(0, 8), name, description, mainTokenMaxSupply, defaultQuorum,
-      founder: ctx.fromAddress, founderAllocation, treasuryToken, founderCommitment, dividendsEnabled,
+      founder: ctx.actor, founderAllocation, treasuryToken, founderCommitment, dividendsEnabled,
     };
     const salt = resolveSalt({referralUid});
     const transaction = ctx.txBuilder.deployDac({config, salt, deferBirthRole});
@@ -147,10 +148,10 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
     return;
   }
 
-  const {account, core} = await makeCoreContext(resolver);
+  const {account, core, actor} = await makeCoreContext(resolver);
   const config: DACConfig = {
     symbol: symbol.slice(0, 8), name, description, mainTokenMaxSupply, defaultQuorum,
-    founder: account.address, founderAllocation, treasuryToken, founderCommitment, dividendsEnabled,
+    founder: actor, founderAllocation, treasuryToken, founderCommitment, dividendsEnabled,
   };
 
   const result = await core.deployDac({config, referralUid, deferBirthRole});
@@ -158,12 +159,12 @@ async function cmdCreate(resolver: OptionResolver): Promise<void> {
   const autoDelegate = resolver.resolveBoolean("auto-delegate", false);
   let delegateTx: Hex | undefined;
   if (autoDelegate && result.mainToken) {
-    delegateTx = await core.delegateVotes({token: result.mainToken, delegatee: account.address});
+    delegateTx = await core.delegateVotes({token: result.mainToken, delegatee: actor});
   }
 
   printJson({
     action: "dac.create",
-    creator: account.address,
+    creator: actor,
     txHash: result.txHash,
     salt: result.salt,
     referralUid,
@@ -227,7 +228,7 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
 
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
-    const config = buildConfig(ctx.fromAddress);
+    const config = buildConfig(ctx.actor);
     const transactions = [];
     if (resolver.resolveBoolean("auto-approve", false) && treasurySeedAmount > 0n) {
       transactions.push(ctx.txBuilder.approveErc20({token: underlyingToken, spender: ctx.protocol.dacFactory, amount: treasurySeedAmount}));
@@ -241,13 +242,13 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
     return;
   }
 
-  const {account, core, protocol} = await makeCoreContext(resolver);
-  const config = buildConfig(account.address);
+  const {account, core, protocol, actor} = await makeCoreContext(resolver);
+  const config = buildConfig(actor);
 
   const autoApprove = resolver.resolveBoolean("auto-approve", true);
   let approveTx: Hex | undefined;
   if (autoApprove && treasurySeedAmount > 0n) {
-    const allowance = await core.getErc20Allowance({token: underlyingToken, owner: account.address, spender: protocol.dacFactory});
+    const allowance = await core.getErc20Allowance({token: underlyingToken, owner: actor, spender: protocol.dacFactory});
     if (allowance < treasurySeedAmount) {
       approveTx = await core.approveErc20({token: underlyingToken, spender: protocol.dacFactory, amount: treasurySeedAmount});
     }
@@ -258,12 +259,12 @@ async function cmdCreateExistingToken(resolver: OptionResolver): Promise<void> {
   const autoDelegate = resolver.resolveBoolean("auto-delegate", false);
   let delegateTx: Hex | undefined;
   if (autoDelegate && result.mainToken) {
-    delegateTx = await core.delegateVotes({token: result.mainToken, delegatee: account.address});
+    delegateTx = await core.delegateVotes({token: result.mainToken, delegatee: actor});
   }
 
   printJson({
     action: "dac.create.existing-token",
-    creator: account.address,
+    creator: actor,
     approveTx,
     txHash: result.txHash,
     salt: result.salt,
@@ -300,14 +301,14 @@ async function cmdDelegate(resolver: OptionResolver): Promise<void> {
 
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
-    const delegatee = asAddress(resolver.resolveString("delegatee", ctx.fromAddress) ?? ctx.fromAddress, "Delegatee");
+    const delegatee = asAddress(resolver.resolveString("delegatee", ctx.actor) ?? ctx.actor, "Delegatee");
     const transaction = ctx.txBuilder.delegateVotes({token: mainToken, delegatee});
     printJson({action: "dac.delegate", dryRun: true, dac, mainToken, delegatee, transaction});
     return;
   }
 
-  const {account, core} = await makeCoreContext(resolver);
-  const delegatee = asAddress(resolver.resolveString("delegatee", account.address) ?? account.address, "Delegatee");
+  const {account, core, actor} = await makeCoreContext(resolver);
+  const delegatee = asAddress(resolver.resolveString("delegatee", actor) ?? actor, "Delegatee");
   const txHash = await core.delegateVotes({token: mainToken, delegatee});
 
   printJson({action: "dac.delegate", dac, mainToken, delegatee, txHash});
@@ -331,13 +332,13 @@ async function cmdWrap(resolver: OptionResolver): Promise<void> {
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
     const recipientText = resolver.resolveString("recipient");
-    const recipient = recipientText ? asAddress(recipientText, "Wrap recipient") : ctx.fromAddress;
+    const recipient = recipientText ? asAddress(recipientText, "Wrap recipient") : ctx.actor;
     const transactions = [];
     if (resolver.resolveBoolean("auto-approve", false) && amount > 0n) {
       transactions.push(ctx.txBuilder.approveErc20({token: underlyingToken, spender: wrappedToken, amount}));
     }
     transactions.push(
-      recipient.toLowerCase() === ctx.fromAddress.toLowerCase()
+      recipient.toLowerCase() === ctx.actor.toLowerCase()
         ? ctx.txBuilder.wrapMainToken({wrappedToken, amount})
         : ctx.txBuilder.wrapMainTokenTo({wrappedToken, recipient, amount}),
     );
@@ -345,24 +346,24 @@ async function cmdWrap(resolver: OptionResolver): Promise<void> {
     return;
   }
 
-  const {account, core} = await makeCoreContext(resolver);
+  const {account, core, actor} = await makeCoreContext(resolver);
   const recipientText = resolver.resolveString("recipient");
-  const recipient = recipientText ? asAddress(recipientText, "Wrap recipient") : account.address;
+  const recipient = recipientText ? asAddress(recipientText, "Wrap recipient") : actor;
 
   const autoApprove = resolver.resolveBoolean("auto-approve", true);
   let approveTx: Hex | undefined;
   if (autoApprove && amount > 0n) {
-    const allowance = await core.getErc20Allowance({token: underlyingToken, owner: account.address, spender: wrappedToken});
+    const allowance = await core.getErc20Allowance({token: underlyingToken, owner: actor, spender: wrappedToken});
     if (allowance < amount) {
       approveTx = await core.approveErc20({token: underlyingToken, spender: wrappedToken, amount});
     }
   }
 
-  const txHash = recipient.toLowerCase() === account.address.toLowerCase()
+  const txHash = recipient.toLowerCase() === actor.toLowerCase()
     ? await core.wrapMainToken({wrappedToken, amount})
     : await core.wrapMainTokenTo({wrappedToken, recipient, amount});
 
-  printJson({action: "dac.wrap", caller: account.address, dac, wrappedToken, underlyingToken, recipient, amount, approveTx, txHash});
+  printJson({action: "dac.wrap", caller: actor, dac, wrappedToken, underlyingToken, recipient, amount, approveTx, txHash});
 }
 
 async function cmdUnwrap(resolver: OptionResolver): Promise<void> {
@@ -383,23 +384,23 @@ async function cmdUnwrap(resolver: OptionResolver): Promise<void> {
   if (isDryRun(resolver)) {
     const ctx = await makeDryRunContext(resolver);
     const recipientText = resolver.resolveString("recipient");
-    const recipient = recipientText ? asAddress(recipientText, "Unwrap recipient") : ctx.fromAddress;
-    const transaction = recipient.toLowerCase() === ctx.fromAddress.toLowerCase()
+    const recipient = recipientText ? asAddress(recipientText, "Unwrap recipient") : ctx.actor;
+    const transaction = recipient.toLowerCase() === ctx.actor.toLowerCase()
       ? ctx.txBuilder.unwrapMainToken({wrappedToken, amount})
       : ctx.txBuilder.unwrapMainTokenTo({wrappedToken, recipient, amount});
     printJson({action: "dac.unwrap", dryRun: true, dac, wrappedToken, underlyingToken, recipient, amount, transaction});
     return;
   }
 
-  const {account, core} = await makeCoreContext(resolver);
+  const {account, core, actor} = await makeCoreContext(resolver);
   const recipientText = resolver.resolveString("recipient");
-  const recipient = recipientText ? asAddress(recipientText, "Unwrap recipient") : account.address;
+  const recipient = recipientText ? asAddress(recipientText, "Unwrap recipient") : actor;
 
-  const txHash = recipient.toLowerCase() === account.address.toLowerCase()
+  const txHash = recipient.toLowerCase() === actor.toLowerCase()
     ? await core.unwrapMainToken({wrappedToken, amount})
     : await core.unwrapMainTokenTo({wrappedToken, recipient, amount});
 
-  printJson({action: "dac.unwrap", caller: account.address, dac, wrappedToken, underlyingToken, recipient, amount, txHash});
+  printJson({action: "dac.unwrap", caller: actor, dac, wrappedToken, underlyingToken, recipient, amount, txHash});
 }
 
 async function cmdPropose(resolver: OptionResolver, proposalTypeRaw: string, args: string[]): Promise<void> {
@@ -1033,7 +1034,7 @@ async function cmdOracleStatus(resolver: OptionResolver): Promise<void> {
 }
 
 async function cmdJoin(resolver: OptionResolver): Promise<void> {
-  const {account, core} = await makeCoreContext(resolver);
+  const {account, core, actor} = await makeCoreContext(resolver);
   const dac = resolveDacAddressOrThrow(resolver);
 
   let treasuryTokenText = resolver.resolveString("treasury-token");
@@ -1047,7 +1048,7 @@ async function cmdJoin(resolver: OptionResolver): Promise<void> {
     const dacId = await resolveDacIdOrThrow(resolver);
     const calls = await client.capitalCalls.listByDac(dacId, {limit: 200, offset: 0});
 
-    const caller = account.address.toLowerCase();
+    const caller = actor.toLowerCase();
     const pending = calls.filter((entry) => {
       if (!entry.recipient || entry.recipient.toLowerCase() !== caller) {
         return false;
@@ -1096,7 +1097,7 @@ async function cmdJoin(resolver: OptionResolver): Promise<void> {
   const autoApprove = resolver.resolveBoolean("auto-approve", false);
   let approveTx: Hex | undefined;
   if (autoApprove && cashAmount > 0n) {
-    const allowance = await core.getErc20Allowance({token: treasuryToken, owner: account.address, spender: dac});
+    const allowance = await core.getErc20Allowance({token: treasuryToken, owner: actor, spender: dac});
     if (allowance < cashAmount) {
       approveTx = await core.approveErc20({token: treasuryToken, spender: dac, amount: cashAmount});
     }
@@ -1114,7 +1115,7 @@ async function cmdJoin(resolver: OptionResolver): Promise<void> {
 
   printJson({
     action: "dac.join",
-    fulfiller: account.address,
+    fulfiller: actor,
     dac,
     approveTx,
     txHash,
@@ -1133,9 +1134,9 @@ async function cmdRecoverTreasury(resolver: OptionResolver): Promise<void> {
     return;
   }
 
-  const {account, core} = await makeCoreContext(resolver);
+  const {account, core, actor} = await makeCoreContext(resolver);
   const txHash = await core.recoverTreasury({dacCell: dac, token});
-  printJson({action: "dac.recover-treasury", caller: account.address, dac, token, txHash});
+  printJson({action: "dac.recover-treasury", caller: actor, dac, token, txHash});
 }
 
 async function cmdRecoverErc20(resolver: OptionResolver): Promise<void> {
@@ -1149,9 +1150,9 @@ async function cmdRecoverErc20(resolver: OptionResolver): Promise<void> {
     return;
   }
 
-  const {account, core} = await makeCoreContext(resolver);
+  const {account, core, actor} = await makeCoreContext(resolver);
   const txHash = await core.recoverErc20({dacCell: dac, token});
-  printJson({action: "dac.recover-erc20", caller: account.address, dac, token, txHash});
+  printJson({action: "dac.recover-erc20", caller: actor, dac, token, txHash});
 }
 
 async function cmdDepositTreasury(resolver: OptionResolver): Promise<void> {
@@ -1172,10 +1173,10 @@ async function cmdDepositTreasury(resolver: OptionResolver): Promise<void> {
     return;
   }
 
-  const {account, core} = await makeCoreContext(resolver);
+  const {account, core, actor} = await makeCoreContext(resolver);
   const transferTx = await core.transferErc20({token, to: dac, amount});
   const recoverTx = await core.recoverErc20({dacCell: dac, token});
-  printJson({action: "dac.deposit-treasury", caller: account.address, dac, token, amount, transferTx, recoverTx});
+  printJson({action: "dac.deposit-treasury", caller: actor, dac, token, amount, transferTx, recoverTx});
 }
 
 async function cmdLegalMessage(resolver: OptionResolver, messageFile: string): Promise<void> {
@@ -1191,13 +1192,13 @@ async function cmdLegalMessage(resolver: OptionResolver, messageFile: string): P
     return;
   }
 
-  const {core, account} = await makeCoreContext(resolver);
+  const {core, account, actor} = await makeCoreContext(resolver);
   const txHash = await core.sendDacLegalWrapperMessage({dacCell: dac, kind, message});
-  printJson({action: "dac.legal-message", caller: account.address, dac, kind, message, txHash});
+  printJson({action: "dac.legal-message", caller: actor, dac, kind, message, txHash});
 }
 
 async function cmdClaimDividend(resolver: OptionResolver, proofFile: string): Promise<void> {
-  const {core, account} = await makeCoreContext(resolver);
+  const {core, account, actor} = await makeCoreContext(resolver);
   const dac = resolveDacAddressOrThrow(resolver);
   const payload = await readJsonFile<Record<string, unknown>>(resolvePath(proofFile));
 
@@ -1223,7 +1224,7 @@ async function cmdClaimDividend(resolver: OptionResolver, proofFile: string): Pr
 
   printJson({
     action: "dac.claim-dividend",
-    caller: account.address,
+    caller: actor,
     dac,
     proposalId,
     index,
@@ -1404,6 +1405,7 @@ async function cmdDiscover(resolver: OptionResolver): Promise<void> {
     account,
     apiUrl,
     dacs: [],
+    ...tbaAuthOptions(resolveTbaSpec(resolver, chainId ?? 84532), chainId ?? 84532),
   });
 
   const result = await discover(apiUrl, authToken, chainId ?? undefined);

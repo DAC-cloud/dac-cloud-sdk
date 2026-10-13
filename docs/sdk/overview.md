@@ -96,7 +96,7 @@ automation. See [CLI Overview](../cli/overview.md).
 
 ### @dac-cloud/qa (private)
 
-E2E QA harness: 33 scenarios covering DAC + deal lifecycles, accounting invariants, and
+E2E QA harness: 34 scenarios covering DAC + deal lifecycles, accounting invariants, and
 an optional Claude-based agent reviewer. Not published. See
 [QA package README](../../packages/qa/README.md).
 

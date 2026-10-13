@@ -19,3 +19,11 @@ export {
   type DealCycleResult,
   type NativeDacContext,
 } from "./agent-deal.js";
+export {
+  deployMockNft,
+  ensureErc6551Infrastructure,
+  mintNft,
+  setupTbaFixture,
+  transferNft,
+  type TbaFixture,
+} from "./tba.js";

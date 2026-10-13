@@ -4,12 +4,14 @@ import {
   createDacTransactionBuilder,
   type DacCoreClient,
   type DacTransactionBuilder,
+  type TxExecutor,
 } from "@dac-cloud/core";
 import {createIndexerClient} from "@dac-cloud/indexer";
 import {fetchManifest, type ProtocolManifest} from "@dac-cloud/manifests";
 import {defineChain, type Address, type Hex, type PrivateKeyAccount} from "viem";
 import {resolveAuthToken} from "../auth/flows.js";
 import type {OptionResolver} from "./config";
+import {assertTbaControl, executorFromSpec, resolveTbaSpec, tbaAuthOptions, type TbaSpec} from "./tba";
 
 const DEFAULT_API_URL = "https://api.dac.cloud";
 const DEFAULT_CHAIN_ID = 84532;
@@ -17,7 +19,12 @@ const DEFAULT_CHAIN_ID = 84532;
 export interface CoreContext {
   chainId: number;
   apiUrl: string;
+  /** The signer. With a token-bound account this is the NFT owner. */
   account: PrivateKeyAccount;
+  /** The protocol-level actor: the ERC-6551 account when one is configured, else the signer. */
+  actor: Address;
+  executor: TxExecutor;
+  tba?: TbaSpec;
   protocol: ProtocolManifest;
   core: DacCoreClient;
 }
@@ -60,6 +67,8 @@ export async function makeCoreContext(resolver: OptionResolver): Promise<CoreCon
     "Missing --private-key. Pass --private-key <hex>, set DAC_PRIVATE_KEY in your config, or export DAC_PRIVATE_KEY in the environment.",
   ) as Hex;
   const account = accountFromPrivateKey(privateKey);
+  const tba = resolveTbaSpec(resolver, chainId);
+  const executor = executorFromSpec(tba);
 
   const authToken = await resolveAuthToken({
     configToken: resolver.resolveString("auth-token"),
@@ -68,6 +77,7 @@ export async function makeCoreContext(resolver: OptionResolver): Promise<CoreCon
     account,
     apiUrl,
     dacs: collectDacsFromResolver(resolver),
+    ...tbaAuthOptions(tba, chainId),
   });
 
   const chain = defineChain({
@@ -87,12 +97,20 @@ export async function makeCoreContext(resolver: OptionResolver): Promise<CoreCon
     account,
     protocol,
     fetchOptions: {headers: authHeaders(authToken)},
+    executor,
   });
+
+  if (tba) {
+    await assertTbaControl(core, tba, account.address);
+  }
 
   return {
     chainId,
     apiUrl,
     account,
+    actor: tba?.account ?? account.address,
+    executor,
+    tba,
     protocol,
     core,
   };
@@ -120,6 +138,7 @@ export async function makeReadOnlyCoreContext(resolver: OptionResolver): Promise
     account,
     apiUrl,
     dacs: collectDacsFromResolver(resolver),
+    ...tbaAuthOptions(resolveTbaSpec(resolver, chainId), chainId),
   });
 
   const chain = defineChain({
@@ -146,7 +165,12 @@ export async function makeReadOnlyCoreContext(resolver: OptionResolver): Promise
 export interface DryRunContext {
   chainId: number;
   apiUrl: string;
+  /** The signer of the emitted transactions (NFT owner for a token-bound account). */
   fromAddress: Address;
+  /** The protocol-level actor: the ERC-6551 account when one is configured, else `fromAddress`. */
+  actor: Address;
+  executor: TxExecutor;
+  tba?: TbaSpec;
   protocol: ProtocolManifest;
   txBuilder: DacTransactionBuilder;
 }
@@ -172,20 +196,29 @@ export async function makeDryRunContext(resolver: OptionResolver): Promise<DryRu
     throw new Error("--dry-run requires --from <address> or --private-key to derive sender address");
   }
 
-  // Dry-run requires a valid token but can work without a private key
+  const tba = resolveTbaSpec(resolver, chainId);
+  const executor = executorFromSpec(tba);
+
+  // Dry-run requires a valid token but can work without a private key. A
+  // configured key that is not the --from sender must not sign a token-bound
+  // session either: only the NFT owner's signature is accepted by the account.
+  const authAccount = tba && account && account.address.toLowerCase() !== fromAddress.toLowerCase()
+    ? undefined
+    : account;
   await resolveAuthToken({
     configToken: resolver.resolveString("auth-token"),
     configTokenExpires: resolver.resolveString("auth-expires"),
     chainId,
-    account,
+    account: authAccount,
     apiUrl,
     dacs: collectDacsFromResolver(resolver),
+    ...tbaAuthOptions(tba, chainId),
   });
 
   const protocol = await fetchManifest(chainId, apiUrl);
-  const txBuilder = createDacTransactionBuilder({chainId, fromAddress, protocol});
+  const txBuilder = createDacTransactionBuilder({chainId, fromAddress, protocol, executor});
 
-  return {chainId, apiUrl, fromAddress, protocol, txBuilder};
+  return {chainId, apiUrl, fromAddress, actor: txBuilder.actor, executor, tba, protocol, txBuilder};
 }
 
 export async function makeIndexer(resolver: OptionResolver) {
@@ -203,6 +236,7 @@ export async function makeIndexer(resolver: OptionResolver) {
     account,
     apiUrl,
     dacs: collectDacsFromResolver(resolver),
+    ...tbaAuthOptions(resolveTbaSpec(resolver, chainId), chainId),
   });
 
   return createIndexerClient({

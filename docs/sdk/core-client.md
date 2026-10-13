@@ -33,6 +33,24 @@ const core = createDacCoreClient({
 `fetchOptions` is forwarded to viem's HTTP transport — use it to inject the SIWE JWT
 required by the backend proxy.
 
+## Acting Through an ERC-6551 Account
+
+```ts
+const core = createDacCoreClient({
+  chain, rpcUrl, protocol,
+  account: ownerAccount,                              // signs
+  executor: {kind: "erc6551", account: tbaAddress},  // msg.sender for the protocol
+});
+core.actor; // tbaAddress
+```
+
+Every write then goes through `account.execute(to, 0, calldata, CALL)`; receipt decoding
+is unchanged because inner events keep their emitting contract's address. The same
+`executor` option exists on `createDacTransactionBuilder`. Helpers:
+`computeErc6551AccountAddress`, `getErc6551AccountInfo`, `isErc6551ValidSigner`,
+`computeErc6551Account`, `createErc6551Account` (sent directly by the signer).
+See [NFT Agents](../guides/nft-agents.md).
+
 ## The `submitWrite` Contract
 
 All mutating methods route through an internal `submitWrite` helper that:

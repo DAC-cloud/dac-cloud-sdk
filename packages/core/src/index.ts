@@ -2,6 +2,7 @@ export * from "./abi";
 export * from "./client";
 export * from "./encoding";
 export * from "./errors";
+export * from "./erc6551";
 export * from "./proposals";
 export * from "./scale";
 export * from "./selectors";

@@ -71,6 +71,11 @@ const OPTION_SPECS = {
   "dry-run": {flags: "--dry-run", description: "Output unsigned transaction data instead of broadcasting"},
   "from": {flags: "--from <address>", description: "Sender address for dry-run mode (alternative to --private-key)"},
   "pretty-print": {flags: "--pretty-print", description: "Pretty-print JSON output (human-friendly, indented)"},
+  tba: {flags: "--tba <address>", description: "Act as this ERC-6551 token-bound account (NFT owner signs; the account is the protocol actor)"},
+  nft: {flags: "--nft <contract:tokenId>", description: "Act as the ERC-6551 account of this NFT (address derived from --tba-implementation / --tba-salt)"},
+  "tba-implementation": {flags: "--tba-implementation <address>", description: "ERC-6551 account implementation used to derive --nft accounts (default: reference implementation)"},
+  "tba-salt": {flags: "--tba-salt <bytes32>", description: "ERC-6551 account salt used to derive --nft accounts (default: zero)"},
+  "tba-registry": {flags: "--tba-registry <address>", description: "ERC-6551 registry (default: canonical 0x000000006551c194...5758)"},
 } satisfies Record<string, CliOptionSpec>;
 
 export type OptionKey = keyof typeof OPTION_SPECS;
@@ -83,6 +88,11 @@ export const GLOBAL_OPTION_KEYS: OptionKey[] = [
   "dry-run",
   "from",
   "pretty-print",
+  "tba",
+  "nft",
+  "tba-implementation",
+  "tba-salt",
+  "tba-registry",
 ];
 
 export interface RequirementSpec {
