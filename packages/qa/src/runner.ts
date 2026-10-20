@@ -1,6 +1,7 @@
 import {createHarness} from "./harness/index.js";
 import {reviewScenario} from "./review/reviewer.js";
 import {reviewScenarioWithAgent} from "./review/reviewer-agent.js";
+import {ensureMockErc20Fixtures} from "./scenarios/fixtures/erc20.js";
 import type {QaConfig, Scenario, ScenarioResult} from "./harness/types.js";
 
 export interface RunOptions {
@@ -43,6 +44,9 @@ export async function runScenarios(
   console.log(`\n${"=".repeat(60)}`);
   console.log(`DAC Cloud QA — ${filtered.length} scenario(s)`);
   console.log(`${"=".repeat(60)}\n`);
+
+  // Fresh local chains have no mock tokens: install the QA ERC-20 fixtures once up front.
+  await ensureMockErc20Fixtures(config, (msg) => console.log(`  ${msg}`));
 
   const results: ScenarioResult[] = [];
 

@@ -27,3 +27,4 @@ export {
   transferNft,
   type TbaFixture,
 } from "./tba.js";
+export {QA_TREASURY_TOKEN_ADDRESS, QA_SECONDARY_TOKEN_ADDRESS, ensureMockErc20Fixtures} from "./erc20.js";

@@ -2,6 +2,7 @@ import {readFileSync, existsSync} from "node:fs";
 import {resolve} from "node:path";
 import dotenv from "dotenv";
 import type {QaConfig, TokenConfig, WalletConfig} from "./harness/types.js";
+import {QA_SECONDARY_TOKEN_ADDRESS, QA_TREASURY_TOKEN_ADDRESS} from "./scenarios/fixtures/erc20.js";
 
 const DEFAULT_PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
@@ -126,14 +127,16 @@ export function loadQaConfig(input: QaConfigInput = {}): QaConfig {
     }
   }
 
-  // Token addresses — read from QA .env (process.env, populated by dotenv)
-  const treasuryToken = process.env.DAC_TREASURY_TOKEN;
+  // Token addresses — QA .env (process.env, populated by dotenv) overrides; on local
+  // chains the defaults are the QA mock fixtures that the runner installs with
+  // `anvil_setCode` at fixed addresses (see scenarios/fixtures/erc20.ts).
+  const treasuryToken = process.env.DAC_TREASURY_TOKEN || (isLocal ? QA_TREASURY_TOKEN_ADDRESS : undefined);
   if (!treasuryToken) {
-    throw new Error("DAC_TREASURY_TOKEN is required in .env (underlying/treasury mock token address)");
+    throw new Error("DAC_TREASURY_TOKEN is required in .env on non-local chains (underlying/treasury token address)");
   }
   const tokens: TokenConfig = {
     treasury: treasuryToken,
-    secondary: process.env.DAC_SECONDARY_TOKEN || undefined,
+    secondary: process.env.DAC_SECONDARY_TOKEN || (isLocal ? QA_SECONDARY_TOKEN_ADDRESS : undefined),
     permit2: process.env.DAC_PERMIT2_ADDRESS || DEFAULT_PERMIT2_ADDRESS,
   };
 

@@ -18,7 +18,7 @@ Rebuild after editing (needs forge and the OpenZeppelin checkout of
 
 ```bash
 cd packages/qa/fixtures/erc6551
-ln -sfn ../../../../../dac-cloud-contracts/lib/openzeppelin-contracts lib/openzeppelin-contracts
+ln -sfn ../../../../../../dac-cloud-contracts/lib/openzeppelin-contracts lib/openzeppelin-contracts
 forge build
 node -e '
 const fs=require("fs");const out={};

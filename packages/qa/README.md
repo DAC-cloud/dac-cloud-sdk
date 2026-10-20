@@ -17,9 +17,11 @@ node packages/qa/dist/index.js --config ./config.env
 npx dac-qa --config ./config.env
 ```
 
-The mock treasury/underlying token is read from `DAC_TREASURY_TOKEN` in the repo-root
-`.env`. Its address changes whenever the local chain is re-seeded — update it before
-running. `DAC_SECONDARY_TOKEN` (optional, a second mintable mock) enables the
+On the local chain the runner installs its own mintable mock ERC-20s (`sUSD`, 6 decimals,
+and `uWDAC`, 18 decimals) at fixed addresses with `anvil_setCode` before the first
+scenario — see `fixtures/erc20/README.md` — so a fresh anvil needs no token setup.
+`DAC_TREASURY_TOKEN` / `DAC_SECONDARY_TOKEN` in the repo-root `.env` override those
+defaults and are required on a testnet. The secondary token enables the
 `recover-profits` step of `deal-governance-toggles`.
 
 ### Filtering
