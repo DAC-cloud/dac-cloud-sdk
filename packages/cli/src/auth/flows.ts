@@ -11,6 +11,7 @@ import {
   writeCachedToken,
   type CachedToken,
 } from "./cache.js";
+import {writeConfigKey} from "../runtime/config.js";
 
 /**
  * Full auto-auth: nonce → sign → verify → cache.
@@ -198,10 +199,23 @@ async function validateToken(apiUrl: string, token: string): Promise<boolean> {
  * Each stored-token source is probed against the backend (`/auth/me`) before
  * being returned — a token that's local-valid but server-revoked (e.g. after
  * a backend wipe) is treated as absent and we fall through to relogin.
+ *
+ * Any session this resolver obtains (or finds in the cache) for the config's
+ * own wallet is written back to `configPath`, so a login is performed once —
+ * never once per command. Guest → member promotion in particular used to
+ * re-login on every DAC-scoped command because the guest token in the config
+ * always won over the promoted token in the cache; the backend's auth rate
+ * limit was then exhausted by the CLI itself.
  */
 export async function resolveAuthToken(opts: {
   configToken?: string;
   configTokenExpires?: string;
+  /**
+   * Config file to persist a (re)obtained session for the config's own wallet
+   * to. Omit when the private key was overridden on the command line: that
+   * wallet's session must not replace the config's and lives in the cache only.
+   */
+  configPath?: string;
   chainId: number;
   account?: PrivateKeyAccount;
   apiUrl: string;
@@ -210,9 +224,25 @@ export async function resolveAuthToken(opts: {
   sessionAddress?: string;
   wrapSignature?: (signature: Hex) => Hex;
 }): Promise<string> {
-  const {configToken, configTokenExpires, chainId, account, apiUrl, dacs, sessionAddress, wrapSignature} = opts;
+  const {configToken, configTokenExpires, configPath, chainId, account, apiUrl, dacs, sessionAddress, wrapSignature} = opts;
   const sessionWallet = (sessionAddress ?? account?.address)?.toLowerCase();
   let staleTokenSeen = false;
+
+  // The config is updated only for its own wallet: a token already in the config
+  // for another wallet is left alone (same rule as a --private-key override).
+  const configTokenWallet = configToken ? extractJwtSubject(configToken) : undefined;
+  const persistToConfig = Boolean(configPath && sessionWallet && (!configTokenWallet || configTokenWallet === sessionWallet));
+  const persist = (session: {token: string; expiresAt: string}): void => {
+    if (!persistToConfig || !configPath) return;
+    if (session.token === configToken) return;
+    writeConfigKey(configPath, "DAC_AUTH_TOKEN", session.token);
+    writeConfigKey(configPath, "DAC_AUTH_EXPIRES", session.expiresAt);
+  };
+  const login = async (): Promise<string> => {
+    const result = await autoAuth({apiUrl, chainId, account: account!, dacs, sessionAddress, wrapSignature});
+    persist(result);
+    return result.token;
+  };
 
   // 1. Try config token — only if it matches the current wallet (or no wallet specified)
   if (configToken && configTokenExpires) {
@@ -222,20 +252,22 @@ export async function resolveAuthToken(opts: {
         // No wallet to match against (dry-run without private key) — validate before use
         if (await validateToken(apiUrl, configToken)) return configToken;
         staleTokenSeen = true;
-      } else {
-        const tokenWallet = extractJwtSubject(configToken);
-        if (tokenWallet === sessionWallet) {
-          // Token matches wallet — but check if it's guest and we can promote to member
-          if (account && isGuestToken(configToken) && dacs.length > 0) {
-            // Guest token with DAC context available — re-auth as member
-            const result = await autoAuth({apiUrl, chainId, account, dacs, sessionAddress, wrapSignature});
-            return result.token;
+      } else if (configTokenWallet === sessionWallet) {
+        // Token matches wallet — but check if it's guest and we can promote to member
+        if (account && isGuestToken(configToken) && dacs.length > 0) {
+          // A previous command may already have promoted this session: reuse it
+          // (and heal the config) instead of logging in again.
+          const cached = readCachedToken(chainId, sessionWallet);
+          if (cached && cached.kind !== "guest" && await validateToken(apiUrl, cached.token)) {
+            persist(cached);
+            return cached.token;
           }
-          if (await validateToken(apiUrl, configToken)) return configToken;
-          staleTokenSeen = true;
+          return login();
         }
-        // Config token is for a different wallet — fall through to cache/auto-auth
+        if (await validateToken(apiUrl, configToken)) return configToken;
+        staleTokenSeen = true;
       }
+      // Config token is for a different wallet — fall through to cache/auto-auth
     }
   }
 
@@ -245,18 +277,19 @@ export async function resolveAuthToken(opts: {
     if (cached) {
       // Promote guest → member if DAC context is available
       if (account && cached.kind === "guest" && dacs.length > 0) {
-        const result = await autoAuth({apiUrl, chainId, account, dacs, sessionAddress, wrapSignature});
-        return result.token;
+        return login();
       }
-      if (await validateToken(apiUrl, cached.token)) return cached.token;
+      if (await validateToken(apiUrl, cached.token)) {
+        persist(cached);
+        return cached.token;
+      }
       staleTokenSeen = true;
     }
   }
 
   // 3. Auto-auth if we have a private key
   if (account) {
-    const result = await autoAuth({apiUrl, chainId, account, dacs, sessionAddress, wrapSignature});
-    return result.token;
+    return login();
   }
 
   // 4. No way to auth

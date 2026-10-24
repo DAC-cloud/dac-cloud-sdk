@@ -40,10 +40,9 @@ import {
 } from "./shared";
 import {addCommandHelp, applyOptions, type OptionKey} from "../cli/options";
 import type {OptionResolver} from "../runtime/config";
-import {makeCoreContext, makeDryRunContext, makeIndexer, resolveApiUrl} from "../runtime/chain";
+import {authOptionsFromResolver, makeCoreContext, makeDryRunContext, makeIndexer, resolveApiUrl} from "../runtime/chain";
 import {printJson, readJsonFile} from "../runtime/io";
 import {discover} from "../auth/api.js";
-import {resolveTbaSpec, tbaAuthOptions} from "../runtime/tba.js";
 import {resolveAuthToken} from "../auth/flows.js";
 
 function isDryRun(resolver: OptionResolver): boolean {
@@ -1405,15 +1404,7 @@ async function cmdDiscover(resolver: OptionResolver): Promise<void> {
     ? accountFromPrivateKey(privateKeyRaw as Hex)
     : undefined;
 
-  const authToken = await resolveAuthToken({
-    configToken: resolver.resolveString("auth-token"),
-    configTokenExpires: resolver.resolveString("auth-expires"),
-    chainId: chainId ?? 84532,
-    account,
-    apiUrl,
-    dacs: [],
-    ...tbaAuthOptions(resolveTbaSpec(resolver, chainId ?? 84532), chainId ?? 84532),
-  });
+  const authToken = await resolveAuthToken(authOptionsFromResolver(resolver, {chainId: chainId ?? 84532, account, dacs: []}));
 
   const result = await discover(apiUrl, authToken, chainId ?? undefined);
   printJson({action: "discover", ...result});

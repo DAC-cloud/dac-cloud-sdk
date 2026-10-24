@@ -71,6 +71,9 @@ export function registerAuthCommands(
       expiresAt: result.expiresAt,
       memberships: result.session.memberships,
       warnings: result.warnings,
+      note: result.session.kind === "guest"
+        ? "Guest session (no --dac given). The first DAC-scoped command promotes it to a member session and updates the config."
+        : undefined,
     });
   });
 

@@ -10,7 +10,7 @@ import {createIndexerClient} from "@dac-cloud/indexer";
 import {fetchManifest, type ProtocolManifest} from "@dac-cloud/manifests";
 import {defineChain, type Address, type Hex, type PrivateKeyAccount} from "viem";
 import {resolveAuthToken} from "../auth/flows.js";
-import type {OptionResolver} from "./config";
+import {resolveConfigPath, type OptionResolver} from "./config";
 import {assertTbaControl, executorFromSpec, resolveTbaSpec, tbaAuthOptions, type TbaSpec} from "./tba";
 
 const DEFAULT_API_URL = "https://api.dac.cloud";
@@ -53,6 +53,30 @@ function collectDacsFromResolver(resolver: OptionResolver): string[] {
   return dacs;
 }
 
+/**
+ * Options for `resolveAuthToken` derived from the command's config: stored token,
+ * DAC scope, token-bound session, and the config file to persist a session to.
+ * A `--private-key` passed on the command line is a wallet override whose session
+ * must stay out of the config file (cache only), so no path is given then.
+ */
+export function authOptionsFromResolver(
+  resolver: OptionResolver,
+  args: {chainId: number; account?: PrivateKeyAccount; dacs?: string[]; tba?: TbaSpec},
+): Parameters<typeof resolveAuthToken>[0] {
+  const {chainId, account} = args;
+  const tba = args.tba ?? resolveTbaSpec(resolver, chainId);
+  return {
+    configToken: resolver.resolveString("auth-token"),
+    configTokenExpires: resolver.resolveString("auth-expires"),
+    configPath: resolver.hasCliOption("private-key") ? undefined : resolveConfigPath(resolver),
+    chainId,
+    account,
+    apiUrl: resolveApiUrl(resolver),
+    dacs: args.dacs ?? collectDacsFromResolver(resolver),
+    ...tbaAuthOptions(tba, chainId),
+  };
+}
+
 function authHeaders(token: string): Record<string, string> {
   return {authorization: `Bearer ${token}`};
 }
@@ -70,15 +94,7 @@ export async function makeCoreContext(resolver: OptionResolver): Promise<CoreCon
   const tba = resolveTbaSpec(resolver, chainId);
   const executor = executorFromSpec(tba);
 
-  const authToken = await resolveAuthToken({
-    configToken: resolver.resolveString("auth-token"),
-    configTokenExpires: resolver.resolveString("auth-expires"),
-    chainId,
-    account,
-    apiUrl,
-    dacs: collectDacsFromResolver(resolver),
-    ...tbaAuthOptions(tba, chainId),
-  });
+  const authToken = await resolveAuthToken(authOptionsFromResolver(resolver, {chainId, account, tba}));
 
   const chain = defineChain({
     id: chainId,
@@ -131,15 +147,7 @@ export async function makeReadOnlyCoreContext(resolver: OptionResolver): Promise
   const privateKeyRaw = resolver.resolveString("private-key");
   const account = privateKeyRaw ? accountFromPrivateKey(privateKeyRaw as Hex) : undefined;
 
-  const authToken = await resolveAuthToken({
-    configToken: resolver.resolveString("auth-token"),
-    configTokenExpires: resolver.resolveString("auth-expires"),
-    chainId,
-    account,
-    apiUrl,
-    dacs: collectDacsFromResolver(resolver),
-    ...tbaAuthOptions(resolveTbaSpec(resolver, chainId), chainId),
-  });
+  const authToken = await resolveAuthToken(authOptionsFromResolver(resolver, {chainId, account}));
 
   const chain = defineChain({
     id: chainId,
@@ -205,15 +213,7 @@ export async function makeDryRunContext(resolver: OptionResolver): Promise<DryRu
   const authAccount = tba && account && account.address.toLowerCase() !== fromAddress.toLowerCase()
     ? undefined
     : account;
-  await resolveAuthToken({
-    configToken: resolver.resolveString("auth-token"),
-    configTokenExpires: resolver.resolveString("auth-expires"),
-    chainId,
-    account: authAccount,
-    apiUrl,
-    dacs: collectDacsFromResolver(resolver),
-    ...tbaAuthOptions(tba, chainId),
-  });
+  await resolveAuthToken(authOptionsFromResolver(resolver, {chainId, account: authAccount, tba}));
 
   const protocol = await fetchManifest(chainId, apiUrl);
   const txBuilder = createDacTransactionBuilder({chainId, fromAddress, protocol, executor});
@@ -229,15 +229,7 @@ export async function makeIndexer(resolver: OptionResolver) {
   const privateKeyRaw = resolver.resolveString("private-key");
   const account = privateKeyRaw ? accountFromPrivateKey(privateKeyRaw as Hex) : undefined;
 
-  const authToken = await resolveAuthToken({
-    configToken: resolver.resolveString("auth-token"),
-    configTokenExpires: resolver.resolveString("auth-expires"),
-    chainId,
-    account,
-    apiUrl,
-    dacs: collectDacsFromResolver(resolver),
-    ...tbaAuthOptions(resolveTbaSpec(resolver, chainId), chainId),
-  });
+  const authToken = await resolveAuthToken(authOptionsFromResolver(resolver, {chainId, account}));
 
   return createIndexerClient({
     url: indexerUrl,

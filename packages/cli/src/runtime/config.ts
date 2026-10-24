@@ -59,6 +59,11 @@ export class OptionResolver {
     this.defaultConfig = input.defaultConfig;
   }
 
+  /** True when the option was passed on the command line (not from a config file or env). */
+  public hasCliOption(key: string): boolean {
+    return this.findCliValue(key) !== undefined;
+  }
+
   private findCliValue(key: string): string | undefined {
     const dashed = key;
     const camel = toCamelCase(key);
@@ -198,6 +203,18 @@ export class OptionResolver {
     }
     return value;
   }
+}
+
+/**
+ * The config file that session tokens are written back to: the explicit `--config`
+ * path, else `./config.env` when it exists. Undefined when there is no config file —
+ * a session obtained from an env-provided key then lives in the cache only.
+ */
+export function resolveConfigPath(resolver: OptionResolver): string | undefined {
+  const explicit = resolver.resolveString("config");
+  if (explicit) return resolve(explicit);
+  const fallback = resolve(process.cwd(), "config.env");
+  return existsSync(fallback) ? fallback : undefined;
 }
 
 /**

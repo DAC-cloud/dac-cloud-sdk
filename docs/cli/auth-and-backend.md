@@ -177,7 +177,8 @@ Notes:
 - `discover` works with **guest tokens** (no DAC scope required at sign-in), so a fresh
   wallet can discover memberships before scoping subsequent sessions.
 - The CLI automatically promotes a guest token to a member token if you pass `--dac`
-  on a later command and the cached session is still a guest.
+  on a later command and the stored session is still a guest. The promoted token is
+  written back to the config, so the promotion happens once, not on every command.
 
 ## Dry-Run and Auth
 
@@ -208,7 +209,15 @@ correctly: an override wallet will use its own cached session, not the config wa
 
 Guest-to-member upgrade: if the config or cached token is a guest token and the current
 command passes `--dac`, the CLI re-runs auto-auth with that DAC scope to obtain a
-member-class token (longer TTL, full membership claims).
+member-class token (longer TTL, full membership claims). If the cache already holds a
+promoted session for the wallet, it is reused instead of logging in again.
+
+Write-back: any session the resolver obtains or reuses for the config's own wallet is
+written to `DAC_AUTH_TOKEN` / `DAC_AUTH_EXPIRES` in the config file (`--config`, or
+`./config.env` when it exists). This keeps logins to one per session rather than one per
+command — the backend rate-limits `/auth/nonce` and `/auth/verify` per wallet and per IP,
+and a CLI that re-logs in on every command exhausts that budget on its own. A session for
+a `--private-key` override wallet is never written to the config; it lives in the cache only.
 
 ## Backend Errors and Retries
 
