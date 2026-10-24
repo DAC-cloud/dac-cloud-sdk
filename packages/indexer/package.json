@@ -1,6 +1,6 @@
 {
   "name": "@dac-cloud/indexer",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Typed GraphQL query client for the DAC Cloud Envio indexer read-model.",
   "keywords": [
     "dac-cloud",

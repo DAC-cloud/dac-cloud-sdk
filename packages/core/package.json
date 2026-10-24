@@ -1,6 +1,6 @@
 {
   "name": "@dac-cloud/core",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Viem-based TypeScript SDK for the DAC Cloud protocol — ABIs, types, proposal builders, and contract client.",
   "keywords": [
     "dac-cloud",
@@ -49,7 +49,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@dac-cloud/manifests": "0.2.0",
+    "@dac-cloud/manifests": "0.2.1",
     "viem": "^2.39.0",
     "zod": "^4.1.11"
   }

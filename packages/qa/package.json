@@ -1,6 +1,6 @@
 {
   "name": "@dac-cloud/qa",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.117",
-    "@dac-cloud/indexer": "0.2.0",
+    "@dac-cloud/indexer": "0.2.1",
     "dotenv": "^16.6.1",
     "viem": "^2.39.0"
   },

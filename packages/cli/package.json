@@ -1,6 +1,6 @@
 {
   "name": "@dac-cloud/cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "JSON-first CLI for operating DACs and Deals on the DAC Cloud protocol.",
   "keywords": [
     "dac-cloud",
@@ -46,9 +46,9 @@
     "access": "public"
   },
   "dependencies": {
-    "@dac-cloud/core": "0.2.0",
-    "@dac-cloud/indexer": "0.2.0",
-    "@dac-cloud/manifests": "0.2.0",
+    "@dac-cloud/core": "0.2.1",
+    "@dac-cloud/indexer": "0.2.1",
+    "@dac-cloud/manifests": "0.2.1",
     "commander": "^14.0.1",
     "dotenv": "^17.2.3",
     "viem": "^2.39.0",

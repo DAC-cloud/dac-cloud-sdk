@@ -151,7 +151,7 @@ deployments may rate-limit unauthenticated requests.
 
 ## Versioning
 
-All packages are currently at `0.2.0`. The packages will be released together — pin
+All packages are currently at `0.2.1`. The packages will be released together — pin
 their versions in lockstep until a stable major is announced.
 
 ## Related
