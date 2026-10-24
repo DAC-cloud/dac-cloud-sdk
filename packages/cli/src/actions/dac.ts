@@ -1094,12 +1094,18 @@ async function cmdJoin(resolver: OptionResolver): Promise<void> {
   const treasuryToken = asAddress(treasuryTokenText, "Treasury token");
   const recipient = asAddress(recipientText, "Capital call recipient");
 
+  // The cash leg of a capital call is pulled by the AssetController
+  // (`safeTransferFrom(recipient, controller, cash)` in both Native and
+  // ExistingToken controllers), so the allowance must name the controller as
+  // spender. Approving the DACCell would never be consumed.
   const autoApprove = resolver.resolveBoolean("auto-approve", false);
   let approveTx: Hex | undefined;
+  let assetController: Address | undefined;
   if (autoApprove && cashAmount > 0n) {
-    const allowance = await core.getErc20Allowance({token: treasuryToken, owner: actor, spender: dac});
+    assetController = await core.getAssetController({dacCell: dac});
+    const allowance = await core.getErc20Allowance({token: treasuryToken, owner: actor, spender: assetController});
     if (allowance < cashAmount) {
-      approveTx = await core.approveErc20({token: treasuryToken, spender: dac, amount: cashAmount});
+      approveTx = await core.approveErc20({token: treasuryToken, spender: assetController, amount: cashAmount});
     }
   }
 
@@ -1117,6 +1123,7 @@ async function cmdJoin(resolver: OptionResolver): Promise<void> {
     action: "dac.join",
     fulfiller: actor,
     dac,
+    assetController,
     approveTx,
     txHash,
     call,

@@ -275,7 +275,8 @@ dac deposit-treasury --token 0x<erc20> --amount 5000000000000000000000 \
   --dac 0x<dac> --auto-approve
 ```
 
-`--auto-approve` runs the ERC20 approve to AssetController before the transfer.
+`--auto-approve` is accepted for symmetry but performs no approve: the command transfers
+the tokens directly to the DACCell and then credits them, so no allowance is needed.
 
 ### `recover-erc20`
 
@@ -306,6 +307,10 @@ dac join --dac 0x<dac> --auto-approve
 dac join --dac 0x<dac> --recipient 0x... --treasury-token 0x... \
   --token-amount 1000... --cash-amount 0 --nonce 3 --auto-approve
 ```
+
+`--auto-approve` approves the treasury token to the DAC's **AssetController** (the contract
+that pulls the cash leg via `transferFrom`), not to the DACCell. The approved spender is
+echoed back as `assetController` in the output. With `--cash-amount 0` no approval is made.
 
 ### `claim-dividend <proofFile>`
 

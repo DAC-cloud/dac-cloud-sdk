@@ -54,6 +54,7 @@ ANTHROPIC_API_KEY=sk-... node packages/qa/dist/index.js
 | `existing-token-dac-lifecycle` | dac, existing-token, hybrid | Create, wrap, propose / vote / execute, unwrap (self + to third party), third-party `wrapTo` delegation, `recover-erc20` |
 | `dac-agent-distributor` | dac, agent-tokens, distributor | Approve distributor, mint inventory, disable, direct mint comparison |
 | `dac-burn-main-tokens` | dac, governance, mint, burn | Mint MainTokens to treasury, burn from treasury, verify balances |
+| `dac-capital-call-cash` | dac, capital-call, join, regression | Cash-bearing capital call to an EOA, fulfilled via `dac join --auto-approve`; asserts the approval targets the AssetController and is consumed exactly |
 | `legal-wrapper` | dac, legal-wrapper, governance | Set legal-wrapper, verify role on login, send legal messages |
 
 ### Deal Evaluation

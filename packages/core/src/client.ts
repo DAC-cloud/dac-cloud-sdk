@@ -146,6 +146,12 @@ export interface DacCoreClient {
   delegateVotes(args: {token: Address; delegatee: Address}): Promise<Hex>;
   getErc20Allowance(args: {token: Address; owner: Address; spender: Address}): Promise<bigint>;
   getErc20Balance(args: {token: Address; holder: Address}): Promise<bigint>;
+  /**
+   * AssetController behind a DACCell. Capital-call cash is pulled by the controller
+   * (`safeTransferFrom(recipient, controller, cash)`), so ERC20 approvals for
+   * `fulfillCapitalCall` must name this address as spender, not the cell.
+   */
+  getAssetController(args: {dacCell: Address}): Promise<Address>;
   /** Timestamp of the latest block: the clock on-chain deadline checks run against. */
   getChainTime(): Promise<bigint>;
   /** `CoreModuleFactory.dealGovernanceFactory()`; undefined when the module does not expose it. */
@@ -1005,6 +1011,14 @@ export function createDacCoreClient(options: DacCoreOptions): DacCoreClient {
         abi: erc20Abi,
         functionName: "allowance",
         args: [owner, spender],
+      });
+    },
+
+    async getAssetController({dacCell}) {
+      return publicClient.readContract({
+        address: dacCell,
+        abi: dacCellAbi,
+        functionName: "getAssetController",
       });
     },
 
